@@ -122,18 +122,84 @@
     @apply font-sans;
   }
 }
-/*
- * The "you are here" node on the programme map. A slow, small breath — big
- * enough to find the node on a long path while scrolling, small enough not to
- * be a distraction on a page someone stares at while waiting for a bus.
- */
+
+/* ===========================================================================
+   THE PROGRAMME ROADMAP
+   All of it in CSS rather than an animation library. Every effect below is a
+   keyframe or a transition, which costs no JavaScript on the marketplace's
+   busiest page — and the audience is on Algerian mobile data.
+   =========================================================================== */
+
+/* The road wiping in from the top as it scrolls into view. A clip is used
+   rather than opacity so the road appears to be laid, not faded in. */
+@keyframes road-reveal {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0% 0);
+  }
+}
+
+.animate-road-reveal {
+  animation: road-reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* The centre line's dashes creeping forward — the detail that makes a static
+   shape read as a road you travel along. Slow enough to be subliminal. */
+@keyframes road-dashes {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.animate-road-dashes {
+  animation: road-dashes 1.6s linear infinite;
+}
+
+/* Each stop popping in, staggered by an inline animation-delay. */
+@keyframes roadmap-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-roadmap-pop {
+  animation: roadmap-pop 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* The finish flag, drifting. */
+@keyframes roadmap-float {
+  0%,
+  100% {
+    transform: translate(-50%, -50%);
+  }
+  50% {
+    transform: translate(-50%, calc(-50% - 4px));
+  }
+}
+
+.animate-roadmap-float {
+  animation: roadmap-float 3s ease-in-out infinite;
+}
+
+/* "You are here": a slow, small breath. Big enough to find the stop while
+   scrolling a long programme, small enough not to nag on a page someone
+   stares at while waiting for a bus. */
 @keyframes milestone-pulse {
   0%,
   100% {
     transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-brand-600) 45%, transparent);
   }
   50% {
-    transform: scale(1.09);
+    transform: scale(1.07);
+    box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-brand-600) 0%, transparent);
   }
 }
 
@@ -141,9 +207,15 @@
   animation: milestone-pulse 2.4s ease-in-out infinite;
 }
 
-/* Vestibular disorders are real and this is decorative. The ring and the
-   "vous êtes ici" label already identify the node without any motion. */
+/* Vestibular disorders are real and every animation above is decorative. The
+   colours, the ring and the "vous êtes ici" label carry the same information
+   with nothing moving. `useReveal` also short-circuits to the finished state
+   under this setting, so nothing is left half-drawn. */
 @media (prefers-reduced-motion: reduce) {
+  .animate-road-reveal,
+  .animate-road-dashes,
+  .animate-roadmap-pop,
+  .animate-roadmap-float,
   .animate-milestone-pulse {
     animation: none;
   }

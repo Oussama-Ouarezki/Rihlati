@@ -388,7 +388,8 @@
     "defaultBadge": "par défaut",
     "markArrived": "✓ Arrivé",
     "markAbsent": "✗ Absent",
-    "markExpected": "↩ Attendu"
+    "markExpected": "↩ Attendu",
+    "dragHint": "Glissez une étape pour la déplacer, ou utilisez les flèches."
   },
   "trip": {
     "greeting": "Bonjour {name},",
@@ -407,7 +408,12 @@
     "youAreHere": "Vous êtes ici",
     "location": "Lieu",
     "meetingPoint": "Point de rendez-vous",
-    "openMap": "Ouvrir dans Maps"
+    "openMap": "Ouvrir dans Maps",
+    "start": "Départ",
+    "goal": "Arrivée",
+    "progress": "{done} étapes sur {total} terminées",
+    "statusCompleted": "Terminé",
+    "statusUpcoming": "À venir"
   },
   "milestoneKinds": {
     "meeting": "Rendez-vous",

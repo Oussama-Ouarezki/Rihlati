@@ -4,7 +4,7 @@
 > tick-off, the offer-page map, and the traveler page. Remaining polish in §8, item 6.
 > An offer's programme used to be one free-text blob in `Offer.description`. It is now a
 > structured list of **milestones**, which the agency edits as a list and every client reads
-> as a **map** — a serpentine path of nodes, split by day, showing where the group is.
+> as a **road map** — a winding road with a marker at each stop, showing where the group is.
 
 ---
 
@@ -226,58 +226,42 @@ than redefined to carry this.
 > below. Building one component for both audiences was tried on paper and rejected: the
 > shared thing would have been a list with half its columns hidden, which serves neither.
 
-### 7.1 The programme map — `ProgrammeMap.tsx`
+### 7.1 The programme map — `components/roadmap/`
 
-What both client surfaces render. Not a list: a **serpentine path of nodes**, scrolled
-vertically, one node per milestone.
+What both client surfaces render. Not a list: a **road**. It runs across the screen, folds
+back at the edge with a rounded U-turn, and carries a marker at each stop.
 
 ```
-      Jour 1  10 févr.
-                  ( ✓ )
-              ┌───────────┐
-              │  Réunion  │
-              │   18:00   │
-              └───────────┘
-      Jour 2  11 févr.
-                        ( ✓ )
-                    ┌───────────┐
-                    │  Départ   │
-                    │   04:30   │
-                    └───────────┘
-                  (( 🏨 ))  ← current: day colour, halo, slow pulse
-              ┌───────────┐
-              │Installation│
-              └───────────┘
-               [Vous êtes ici]
-      Jour 3  12 févr.
-            ( 🕋 )
-        ┌───────────┐
-        │   Omra    │
-        └───────────┘
+   ╭──● Réunion ══════● Départ ══════● Vol Alger ══════● Installation ╮
+   │     18:00           04:30          07:15            16:00        │
+   │                                                                  │
+   ╰──● Ziyarat ══════● Transfert ═══● Ziyarat ═══════● Omra ─────────╯
+        Médine          Médine         Makkah          tawaf
 ```
 
 Why each piece is the way it is:
 
-- **A path, not a list.** A 15-day Omra is forty rows of text. As a path you see the shape of
-  the trip — how many days, where the weight is, how far along the group is — before reading
-  a single word.
-- **The wave runs across the whole programme, never restarting per day.** The first attempt
-  restarted the cycle at each day and it looked broken: an Omra with one step on most days put
-  every node dead centre and no snake appeared at all. The path is continuous, so its geometry
-  has to be.
-- **Days are marked by a chip at the edge and by colour**, not a full-width band. A band cuts
-  the path in half, and the path is the point.
-- **Every cell has a fixed height.** That is what lets each connector be computed as
-  arithmetic — we know the lateral offset of the next node before rendering — rather than
-  measured after paint. No refs, no resize observers, and it renders correctly on the server.
-  The cost: a title that grew to a third line would spill into the node below, so the height
-  and the two-line clamp are one decision, not two.
-- **The tile is opaque.** The path runs behind it; a connector crossing the glyphs makes both
-  unreadable. This is also why the title is capped — see §7.3.
-- **A node carries an icon, a short title, a time. Nothing else.** Everything else opens in a
-  sheet on tap. Someone standing in an airport at 4am reads one thing.
-- **RTL mirrors the wave.** The lateral offset is a physical `translateX`, so Arabic flips its
-  sign — otherwise the path would curve against the reading direction.
+- **A road, not a list.** A 15-day Omra is forty rows of text. As a route you see the shape
+  of the trip — how long it is, how far along the group is — before reading a single word.
+- **Horizontal, folding back.** The first build ran vertically, one stop per row, and was
+  nearly a thousand pixels tall for nine steps while the right half of every desktop screen
+  sat empty. Four stops to a row cuts the height by two thirds. See [[Decision Log]] #020.
+- **Four strokes of the same curve** make the asphalt: a pale shoulder, dark slate, the
+  travelled stretch in brand colour, and a white dashed centre line. Drawing a real road as
+  one closed shape would need an inner and outer contour offset from a centre line — genuine
+  computational geometry. Stacked strokes fake it exactly, for free, and stay aligned around
+  the turns because there is only ever one curve.
+- **The curve is generated from the stop positions, never measured.** This is the piece worth
+  understanding — [[Decision Log]] #022 has the reasoning. It is also why the travelled
+  stretch is exact: it is the same builder run over the first N stops.
+- **The SVG is stretched, and the strokes opt out.** `preserveAspectRatio="none"` lets the
+  road fill a box whose shape it does not control; `vectorEffect="non-scaling-stroke"` stops
+  that stretch from squashing the asphalt into something thick one way and thin the other.
+  Removing either one breaks it.
+- **A marker carries an icon, a short title and a time. Nothing else.** Everything else opens
+  in a sheet on tap. Someone standing in an airport at 4am reads one thing.
+- **RTL mirrors the road.** The x axis is flipped when building the points, so Arabic starts
+  on the right and runs the other way. One mirroring rule, in one place.
 
 ### 7.2 The current node — "vous êtes ici"
 
@@ -346,9 +330,10 @@ next to the family it belongs to: a WhatsApp button pre-filled with the message 
 plus a preview link for the agent. A reservation created before `publicCode` existed shows
 "créer le lien" instead, which mints one — see the idempotency note in [[API Endpoints]].
 
-### 7.3 Agency editor — `/console/offers/{id}/programme`
+### 7.6 Agency editor — `/console/offers/{id}/programme`
 
-- Add / reorder (drag or up-down buttons) / delete
+- Add / reorder (**drag a row**, or the up-down buttons — the drag is a shortcut, the
+  buttons are the path that works on a touchscreen and by keyboard) / delete
 - Each row: kind (icon), title, day, time, location, meeting point, map link,
   **attendance tracking: off / mandatory / optional**
 - **Duplicate a day** — Omra programmes repeat, and retyping five identical days is how
@@ -356,7 +341,7 @@ plus a preview link for the agent. A reservation created before `publicCode` exi
 - **Copy the programme from another offer** — the single biggest time-saver, because next
   season's Ramadan trip is last season's with new dates
 
-### 7.4 Agency live view — ticking milestones and checking people off
+### 7.7 Agency live view — ticking milestones and checking people off
 
 Lives beside the [[Trip Manifest]] check-in screen, same design rules: one hand, bad light,
 big targets. Two related but separate taps:

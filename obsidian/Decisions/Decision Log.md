@@ -386,33 +386,57 @@ two related-but-different statuses without confusing the guide about which one h
 
 **Date:** 2026-08-02
 
-The trip programme renders as a **serpentine node map** — days marked by colour, one short
-title per node, details on tap — on every client-facing surface (the public offer page and
-the booked traveler's `/mon-voyage/{code}`). The agency keeps its list editor in the console.
-One `ProgrammeMap` component, one prop different: only the traveler's version marks the
-current node.
+The trip programme renders as a **road map** — a horizontal serpentine road with a marker at
+each stop, a dashed centre line, and the travelled stretch in brand colour — on every
+client-facing surface (the public offer page and the booked traveler's `/mon-voyage/{code}`).
+The agency keeps its list editor in the console. One `Roadmap` component, one prop different:
+only the traveler's version marks a current stop.
 
 **Rejected:**
 - *A dashed vertical timeline for everyone*, which is what this note used to describe. It is a
   list with decoration. A 15-day Omra is forty rows of text — you cannot see the shape of the
   trip, only read it. The whole reason a traveler opens the page is spatial: where am I, what
   is next.
+- *A row of beads on a straight line.* Cheap to build and it reads as a progress bar, which is
+  the wrong metaphor — a trip is a route, and a route bends.
 - *A different component per surface.* The buyer's view and the traveler's view differ by
   exactly one thing — whether the group has started — so two components would have been the
   same file twice, drifting.
 - *Sharing one component with the agency editor.* The shared thing would have been a list with
   half its columns hidden, serving neither audience. Editing and reading are different
   products, not different skins.
-- *A CSS-grid boustrophedon snake* (rows filling left→right then right→left). Genuinely a
-  snake and grid-aligned, but the row direction has to know the column count, so responsive
-  breakpoints would each need their own reversal rules. A one-column vertical wave is
-  mobile-first — which is the actual device — and needs no breakpoint logic at all.
+- *A one-stop-per-row vertical wave.* Built first, and rejected on sight: nine steps came out
+  nearly a thousand pixels tall at every width, and the whole right half of a desktop screen
+  sat empty. The serpentine packs four stops into a row and cuts that by two thirds.
 
-**Cost:** the map's geometry depends on a **fixed cell height** — that is what lets each
-connector be computed as arithmetic instead of measured after paint. So the node label is
-clamped to two lines and `MILESTONE_TITLE_MAX` dropped from 120 to 60 characters. A title
-that grows a third line spills into the node below it. The height, the clamp and the title
-limit are one decision; changing any of them means changing all three.
+**Cost:** the number of columns is a **JavaScript** decision, not a CSS one — the path has to
+know where the row breaks in order to draw the U-turn. So the breakpoint lives in
+`useRoadPath` behind a `useSyncExternalStore` media query rather than in a Tailwind class,
+and the server renders the two-column layout until the client says otherwise.
+
+---
+
+## 022 — The road is generated from its points, not measured from its path
+
+**Date:** 2026-08-02
+
+`pathHelpers.ts` chooses the stop positions first and builds the SVG curve through them.
+Markers are then placed at coordinates we already hold.
+
+**Rejected:** *the standard approach* — draw the path, then call `getTotalLength()` and
+`getPointAtLength()` to find where to put things. It is what every tutorial shows, and it
+loses on three counts here: it needs a real DOM, so nothing can render on the server; it
+needs a layout effect, so markers visibly snap into place on a slow phone; and it makes the
+"how far along are we" overlay a length calculation instead of what it actually is.
+
+The payoff shows up in the travelled stretch: it is the *same builder run over the first N
+points*. It cannot drift from the road underneath it, because it is the same function over
+the same numbers.
+
+**Cost:** the curve is ours to get right. A Bézier only passes through its endpoints, so
+naïvely feeding points to one puts the road *near* the markers rather than through them —
+the turns are hand-built cubics with control points placed outboard of the two stops they
+join. Change the layout and that turn maths has to change with it.
 
 ---
 

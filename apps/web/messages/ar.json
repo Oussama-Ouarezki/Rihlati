@@ -388,7 +388,8 @@
     "defaultBadge": "افتراضي",
     "markArrived": "✓ وصل",
     "markAbsent": "✗ غائب",
-    "markExpected": "↩ منتظر"
+    "markExpected": "↩ منتظر",
+    "dragHint": "اسحب أي مرحلة لتغيير ترتيبها، أو استخدم الأسهم."
   },
   "trip": {
     "greeting": "مرحبًا {name}،",
@@ -407,7 +408,12 @@
     "youAreHere": "أنت هنا",
     "location": "المكان",
     "meetingPoint": "نقطة اللقاء",
-    "openMap": "فتح في الخرائط"
+    "openMap": "فتح في الخرائط",
+    "start": "الانطلاق",
+    "goal": "الوصول",
+    "progress": "{done} من {total} مراحل مكتملة",
+    "statusCompleted": "مكتملة",
+    "statusUpcoming": "قادمة"
   },
   "milestoneKinds": {
     "meeting": "نقطة لقاء",

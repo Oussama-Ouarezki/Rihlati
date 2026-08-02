@@ -388,7 +388,8 @@
     "defaultBadge": "default",
     "markArrived": "✓ Arrived",
     "markAbsent": "✗ Absent",
-    "markExpected": "↩ Expected"
+    "markExpected": "↩ Expected",
+    "dragHint": "Drag a step to move it, or use the arrows."
   },
   "trip": {
     "greeting": "Hello {name},",
@@ -407,7 +408,12 @@
     "youAreHere": "You are here",
     "location": "Place",
     "meetingPoint": "Meeting point",
-    "openMap": "Open in Maps"
+    "openMap": "Open in Maps",
+    "start": "Start",
+    "goal": "Arrival",
+    "progress": "{done} of {total} steps done",
+    "statusCompleted": "Done",
+    "statusUpcoming": "Upcoming"
   },
   "milestoneKinds": {
     "meeting": "Meeting point",

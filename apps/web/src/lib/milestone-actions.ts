@@ -119,8 +119,8 @@ export async function deleteMilestone(offerId: string, milestoneId: string): Pro
 }
 
 /**
- * Up/down reordering, one swap at a time — simpler and more reliable on a
- * console than drag-and-drop, and it's the same `reorder` endpoint either way.
+ * Up/down reordering, one swap at a time. Kept alongside drag-and-drop as the
+ * touch and keyboard path — a drag is neither. Same `reorder` endpoint.
  */
 export async function moveMilestone(
   offerId: string,
@@ -193,6 +193,27 @@ export async function setMilestoneCompletion(
       body: JSON.stringify({ isDone }),
     },
   );
+
+  revalidatePath('/', 'layout');
+}
+
+/**
+ * Reorder from a full, explicit list of ids — what drag-and-drop produces.
+ *
+ * The API rejects anything that is not exactly the offer's current milestone
+ * set, so a stale list from a tab left open since yesterday fails loudly
+ * instead of silently pushing the missing steps to the back.
+ */
+export async function reorderMilestones(offerId: string, orderedIds: string[]): Promise<void> {
+  const session = await getSession();
+  const agencyId = session?.membership?.agencyId;
+  if (!agencyId || orderedIds.length === 0) return;
+
+  await authedFetch(`/v1/agencies/${agencyId}/offers/${offerId}/milestones/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderedIds }),
+  });
 
   revalidatePath('/', 'layout');
 }

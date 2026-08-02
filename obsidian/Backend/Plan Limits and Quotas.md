@@ -10,19 +10,19 @@ can edit yourself.
 
 ## The table
 
-| | `free` | `pro` | `business` |
-|---|---|---|---|
-| Published offers | **5** | 30 | unlimited |
-| Staff accounts | 2 | 8 | unlimited |
-| Leads per month | unlimited | unlimited | unlimited |
-| CRM pipeline board | — | ✅ | ✅ |
-| Assign leads to staff | — | ✅ | ✅ |
-| Analytics dashboard | — | ✅ | ✅ |
-| Export leads to CSV | — | ✅ | ✅ |
-| Promoted listings | — | ✅ | ✅ |
-| Custom tags | — | ✅ | ✅ |
-| [[Tracked Links]] | 2 | 50 | unlimited |
-| [[Agency Chatbot]] | — | ✅ | ✅ |
+|                       | `free`    | `pro`     | `business` |
+| --------------------- | --------- | --------- | ---------- |
+| Published offers      | **5**     | 30        | unlimited  |
+| Staff accounts        | 2         | 8         | unlimited  |
+| Leads per month       | unlimited | unlimited | unlimited  |
+| CRM pipeline board    | —         | ✅         | ✅          |
+| Assign leads to staff | —         | ✅         | ✅          |
+| Analytics dashboard   | —         | ✅         | ✅          |
+| Export leads to CSV   | —         | ✅         | ✅          |
+| Promoted listings     | —         | ✅         | ✅          |
+| Custom tags           | —         | ✅         | ✅          |
+| [[Tracked Links]]     | 2         | 50        | unlimited  |
+| [[Agency Chatbot]]    | —         | ✅         | ✅          |
 
 `null` means unlimited in the code.
 
