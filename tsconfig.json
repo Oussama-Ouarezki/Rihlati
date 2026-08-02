@@ -1,0 +1,18 @@
+{
+  // Root project for the files that belong to no workspace: the Playwright
+  // config and the end-to-end specs. Without it ESLint's type-aware rules
+  // skip them silently, which is the worst kind of "passing" lint.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["playwright.config.ts", "e2e/**/*.ts"]
+}

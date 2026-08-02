@@ -1,0 +1,39 @@
+{
+  "name": "rihlati",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Travel agency marketplace + CRM for the Algerian market",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run db:migrate --workspace @rihlati/api",
+    "db:studio": "npm run db:studio --workspace @rihlati/api",
+    "db:seed": "npm run db:seed --workspace @rihlati/api",
+    "db:restore-rehearsal": "./scripts/restore-rehearsal.sh",
+    "dev:api": "npm run dev --workspace @rihlati/api",
+    "dev:web": "npm run dev --workspace @rihlati/web",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e:build && playwright test",
+    "test:e2e:build": "npm run build --workspace @rihlati/api && cd apps/web && NEXT_PUBLIC_API_URL=http://localhost:4200 npx next build",
+    "test:e2e:update": "playwright test --update-snapshots",
+    "check": "npm run build --workspace @rihlati/shared && npm run typecheck && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
+    "typescript-eslint": "^8.65.0"
+  }
+}

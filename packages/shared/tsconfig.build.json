@@ -1,0 +1,10 @@
+{
+  // The NARROW project: what ships. Tests are excluded so they never reach
+  // `dist/`, and `noEmit` is turned back off so this one actually builds.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
+}

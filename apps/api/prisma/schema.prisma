@@ -1,0 +1,1006 @@
+// Rihlati data model.
+//
+// Two rules govern everything here:
+//   1. Every table that belongs to an agency has a NON-NULL `agencyId`. That column is what
+//      makes cross-tenant data leaks structurally impossible (CLAUDE.md rule #3).
+//   2. Anything users FILTER or SORT by is a real column. Anything else that varies by offer
+//      type lives in `attributes` (JSON), validated per-kind in packages/shared.
+//      That is what lets you add new offer types without a migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// IDENTITY & TENANCY
+// ============================================================================
+
+enum Locale {
+  ar
+  fr
+  en
+}
+
+model User {
+  id String @id @default(uuid(7))
+
+  // Travelers are phone-first; agency staff are email-first. Either may be null,
+  // but a user must have at least one (enforced in the service layer).
+  email        String? @unique
+  phone        String? @unique // E.164, always "+213..."
+  passwordHash String? // null for OTP-only accounts
+
+  displayName String
+  locale      Locale  @default(fr)
+  avatarUrl   String?
+
+  // Rihlati's own staff. Never settable through a public endpoint.
+  isPlatformAdmin Boolean @default(false)
+
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
+  lastLoginAt     DateTime?
+  disabledAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+  oauthAccounts OAuthAccount[]
+  assignedLeads Lead[]         @relation("LeadAssignee")
+  travelerLeads Lead[]         @relation("LeadTraveler")
+  leadNotes     LeadNote[]
+  reviews       Review[]
+  auditLogs     AuditLog[]
+  savedOffers   SavedOffer[]
+  offerReports  OfferReport[]
+
+  @@map("users")
+}
+
+/// Sign-in providers other than a password. One table rather than a
+/// `googleId` column on User, so adding Apple (required by the App Store the
+/// day the iOS app offers Google) or Facebook is a row, not a migration.
+enum OAuthProvider {
+  google
+  apple
+  facebook
+}
+
+/// A link between a Rihlati user and their identity at a provider.
+///
+/// `providerAccountId` is the provider's STABLE subject id (`sub`), never the
+/// email. People change their email; the subject never changes. Keying on
+/// email would also mean that whoever controls an address controls the
+/// account — which is the whole vulnerability class this table has to avoid.
+model OAuthAccount {
+  id                String        @id @default(uuid(7))
+  userId            String
+  provider          OAuthProvider
+  providerAccountId String
+
+  /// What the provider said the email was AT LINK TIME. Kept for support
+  /// ("which Google account is this?"), never used to find the user.
+  emailAtLink String?
+
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // One provider identity maps to exactly one Rihlati user…
+  @@unique([provider, providerAccountId])
+  // …and one user links each provider at most once.
+  @@unique([userId, provider])
+  @@map("oauth_accounts")
+}
+
+// Refresh tokens are stored HASHED and rotated. Reusing a revoked token
+// revokes the whole family — that is how stolen-token replay is detected.
+model RefreshToken {
+  id        String   @id @default(uuid(7))
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  familyId  String
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([familyId])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+// AGENCIES  — the tenant
+// ============================================================================
+
+enum AgencyStatus {
+  draft
+  pending_review
+  verified
+  rejected
+  suspended
+}
+
+// Reserved for monetization. v1 ships no billing code — only the field,
+// so adding it later is not a migration of live data.
+enum AgencyPlan {
+  free
+  pro
+  business
+}
+
+model Agency {
+  id          String  @id @default(uuid(7))
+  slug        String  @unique
+  name        String
+  legalName   String?
+  description String?
+  logoUrl     String?
+
+  status           AgencyStatus @default(draft)
+  verifiedAt       DateTime?
+  verifiedByUserId String?
+  rejectionReason  String?
+
+  // Algerian legal identifiers, checked BY HAND by an admin.
+  // This manual work is the product's moat, not an inconvenience.
+  registreCommerce String? // RC
+  nif              String? // numéro d'identification fiscale
+  tourismLicence   String? // agrément d'agence de tourisme et de voyage
+
+  phone       String?
+  whatsapp    String?
+  email       String?
+  websiteUrl  String?
+  addressLine String?
+  city        String?
+  wilayaCode  String? // "16" = Alger. Full list in packages/shared.
+
+  // Denormalized so listing pages don't aggregate on every request.
+  // Recomputed whenever a review is published or unpublished.
+  ratingSum   Int @default(0)
+  ratingCount Int @default(0)
+
+  plan AgencyPlan @default(free)
+
+  /// Raises this agency's published-offer cap above its plan's default.
+  /// For negotiated/partner deals. null = use the plan limit from
+  /// packages/shared/src/plans.ts. Settable by platform admins only.
+  publishedOfferLimitOverride Int?
+
+  creditBalanceCentimes Int @default(0)
+
+  /// Denormalized moderation counters, for the admin triage queue.
+  suspectedDuplicateCount Int @default(0)
+  openReportCount         Int @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  memberships  Membership[]
+  offers       Offer[]
+  leads        Lead[]
+  tags         Tag[]
+  reviews      Review[]
+  faqs         AgencyFaq[]
+  reservations Reservation[]
+  trackedLinks TrackedLink[]
+
+  @@index([status])
+  @@index([wilayaCode, status])
+  @@map("agencies")
+}
+
+/// Repeated questions an agency answers once. Shown on the public agency page
+/// today; later, the knowledge base for the per-agency chatbot (see
+/// obsidian/Backend/Agency Chatbot.md). This table is CONTENT, not
+/// conversation — chat-history tables come with the chatbot itself, once its
+/// channel (web widget vs WhatsApp) is decided. Capped at 50 per agency in the
+/// service, which is what keeps the list endpoints bounded without pagination.
+model AgencyFaq {
+  id       String @id @default(uuid(7))
+  agencyId String
+
+  question String
+  answer   String
+  /// The language the entry is WRITTEN in. The chatbot translates on the fly;
+  /// the public page groups by it.
+  locale   Locale @default(fr)
+
+  isEnabled Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@index([agencyId, isEnabled, sortOrder])
+  @@map("agency_faqs")
+}
+
+enum AgencyRole {
+  owner // billing + can delete the agency
+  manager // manage offers, staff, all leads
+  agent // works only the leads assigned to them
+}
+
+model Membership {
+  id       String     @id @default(uuid(7))
+  userId   String
+  agencyId String
+  role     AgencyRole @default(agent)
+
+  invitedByUserId String?
+  acceptedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, agencyId])
+  @@index([agencyId])
+  @@map("memberships")
+}
+
+// ============================================================================
+// OFFERS
+// ============================================================================
+
+// Adding a kind here + one schema file in packages/shared is the whole cost
+// of supporting a new product type.
+enum OfferKind {
+  omra
+  hajj
+  package // organized trip: Turkey, Dubai, Tunisia...
+  visa
+  flight
+  hotel
+  transport
+}
+
+enum OfferStatus {
+  draft
+  pending_review
+  published
+  paused
+  archived
+  rejected
+}
+
+model Offer {
+  id       String @id @default(uuid(7))
+  agencyId String
+
+  kind   OfferKind
+  status OfferStatus @default(draft)
+
+  title       String
+  slug        String  @unique // globally unique: it is the public SEO URL
+  summary     String?
+  description String?
+
+  // ---- FILTERABLE COLUMNS -------------------------------------------------
+  // If a user can filter or sort by it, it belongs here, not in `attributes`.
+  priceFromCentimes Int
+  priceToCentimes   Int?
+  currency          String @default("DZD")
+
+  departureDate   DateTime? @db.Date
+  returnDate      DateTime? @db.Date
+  durationDays    Int?
+  isFlexibleDates Boolean   @default(false)
+
+  departureWilayaCode String?
+  destinationCountry  String? // ISO-3166 alpha-2, e.g. "SA", "TR"
+  destinationCity     String?
+
+  seatsTotal Int?
+  seatsLeft  Int?
+
+  // ---- KIND-SPECIFIC ------------------------------------------------------
+  // Validated against the matching schema in packages/shared before write.
+  // Not a junk drawer: unknown keys are rejected.
+  attributes Json @default("{}")
+
+  // [{ url, kind: "image"|"video", order, alt }]
+  media Json @default("[]")
+
+  // ---- RANKING / PROMOTION ------------------------------------------------
+  // Fields exist now so "promoted listings" is a product decision later,
+  // not a schema migration.
+  isFeatured    Boolean   @default(false)
+  featuredUntil DateTime?
+  qualityScore  Int       @default(0) // completeness of the listing, 0-100
+
+  // ---- DUPLICATE / SPAM CONTROL -------------------------------------------
+  // Purpose is ANTI-SPAM, not deduplication. An agency that floods the
+  // marketplace with near-identical listings to occupy more space gets its
+  // extra listings flagged and demoted. NOTHING IS EVER DELETED OR MERGED —
+  // deleting a seller's listing on an automated signal is not recoverable.
+  //
+  // fingerprint = sha256 of agency + kind + destination + departure date +
+  // normalized title. Price is deliberately excluded; see
+  // packages/shared/src/offers/dedup.ts.
+  fingerprint        String?         @db.Char(64)
+  duplicateStatus    DuplicateStatus @default(none)
+  duplicateOfOfferId String?
+
+  /// Denormalized count of open user reports, for admin triage.
+  reportCount Int @default(0)
+
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  agency      Agency  @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  duplicateOf Offer?  @relation("OfferDuplicates", fields: [duplicateOfOfferId], references: [id], onDelete: SetNull)
+  duplicates  Offer[] @relation("OfferDuplicates")
+
+  leads                      Lead[]
+  reports                    OfferReport[]
+  savedBy                    SavedOffer[]
+  metricsDaily               OfferMetricDaily[]
+  reservations               Reservation[]
+  trackedLinks               TrackedLink[]
+  milestones                 OfferMilestone[]
+  duplicateCandidatesAsLeft  OfferDuplicateCandidate[] @relation("DuplicateLeft")
+  duplicateCandidatesAsRight OfferDuplicateCandidate[] @relation("DuplicateRight")
+
+  // Indexes mirror the real search queries: browse published offers, filter by
+  // destination/date/price, and an agency listing its own offers.
+  // duplicateStatus leads the search indexes because the default listing
+  // excludes confirmed spam re-posts.
+  @@index([status, duplicateStatus, kind, departureDate])
+  @@index([status, duplicateStatus, destinationCountry, priceFromCentimes])
+  @@index([status, duplicateStatus, departureWilayaCode, departureDate])
+  @@index([agencyId, status, updatedAt])
+  @@index([agencyId, fingerprint])
+  @@map("offers")
+}
+
+/// Daily per-offer counters — the agency's "how are my posts doing?" chart.
+///
+/// One row per (offer, day), incremented atomically. This is time-series
+/// WITHOUT an event firehose: at this scale the daily grain is what an agency
+/// acts on, and it keeps the chart query one indexed range scan instead of a
+/// scan over millions of click events. If per-event detail is ever needed
+/// (unlikely), add an events table THEN — these rollups stay valid either way.
+///
+/// `date` is the ALGIERS calendar day (UTC+1, no DST), because "yesterday" in
+/// an agency's head is the local day, not the UTC one.
+///
+/// `inquiries` here is a display-only denormalization — the source of truth
+/// for inquiries is the `leads` table, always. Counts are trend data, not
+/// accounting: bots inflate views, and that is accepted and documented.
+model OfferMetricDaily {
+  id       String   @id @default(uuid(7))
+  agencyId String // denormalized tenant key: charts filter without a join
+  offerId  String
+  date     DateTime @db.Date
+
+  views          Int @default(0)
+  whatsappClicks Int @default(0)
+  phoneClicks    Int @default(0)
+  inquiries      Int @default(0)
+
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@unique([offerId, date])
+  @@index([agencyId, date])
+  @@map("offer_metrics_daily")
+}
+
+/// How an offer stands with respect to spam/duplicate control.
+/// `suspected` and `confirmed` offers still EXIST and are still reachable by
+/// direct link — they are only demoted or excluded from the default listing.
+enum DuplicateStatus {
+  none
+  suspected // automatic signal: demoted in search, badge shown to the agency
+  confirmed // a human agreed it is a spam re-post: out of the default listing
+  dismissed // a human decided it is legitimately distinct; never re-flagged
+}
+
+enum DuplicateVerdict {
+  pending
+  confirmed_duplicate
+  not_duplicate
+}
+
+// Near-duplicate pairs surfaced for admin review. Confirming one sets
+// duplicateStatus=confirmed on the newer offer. The offer is not deleted.
+model OfferDuplicateCandidate {
+  id           String @id @default(uuid(7))
+  leftOfferId  String
+  rightOfferId String
+
+  similarity Float // 0..1
+  reason     String // which signals matched, for the reviewer
+
+  verdict          DuplicateVerdict @default(pending)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  leftOffer  Offer @relation("DuplicateLeft", fields: [leftOfferId], references: [id], onDelete: Cascade)
+  rightOffer Offer @relation("DuplicateRight", fields: [rightOfferId], references: [id], onDelete: Cascade)
+
+  @@unique([leftOfferId, rightOfferId])
+  @@index([verdict, similarity])
+  @@map("offer_duplicate_candidates")
+}
+
+/// Why a human flagged an offer. Reports come from travelers AND from rival
+/// agencies — both are useful signals, and both are equally capable of abusing
+/// the report button, which is why a report never auto-hides anything.
+enum OfferReportReason {
+  duplicate_spam
+  misleading_price
+  scam_suspicion
+  wrong_information
+  expired
+  inappropriate
+  other
+}
+
+enum ReportStatus {
+  pending
+  actioned
+  dismissed
+}
+
+model OfferReport {
+  id      String @id @default(uuid(7))
+  offerId String
+
+  /// null for anonymous reports. The IP hash is the only rate-limit handle
+  /// we have for those, so it is stored hashed, never raw.
+  reporterUserId String?
+  reporterIpHash String?
+
+  reason  OfferReportReason
+  details String?
+
+  status           ReportStatus @default(pending)
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  reviewNote       String?
+
+  createdAt DateTime @default(now())
+
+  offer    Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  reporter User? @relation(fields: [reporterUserId], references: [id], onDelete: SetNull)
+
+  // One report per person per offer: stops a single rival spamming the queue.
+  @@unique([offerId, reporterUserId])
+  @@index([status, createdAt])
+  @@index([offerId, status])
+  @@map("offer_reports")
+}
+
+/// A traveler's shortlist. The main reason a traveler bothers to make an
+/// account, and the seed of "notify me when the price drops" later.
+model SavedOffer {
+  userId  String
+  offerId String
+
+  createdAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  offer Offer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@id([userId, offerId])
+  @@index([offerId])
+  @@map("saved_offers")
+}
+
+// ============================================================================
+// LEADS + CRM  ("gestion des clients")
+// ============================================================================
+
+enum LeadStage {
+  new
+  contacted
+  quoted
+  negotiating
+  booked
+  paid
+  travelled
+  lost
+}
+
+// The client-quality labels. Agencies triage with these; later they also feed
+// lead pricing and fraud detection.
+enum LeadQuality {
+  unrated
+  spam
+  troll
+  cold
+  warm
+  serious
+  vip
+}
+
+enum LeadSource {
+  marketplace_inquiry
+  direct_call
+  walk_in
+  whatsapp
+  referral
+  import
+}
+
+model Lead {
+  id       String @id @default(uuid(7))
+  agencyId String // tenant key. NEVER nullable, NEVER taken from the client.
+
+  offerId String?
+
+  // Contact details are SNAPSHOTTED, not just referenced: an inquiry must work
+  // with no traveler account at all, and the record must survive account deletion.
+  contactName  String
+  contactPhone String // E.164
+  contactEmail String?
+
+  travelerUserId String? // set only if they happened to be logged in
+
+  /// Which tracked link this traveler arrived through, if any. The answer to
+  /// "where did this client come from" in the inbox.
+  trackedLinkId String?
+
+  message                String?
+  peopleCount            Int?
+  preferredDepartureDate DateTime? @db.Date
+  budgetCentimes         Int?
+
+  // ---- CONSENT AUDIT TRAIL ------------------------------------------------
+  // This is the legal basis for an agency contacting this person, and later the
+  // basis for charging for the introduction. Captured at submission, immutable.
+  consentGivenAt     DateTime
+  consentTextVersion String // e.g. "inquiry-consent-v1"
+  consentIpHash      String?
+  consentUserAgent   String?
+
+  // ---- CRM ----------------------------------------------------------------
+  stage            LeadStage   @default(new)
+  quality          LeadQuality @default(unrated)
+  source           LeadSource  @default(marketplace_inquiry)
+  assignedToUserId String?
+
+  estimatedValueCentimes Int?
+  actualValueCentimes    Int?
+  lostReason             String?
+
+  nextActionAt     DateTime? // powers the "à rappeler aujourd'hui" list
+  firstRespondedAt DateTime? // response time is the metric agencies are sold on
+  closedAt         DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  agency      Agency       @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  offer       Offer?       @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  traveler    User?        @relation("LeadTraveler", fields: [travelerUserId], references: [id], onDelete: SetNull)
+  assignedTo  User?        @relation("LeadAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  trackedLink TrackedLink? @relation(fields: [trackedLinkId], references: [id], onDelete: SetNull)
+
+  notes       LeadNote[]
+  activities  LeadActivity[]
+  tags        LeadTag[]
+  review      Review?
+  reservation Reservation?
+
+  // Every index leads with agencyId, because every query is tenant-scoped.
+  @@index([agencyId, stage, createdAt])
+  @@index([agencyId, quality])
+  @@index([agencyId, assignedToUserId, nextActionAt])
+  @@index([agencyId, contactPhone])
+  @@index([offerId])
+  @@index([trackedLinkId])
+  @@map("leads")
+}
+
+model LeadNote {
+  id           String @id @default(uuid(7))
+  leadId       String
+  agencyId     String // denormalized so a note can be tenant-scoped without a join
+  authorUserId String?
+
+  body String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  lead   Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User? @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+  @@index([agencyId])
+  @@map("lead_notes")
+}
+
+// Append-only timeline. Written by the system, never edited by users.
+model LeadActivity {
+  id       String @id @default(uuid(7))
+  leadId   String
+  agencyId String
+
+  type    String // "stage_changed", "quality_changed", "assigned", "note_added"
+  actorUserId String?
+  payload Json   @default("{}")
+
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId, createdAt])
+  @@map("lead_activities")
+}
+
+// Free-form labels an agency invents itself ("waiting for passport"), without
+// needing a code change. The escape hatch beside the fixed enums above.
+model Tag {
+  id       String @id @default(uuid(7))
+  agencyId String
+  name     String
+  color    String @default("#64748b")
+
+  createdAt DateTime @default(now())
+
+  agency Agency    @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  leads  LeadTag[]
+
+  @@unique([agencyId, name])
+  @@map("tags")
+}
+
+model LeadTag {
+  leadId   String
+  tagId    String
+  agencyId String
+
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@index([tagId])
+  @@map("lead_tags")
+}
+
+/// A named short link an agency pastes under its Facebook/Instagram posts.
+///
+/// The question it answers is the one every agency asks and none can answer
+/// today: "which of my posts actually brings clients?" Clicks alone are
+/// vanity; `inquiryCount` is the number that matters, and the pair together
+/// is also Rihlati's own sales pitch — proof the platform sends real people.
+///
+/// Counters rather than a daily time series, deliberately: a link IS its own
+/// time bucket (the "Ramadan post" link is Ramadan data), and the agency asks
+/// "which post works", never "how did post X trend in March". Offer-level
+/// dailies already exist in offer_metrics_daily if trend is wanted.
+model TrackedLink {
+  id       String  @id @default(uuid(7))
+  agencyId String
+  /// null = the link points at the agency's whole catalogue, not one trip.
+  offerId  String?
+
+  /// The public key in /l/{code}. Short, unguessable-ish, globally unique.
+  code  String @unique
+  /// The agency's own words: "post Facebook Ramadan", "story Insta promo".
+  label String
+
+  clickCount   Int @default(0)
+  inquiryCount Int @default(0)
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  offer  Offer? @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  leads  Lead[]
+
+  @@index([agencyId, deletedAt])
+  @@map("tracked_links")
+}
+
+// ============================================================================
+// RESERVATIONS — the trip manifest ("la liste de la rihla")
+// ============================================================================
+
+/// The lifecycle the owner described, colour for colour:
+///   expected   🟡 "coming"     — confirmed, not yet at the bus
+///   checked_in 🟢 "came"       — physically present, counted
+///   no_show    🔴 "not coming" — didn't show up
+///   cancelled  ⚪ called off before departure day
+///
+/// Transitions are deliberately free (any → any): at a bus at 4am, the
+/// common operation after a tap is "oops, wrong row" — a state machine that
+/// refuses the undo would be obeyed for one departure and abandoned.
+/// Accountability comes from the audit log, not from blocking.
+enum ReservationStatus {
+  expected
+  checked_in
+  no_show
+  cancelled
+}
+
+/// One reservation = one FAMILY, not one person. In Algeria one person
+/// reserves for everyone, so the row is "Mohamed A. — 4 people", and the
+/// occupancy of the bus is sum(peopleCount), never count(rows).
+///
+/// Contact details are snapshotted (same reasoning as Lead): the manifest for
+/// the 4am departure must not change because someone edited a lead. When a
+/// reservation is created FROM a lead, `leadId` links it into the CRM.
+model Reservation {
+  id       String @id @default(uuid(7))
+  agencyId String // tenant key. NEVER from the client.
+  offerId  String // the departure this belongs to
+  leadId   String? @unique // at most one reservation per lead
+
+  contactName  String
+  contactPhone String // E.164
+  peopleCount  Int    @default(1)
+
+  status ReservationStatus @default(expected)
+
+  /// Who tapped "arrivé" and when — the answer to "who counted this family?"
+  checkedInAt       DateTime?
+  checkedInByUserId String?
+
+  /// Operational notes: "pays the balance at the bus", "wheelchair".
+  /// INTERNAL. Never leaves the console — see TravelerTripView.
+  notes String?
+
+  /// The capability code in /mon-voyage/{code}, sent to the family once by
+  /// WhatsApp on confirmation. 128 bits of randomness, stored in the clear
+  /// because the URL is the lookup key.
+  ///
+  /// Whoever holds the link holds access — there is no password. That is only
+  /// acceptable because the page behind it shows this family's own booking and
+  /// a programme that is already public, and never the passenger list, prices
+  /// paid, or CRM state. See Trip Programme.md §5.
+  ///
+  /// Nullable so rows created before this column simply have no link yet; one
+  /// is minted lazily the first time the agency asks for it.
+  publicCode String? @unique
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  offer  Offer  @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  lead   Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  milestoneCheckIns MilestoneCheckIn[]
+
+  // The manifest query: one departure's list, grouped by status.
+  @@index([agencyId, offerId, status])
+  @@index([offerId, status])
+  @@map("reservations")
+}
+
+// ============================================================================
+// TRIP PROGRAMME — milestones & per-checkpoint attendance
+// (see obsidian/Backend/Trip Programme.md)
+// ============================================================================
+
+/// What kind of step this is — drives the icon on the timeline.
+enum MilestoneKind {
+  meeting // rendez-vous — the one that matters at 4am
+  transport // bus, transfer
+  flight
+  hotel // check-in / check-out
+  ritual // omra, tawaf, sa'i — the point of the trip
+  ziyara // visits
+  meal
+  free_time
+  other
+}
+
+/// Whether — and how strictly — attendance is tracked at this milestone.
+/// Set per milestone by the agency when they build the programme.
+///
+///   none      — informational only, no attendance tracked (most milestones:
+///               a ziyara description, a meal, a hotel check-in note)
+///   mandatory — every family must be checked in fresh at this stop; NEVER
+///               defaults to no_show, because a wrong default here means a
+///               family left behind on a flight
+///   optional  — attendance tracked, and a no_show here is allowed to
+///               default forward to the next optional checkpoint — people
+///               who skip one excursion often skip the next, and re-marking
+///               the same absent family at every stop is needless work for
+///               the guide. See obsidian/Backend/Trip Programme.md.
+enum CheckpointType {
+  none
+  mandatory
+  optional
+}
+
+/// One step in an offer's programme, rendered as a timeline. Agencies build
+/// this list freely (add/reorder/delete) — see Trip Programme.md for the
+/// full design, including why `dayOffset` is used instead of a stored date.
+model OfferMilestone {
+  id       String @id @default(uuid(7))
+  agencyId String // denormalized tenant key (rule #3) — filters without a join
+  offerId  String
+
+  title       String
+  description String?
+  kind        MilestoneKind @default(other)
+
+  /// Day of the trip. 0 = departure day. Combined with Offer.departureDate
+  /// this becomes a real date WITHOUT storing one, so the programme survives
+  /// the departure date moving.
+  dayOffset Int     @default(0)
+  /// "04:30". Null means "sometime that day". LOCAL to wherever the traveler
+  /// is standing (Algiers for departure, Saudi time once there) — never
+  /// converted, or a shifted hour is how people miss a bus.
+  timeOfDay String?
+
+  locationName String? // "Aéroport Houari Boumediene"
+  /// The sentence a traveler reads at 4am. Be specific.
+  meetingPoint String?
+  mapUrl       String? // a plain maps link; no SDK, no API key
+
+  sortOrder Int @default(0)
+
+  /// Whether this step tracks per-family attendance (see CheckpointType).
+  checkpointType CheckpointType @default(none)
+
+  /// Ticked by the agency as the trip actually happens — drives the public
+  /// "vous êtes ici" marker on the traveler's page. Independent of
+  /// per-family attendance below: the group can move on even if one family
+  /// is still being chased down.
+  completedAt       DateTime?
+  completedByUserId String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  offer    Offer              @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  checkIns MilestoneCheckIn[]
+
+  @@index([offerId, dayOffset, sortOrder])
+  @@index([agencyId])
+  @@map("offer_milestones")
+}
+
+/// One family's attendance at ONE checkpoint milestone. Created lazily — the
+/// first time a guide opens that checkpoint's list for that family — never
+/// pre-created for every reservation, so adding a checkpoint mid-trip needs
+/// no backfill.
+///
+/// Reuses ReservationStatus: same 🟡🟢🔴⚪ vocabulary, same "any status to
+/// any status" free transitions, same accountability-via-audit-log model as
+/// the manifest. `Reservation.status` is untouched by this table — it still
+/// means "booked on this departure at all"; this table answers "physically
+/// present at THIS checkpoint", independently per stop.
+model MilestoneCheckIn {
+  id            String @id @default(uuid(7))
+  agencyId      String // denormalized tenant key
+  milestoneId   String
+  reservationId String
+
+  status ReservationStatus @default(expected)
+
+  /// Who tapped, and when — same "who counted this family?" answer as the
+  /// manifest, per checkpoint instead of once for the whole trip.
+  checkedInAt       DateTime?
+  checkedInByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  milestone   OfferMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  reservation Reservation    @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  // One attendance row per family per checkpoint.
+  @@unique([milestoneId, reservationId])
+  @@index([agencyId])
+  @@index([reservationId])
+  // The checkpoint's own check-in screen: one milestone's list, by status.
+  @@index([milestoneId, status])
+  @@map("milestone_check_ins")
+}
+
+// ============================================================================
+// REVIEWS / AGENCY RATINGS
+// ============================================================================
+
+enum ReviewStatus {
+  pending
+  published
+  rejected
+}
+
+model Review {
+  id       String @id @default(uuid(7))
+  agencyId String
+
+  // A review linked to a real lead that reached `travelled` is a VERIFIED review.
+  // That link is what stops agencies from inventing their own reviews.
+  leadId String? @unique
+
+  authorUserId String?
+  authorName   String
+
+  rating Int // 1..5 — CHECK constraint added in the migration
+  title  String?
+  body   String?
+
+  status              ReviewStatus @default(pending)
+  isVerifiedTraveller Boolean      @default(false)
+
+  agencyReply     String?
+  agencyRepliedAt DateTime?
+
+  moderatedByUserId String?
+  moderatedAt       DateTime?
+  rejectionReason   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  agency Agency @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  lead   Lead?  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  author User?  @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([agencyId, status, createdAt])
+  @@map("reviews")
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+// Append-only. Cheap to add now, impossible to reconstruct later, and the only
+// way to answer "who changed this price?" Also a security control.
+model AuditLog {
+  id String @id @default(uuid(7))
+
+  actorUserId String?
+  agencyId    String?
+
+  action     String // "offer.published", "agency.verified", "lead.quality_changed"
+  entityType String
+  entityId   String
+
+  before Json?
+  after  Json?
+
+  ipHash    String?
+  requestId String?
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt])
+  @@index([agencyId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@rihlati/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Rihlati web app — the marketplace travelers see. Server-rendered for SEO; imports every request/response shape from @rihlati/shared.",
+  "scripts": {
+    "predev": "npm run build --workspace @rihlati/shared",
+    "dev": "next dev",
+    "prebuild": "npm run build --workspace @rihlati/shared",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.6.0",
+    "@rihlati/shared": "*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.28.0",
+    "next": "^15.5.0",
+    "next-intl": "^4.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.18.6",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "shadcn": "^4.16.1",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.9.2"
+  }
+}

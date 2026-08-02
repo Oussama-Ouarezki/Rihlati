@@ -1,0 +1,21 @@
+{
+  // The NARROW project: only `src`, and it emits. Used by `nest build`
+  // (see nest-cli.json) so tests and the seed script never reach `dist/`.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "./src",
+    "types": ["node"],
+    // Keep the incremental cache INSIDE dist/.
+    //
+    // `nest build` sets deleteOutDir, so dist/ is wiped before every build. A
+    // .tsbuildinfo living outside it survives that wipe and then tells tsc the
+    // files are already up to date — so it emits nothing, and the app dies at
+    // startup with "Cannot find module". Bit twice before this line existed.
+    // In dist/, the cache and the output are deleted together and cannot
+    // disagree.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", "prisma", "**/*.test.ts"]
+}

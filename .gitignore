@@ -1,0 +1,51 @@
+# ---- SECRETS: rule #1. Never remove these three lines. ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# dependencies
+node_modules/
+.pnp.*
+
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# expo (later)
+.expo/
+*.jks
+*.mobileprovision
+
+# turbo / caches
+.turbo/
+.cache/
+coverage/
+playwright-report/
+test-results/
+
+# db dumps — may contain real user data
+*.sql.gz
+*.dump
+backups/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Playwright
+test-results/
+playwright-report/
+
+# Claude Code: shared config is settings.json; .local.json is personal
+.claude/settings.local.json

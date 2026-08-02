@@ -1,0 +1,243 @@
+{
+  "main": {
+    "id": "153304933f2a8cc3",
+    "type": "split",
+    "children": [
+      {
+        "id": "8399bebc721229ea",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e9e75235ffe2ce94",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Runbooks/Local Setup.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Local Setup"
+            }
+          },
+          {
+            "id": "671375330a8bd636",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Accounts.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Accounts"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "85b4bd65351c9144",
+    "type": "split",
+    "children": [
+      {
+        "id": "102cca703593411c",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3ed72ea3cb092fd7",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "167772751ceb70d2",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "fdab1c560dbca649",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "e74452d1ab97dba9",
+    "type": "split",
+    "children": [
+      {
+        "id": "6a99710b79c2e805",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "573dd74d00913131",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Backend/Agency Chatbot.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "587ff5d80db7c796",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Backend/Agency Chatbot.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "4233e296f4c880bb",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "c69e8b7d1dab7d13",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "48a021843352c567",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Backend/Agency Chatbot.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "671375330a8bd636",
+  "lastOpenFiles": [
+    "Backend/Trip Programme.md.tmp.30701.ac4d3b450e3a",
+    "Backend/Trip Programme.md.tmp.30701.f6db4867fee9",
+    "Backend/Trip Programme.md.tmp.30701.54bf22e59543",
+    "Backend/API Endpoints.md.tmp.30701.ff075203ee19",
+    "Backend/API Endpoints.md.tmp.30701.a4bae67177af",
+    "Backend/Trip Manifest.md.tmp.30701.9c347fb9dfdf",
+    "Decisions/Decision Log.md.tmp.30701.3c804afba18d",
+    "Backend/Trip Programme.md.tmp.30701.4ccbc610a5ee",
+    "Backend/Trip Programme.md.tmp.30701.d3d8bfda0f2f",
+    "Backend/Trip Programme.md.tmp.30701.3333a68b578b",
+    "Backend/Trip Programme.md.tmp.30701.f638572f575d",
+    "Glossary.md",
+    "Vision and Roadmap.md",
+    "Start Here.md",
+    "Accounts.md",
+    "Runbooks/Local Setup.md",
+    "Backend/Agency Chatbot.md",
+    "Backend/Trip Programme.md",
+    "Frontend/CRM Redesign.md",
+    "Backend/Credits and Promotion.md",
+    "Frontend/Interface Plan.md",
+    "Concepts/What the API Is.md",
+    "Concepts/Validation at the Boundary.md",
+    "Concepts/The Shared Package.md",
+    "Concepts/Multi-Tenancy.md",
+    "Concepts/Migrations.md",
+    "Concepts/Indexes and Why Queries Get Slow.md",
+    "Concepts/Authentication vs Authorization.md",
+    "Runbooks/Restore From Backup.md",
+    "Decisions/Decision Log.md",
+    "Decisions/Decisions You Must Make.md",
+    "Data Model/Offer.md",
+    "Data Model/User.md",
+    "Backend/Tracked Links.md",
+    "Backend/Trip Manifest.md",
+    "Frontend/Web App.md"
+  ]
+}

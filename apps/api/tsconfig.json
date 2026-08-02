@@ -1,0 +1,51 @@
+{
+  // The WIDE project: src, tests, seed and config files. No output.
+  //
+  // ESLint's type-aware rules only run on files that belong to a TypeScript
+  // project — a file outside every `include` is silently skipped, which is the
+  // worst kind of "passing" lint. `tsconfig.build.json` is what `nest build`
+  // uses to emit `dist/`.
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "noEmit": true,
+
+    "declaration": false,
+    "sourceMap": true,
+    "incremental": true,
+
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    "types": ["node", "vitest/globals"],
+
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "prisma/**/*.ts",
+    "prisma.config.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

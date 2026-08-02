@@ -1,0 +1,139 @@
+# CI — CLAUDE.md rule #7: "Typecheck + lint + tests run in CI on every PR.
+# Red CI blocks merge."
+#
+# This file is only half the rule. The other half is a branch-protection
+# setting in GitHub: Settings → Branches → protect `main` → require the "check"
+# job to pass. Without that, CI is a notification, not a gate — and a
+# notification is something people learn to scroll past.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+# A new push to the same PR cancels the previous run. Reviewing the results of
+# a superseded commit wastes both CI minutes and attention.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: typecheck · lint · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      # The API tests run against a REAL Postgres, not a mock. The bugs they
+      # exist to catch — a missing agencyId in a WHERE clause, a CHECK
+      # constraint that rejects a legal value — are invisible to a mock.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: rihlati
+          POSTGRES_PASSWORD: rihlati_ci
+          POSTGRES_DB: rihlati
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U rihlati -d rihlati"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://rihlati:rihlati_ci@localhost:5433/rihlati?schema=public
+      NODE_ENV: test
+      # CI-only values. They are not secrets: this database is created and
+      # destroyed inside the job and holds nothing but fixtures. Real secrets
+      # NEVER appear in this file — they go in repository secrets (rule #1).
+      JWT_ACCESS_SECRET: ci-access-secret-long-enough-to-pass-validation-0001
+      JWT_REFRESH_SECRET: ci-refresh-secret-long-enough-to-pass-validation-002
+      LOG_LEVEL: error
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Generate the Prisma client
+        run: npx prisma generate
+        working-directory: apps/api
+
+      - name: Build the shared package
+        # The API imports @rihlati/shared from its `dist`, so this has to run
+        # before anything typechecks.
+        run: npm run build --workspace @rihlati/shared
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Rule #7's other half: the five pages that matter, with screenshots.
+      # A visual diff is what catches "the AI moved something you weren't
+      # looking at" — the exact failure this project was built to avoid.
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Seed the database for the browser tests
+        run: npm run db:seed
+        env:
+          NODE_ENV: development
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # A separate job so it is legible in the PR checks list as its own line.
+  # Rule #1: a key that has ever touched a commit is burned.
+  secrets:
+    name: no secrets in the diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a secret added three commits ago and "removed" in the
+          # latest one is still in the repository forever.
+          fetch-depth: 0
+
+      - name: Scan for committed secrets
+        run: |
+          set -euo pipefail
+
+          if git ls-files --error-unmatch .env >/dev/null 2>&1; then
+            echo "::error::.env is tracked by git. Remove it and rotate every key it held."
+            exit 1
+          fi
+
+          # Deliberately narrow. A pattern that fires on the word "password"
+          # anywhere matches every comment and doc in the repo, and a check
+          # that cries wolf gets disabled within a week.
+          pattern='(sk-[A-Za-z0-9]{20,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}|(secret|password|api[_-]?key)["'"'"']?\s*[:=]\s*["'"'"'][^"'"'"']{12,}["'"'"'])'
+
+          if git grep -InE "$pattern" -- \
+              ':!*.md' ':!obsidian/**' ':!.github/workflows/*' ':!.env.example' \
+              ':!package-lock.json' ':!**/*.test.ts' ':!apps/api/test/**'; then
+            echo "::error::Possible secret above. If it is real, ROTATE it — deleting the line is not enough."
+            exit 1
+          fi
+
+          echo "No secrets found in tracked files."
