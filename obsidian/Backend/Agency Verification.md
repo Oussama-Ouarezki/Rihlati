@@ -110,6 +110,120 @@ actually does.
 
 ---
 
+## Holding identity documents — planned 2026-08-04, not built
+
+The accountability model above only works if "we have a real identity to hand to the
+authorities" is true. Today it is not: an agency types a number into a box and we store the
+number. Anyone can type a number.
+
+So the plan is to collect **documents**, not strings:
+
+| Document | Why it is asked for |
+|---|---|
+| Registre de commerce (scan) | the company exists and is trading legally |
+| Attestation NIF | ties the company to a tax identity |
+| Agrément d'agence de tourisme et de voyage | the licence specific to selling travel |
+| **National ID card or passport of the owner** | ties a *person* to the company |
+
+The last row is the one that changes the model. A company can be dissolved and its name
+abandoned; a person cannot. Holding the owner's identity document is what makes "if you take
+Omra money and vanish, we know who you are" a statement rather than a bluff — and, just as
+importantly, agencies with nothing to hide will hand it over without complaint. The ones who
+refuse have told you something.
+
+> [!danger] This is the most sensitive data in the entire product
+> A passport scan is worth more to a criminal than every offer in the database. It is enough
+> to open accounts in someone's name. If Rihlati leaks one, the damage is not a bad week —
+> it is personal and permanent for the person whose document it was.
+>
+> Which means: **do not build this the day you feel like it.** It is the one feature where
+> shipping a rough version first is not acceptable, because the rough version is a breach
+> waiting to happen.
+
+### The trap: this must NOT reuse the avatar pipeline
+
+[[Image Uploads]] is well designed *for avatars and logos*. Every one of its decisions is
+wrong here, and reaching for it because it already works is the mistake this section exists
+to prevent:
+
+| Avatar pipeline does | Why that is right for a logo | Why it is a breach for a passport |
+|---|---|---|
+| Public URL, no auth to fetch | a logo is meant to be seen | anyone with the link has the passport, forever |
+| `Cache-Control: immutable, max-age=1 year` | the URL is a content hash, so it can never be stale | copies land in every CDN and browser cache; deletion becomes impossible |
+| Content-addressed filename | unguessable and collision-free | still a permanent bearer token — knowing the URL *is* the permission |
+| Re-encode to WebP, strip metadata | kills EXIF GPS and polyglot files | fine, and still wanted — but it is not the part that matters here |
+
+What it needs instead:
+
+- **A private bucket.** No public read. Every fetch goes through an endpoint that checks the
+  session on that request — platform admin, or a member of that agency looking at their own.
+  See [[Multi-Tenancy]]; this is one of the few reads where being an admin is the *only*
+  reason it is allowed.
+- **Short-lived signed URLs**, minutes not years, generated per view. The URL stops working.
+- **`Cache-Control: private, no-store`**, and served as a download, never inline.
+- **Encryption at rest**, with the key not sitting next to the data.
+- **Every read audited, not just every write.** For ordinary data, "who changed this" is the
+  question. For a passport, "who *looked* at this" is the question — and an admin who browses
+  documents for no reason should leave a trail.
+- **Never in any API response an agency or a traveler can reach.** `GET /agencies/{slug}` must
+  not carry so much as a filename. A test should assert this, the same way there is a test
+  that `avatarUrl` cannot be set by the client.
+- **Never in a log line.** Rule #4 already forbids logging phone numbers; a document key
+  belongs on the same list, in `AppLogger`'s redaction.
+
+> [!warning] PDFs break the re-encode trick
+> Scans arrive as PDFs, and the whole security model in [[Image Uploads]] is "decode it and
+> throw the original away" — which has no equivalent for a PDF. A PDF can carry JavaScript and
+> can be a polyglot. Either accept photographs only (JPEG/PNG/WebP, re-encoded, which is
+> probably right since everyone photographs documents with a phone anyway), or serve PDFs with
+> `Content-Disposition: attachment` and never inline. Decide before writing the endpoint.
+
+### Shape of the data
+
+A separate table, not columns on [[Agency]]. `Agency` is read on nearly every page; the
+documents must live somewhere that is *never* joined in by accident.
+
+```
+AgencyDocument
+  id                UUID
+  agencyId          FK  -- tenant-scoped like everything else
+  type              registre_commerce | nif_attestation | tourism_licence
+                    | owner_id_card | owner_passport
+  storageKey        String   -- private bucket, never a public URL
+  uploadedByUserId  FK
+  uploadedAt        DateTime
+  reviewedByUserId  FK?      -- who looked at it
+  reviewedAt        DateTime?
+  outcome           accepted | rejected | unreadable
+  expiresAt         DateTime? -- a licence expires; so should our copy
+  deletedAt         DateTime?
+```
+
+`outcome` is deliberately per-document. "The RC was fine but the licence was expired" is a
+real review result, and a single `status` on the agency cannot express it — which means the
+rejection message to the owner would be vague, and they would resubmit the same thing.
+
+### Retention: decide the deletion rule before the upload rule
+
+The instinct is to keep everything forever, in case it is needed. That instinct is what turns
+a small breach into a large one. Data you deleted cannot leak.
+
+A defensible default, to be confirmed: keep documents while the agency is active, delete them
+a fixed period after an agency is **rejected** (they were never a customer) and after an
+agency **leaves** (the reason to hold them is gone). Keep the *record* that a document was
+seen and by whom — a row saying "RC reviewed 2026-09-01 by X, accepted" is almost as useful
+for accountability and carries none of the risk.
+
+> [!danger] Verify this — do not assume
+> Algeria's Law 18-07 on personal data protection governs collecting and storing this, and
+> nothing in this note asserts what it requires: whether consent must be explicit and in
+> writing, whether a declaration or authorisation is needed to hold identity documents,
+> what retention limits apply, or what must happen on a request for deletion.
+> **This needs an Algerian lawyer before the first upload**, not after. Nothing here is
+> legal advice, and the whole feature is legally shaped, not just technically shaped.
+
+---
+
 ## When it gets built: the slice
 
 Four pieces, one vertical, same shape as everything else:
@@ -122,6 +236,12 @@ Four pieces, one vertical, same shape as everything else:
 3. `/admin` in the web app: the queue, the submitted documents, approve and reject.
 4. A path to the **first** admin — a seed script or a CLI command, since nothing today can set
    `isPlatformAdmin`.
+
+Documents are a **separate, later slice** and should not be bolted onto this one. Order:
+get the queue and the verify/reject audit trail working against the fields that already
+exist, then add `AgencyDocument` as its own vertical with its own storage driver, its own
+tests, and the legal answer in hand. Building both at once is how the passport ends up in
+the public bucket.
 
 Note this is the first genuinely **cross-tenant** surface in the app. Every other query is
 scoped by `agencyId` ([[Multi-Tenancy]]); this one deliberately is not, which makes it the most
@@ -138,8 +258,16 @@ dangerous endpoint in the codebase and the one most worth testing hard. A bug in
   launch or follows it.
 - **What does the badge say, in one sentence?** And does that sentence match what the review
   actually does?
-- **Do we store document scans?** If yes, that is sensitive-document handling — retention,
-  access control, and deletion rules — and it is a real obligation, not a checkbox.
+- **Is the owner's ID card or passport required, or optional?** Required makes the
+  accountability model real and will lose you some agencies at signup — probably the ones you
+  least want, but not only those. Optional makes it a badge tier instead of a gate. This is
+  the single decision that shapes the whole feature.
+- **Photographs only, or PDFs too?** See the warning above. Photos-only is meaningfully safer
+  and probably loses nothing.
+- **How long do we keep them, and what triggers deletion?** Answer this *before* building the
+  upload, not after — see the retention section.
+- **Who is allowed to look at a stored document?** Platform admins only, or also the agency's
+  own owner (to check what they submitted)? Every answer here is an audited read.
 - **What happens on a credible fraud report?** Suspend immediately and investigate, or
   investigate first? An innocent agency suspended for a week loses a season's bookings; a guilty
   one left up for a week takes more money.

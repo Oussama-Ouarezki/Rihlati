@@ -145,6 +145,19 @@ The `/media` route sets, on every response:
 
 ---
 
+---
+
+> [!danger] Do not reuse this module for identity documents
+> Everything on this page assumes the picture is **meant to be public**: no auth to fetch it,
+> a URL cached forever, a filename that is a permanent bearer token. That is correct for a
+> logo and a breach for a passport scan or a registre de commerce.
+>
+> Identity documents need a private bucket, short-lived signed URLs, `no-store`, encryption
+> at rest, and an audit row on every *read*. The design is written up in
+> [[Agency Verification]] — read it before adding a third caller to this module.
+
+---
+
 ## Open questions — for the owner
 
 - **How big should a stored image be?** Avatars are capped at 512 px, logos at 512 px. Nobody

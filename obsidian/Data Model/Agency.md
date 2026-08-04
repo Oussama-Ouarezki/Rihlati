@@ -35,6 +35,14 @@ is decoration.
 > The whole problem, including whether the badge should even say « Vérifiée », is in
 > [[Agency Verification]].
 
+> [!note] Planned: documents, not just numbers
+> `registreCommerce`, `nif` and `tourismLicence` are strings an agency **types in itself**, so
+> today they prove nothing. The plan is a separate `AgencyDocument` table holding scans —
+> including the owner's ID card or passport, which is what makes "we know who took the money"
+> true. Deliberately a separate table and a separate storage path, because that data must
+> never be joined into an ordinary page load. Design and the open questions: [[Agency
+> Verification]].
+
 > [!important] Write down what "Vérifiée" means, in one sentence, before you launch
 > A traveler has to believe it. "We have seen this agency's trade register and tourism
 > licence, and confirmed the address" is a claim you can defend. "Trusted partner" is not.
