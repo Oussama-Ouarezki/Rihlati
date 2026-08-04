@@ -137,17 +137,46 @@ Error messages that name the field and say what's wrong, in the user's language:
 
 ```json
 {
-  "statusCode": 400,
-  "message": "Validation failed",
-  "errors": [
-    { "path": "attributes.makkahHotelStars", "message": "Doit être entre 1 et 5" },
-    { "path": "contactPhone", "message": "Numéro de téléphone algérien invalide" }
-  ]
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "fields": {
+      "contactPhone": ["validation.phoneInvalid"],
+      "password": ["validation.passwordTooShort"]
+    }
+  }
 }
 ```
 
-Because paths are structured, the form can highlight the exact input. A single
+Because the keys are field paths, the form can highlight the exact input. A single
 `"Bad request"` is technically correct and practically useless.
+
+### Why the message is a key and not a sentence
+
+The obvious version of that response says `"Numéro de téléphone algérien invalide"`, and that
+is what this codebase did until 2026-08-04. It is wrong for one reason: **the server does not
+know what language the reader speaks.** A request carries a token and a body, not a person.
+
+The consequence was visible in a screenshot: an Arabic signup page, correctly right-to-left,
+with a French sentence in red under the password box. The page was translated; the schema was
+not, because the schema lives in `packages/shared` where nobody was thinking about locale.
+
+So a schema now emits `'validation.passwordTooShort'`. The API passes it through untouched.
+Each client — the website today, a mobile app later — looks it up in its own message file.
+This is the same rule the top-level `code` already followed; field messages were the one place
+it had leaked.
+
+Two things keep it honest, because a translation nobody added is invisible to a French reader:
+
+- `VALIDATION_MESSAGE_KEYS` in `packages/shared/src/validation-messages.ts` is the only list.
+- `validation-messages.test.ts` scans both `packages/shared/src` and `apps/api/src` for
+  `'validation.…'` literals, and fails if one is not in the list, or if any of `fr` / `ar` /
+  `en` is missing a translation for one that is.
+
+> [!warning] Zod's own wording is still English, everywhere
+> `.email()`, `.uuid()` and `.max(120)` produce Zod's built-in prose — "String must contain at
+> most 120 character(s)" — and it falls through untranslated. Only the messages we wrote were
+> converted. Fixing the rest means a global Zod error map that turns each issue *code* into a
+> key with parameters (`{max}`), which is a real piece of work and has not been done.
 
 > [!warning] Don't leak internals in errors
 > Never return a stack trace, an SQL fragment, or a database column name to a client. Log

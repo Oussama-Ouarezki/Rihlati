@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
+import { translateFieldErrors } from '@/lib/validation-messages';
 import { ChevronDown } from 'lucide-react';
 import {
   OFFER_KINDS,
@@ -50,6 +51,7 @@ export function OfferForm(props: {
   const tAttr = useTranslations('attr');
   const tValues = useTranslations('attrValues');
   const tCountries = useTranslations('countries');
+  const tValidation = useTranslations('validation');
 
   const [state, formAction, pending] = useActionState<OfferFormState, FormData>(props.action, {
     error: null,
@@ -83,9 +85,9 @@ export function OfferForm(props: {
           <p className="font-medium">{state.error}</p>
           {state.fields ? (
             <ul className="mt-1 list-disc ps-5 text-xs">
-              {Object.entries(state.fields).map(([field, messages]) => (
+              {translateFieldErrors(tValidation, state.fields).map(([field, message]) => (
                 <li key={field}>
-                  {field}: {messages.join(', ')}
+                  {field}: {message}
                 </li>
               ))}
             </ul>

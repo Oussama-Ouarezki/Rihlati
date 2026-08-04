@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import type { ApiErrorBody } from '@rihlati/shared';
 import { LOCALES } from '@rihlati/shared';
 import { formText } from './form';
+import { translateFieldError } from './validation-messages';
 import { authedFetch, getSession } from './session';
 
 export interface AccountState {
@@ -125,7 +126,11 @@ async function messageFor(
   t: Awaited<ReturnType<typeof getTranslations<'account'>>>,
 ): Promise<string> {
   const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
-  const fieldMessage = Object.values(body?.error?.fields ?? {})[0]?.[0];
+  const tValidation = await getTranslations('validation');
+  const fieldMessage = translateFieldError(
+    tValidation,
+    Object.values(body?.error?.fields ?? {})[0]?.[0],
+  );
   if (fieldMessage) return fieldMessage;
 
   switch (body?.error?.code) {

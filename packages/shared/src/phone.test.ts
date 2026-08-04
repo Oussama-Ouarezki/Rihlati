@@ -52,11 +52,11 @@ describe('algerianPhoneSchema', () => {
     expect(algerianPhoneSchema.parse('0551 23 45 67')).toBe('+213551234567');
   });
 
-  it('fails with a readable message', () => {
+  it('fails with a translatable key, not with prose', () => {
     const result = algerianPhoneSchema.safeParse('0851234567');
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0]?.message).toContain('invalide');
+      expect(result.error.issues[0]?.message).toBe('validation.phoneInvalid');
     }
   });
 });

@@ -13,7 +13,7 @@ import { TripsService } from './trips.service';
  */
 const publicCodeParam = (): ZodValidationPipe<z.ZodString> =>
   new ZodValidationPipe(
-    z.string().trim().min(16).max(64).regex(/^[A-Za-z0-9_-]+$/, 'Lien invalide'),
+    z.string().trim().min(16).max(64).regex(/^[A-Za-z0-9_-]+$/, 'validation.urlInvalid'),
   );
 
 @Controller('trips')

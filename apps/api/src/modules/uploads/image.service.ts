@@ -68,12 +68,12 @@ export class ImageService {
   ): Promise<{ url: string; key: string }> {
     if (!file || file.size === 0) {
       throw new AppError('VALIDATION_FAILED', 'Aucun fichier reçu', {
-        fields: { file: ['Fichier manquant'] },
+        fields: { file: ['validation.fileMissing'] },
       });
     }
     if (file.size > MAX_UPLOAD_BYTES) {
       throw new AppError('VALIDATION_FAILED', 'Fichier trop volumineux', {
-        fields: { file: ['Image trop lourde (5 Mo maximum)'] },
+        fields: { file: ['validation.imageTooLarge'] },
         details: { maxBytes: MAX_UPLOAD_BYTES },
       });
     }
@@ -85,7 +85,7 @@ export class ImageService {
     const metadata = await pipeline.metadata().catch(() => null);
     if (!metadata?.format || !ACCEPTED_INPUT_FORMATS.has(metadata.format)) {
       throw new AppError('VALIDATION_FAILED', "Le fichier n'est pas une image lisible", {
-        fields: { file: ['Format non supporté. Utilisez JPEG, PNG ou WebP.'] },
+        fields: { file: ['validation.imageFormatUnsupported'] },
       });
     }
 

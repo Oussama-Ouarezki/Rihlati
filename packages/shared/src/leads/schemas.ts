@@ -43,7 +43,7 @@ export const CURRENT_CONSENT_VERSION = 'inquiry-consent-v1';
 export const createInquirySchema = z.object({
   offerId: z.string().uuid(),
 
-  contactName: z.string().trim().min(2, 'Nom trop court').max(80),
+  contactName: z.string().trim().min(2, 'validation.nameTooShort').max(80),
   contactPhone: algerianPhoneSchema,
   contactEmail: z.string().trim().toLowerCase().email().max(254).optional(),
 
@@ -65,7 +65,7 @@ export const createInquirySchema = z.object({
    * unconsented inquiry impossible to express.
    */
   consent: z.literal(true, {
-    errorMap: () => ({ message: "Vous devez accepter d'être contacté par l'agence" }),
+    errorMap: () => ({ message: 'validation.consentRequired' }),
   }),
 });
 export type CreateInquiryInput = z.infer<typeof createInquirySchema>;
@@ -87,7 +87,7 @@ export const createLeadSchema = z.object({
   budgetCentimes: centimesSchema.optional(),
   source: leadSourceSchema.default('direct_call'),
   confirmsConsentObtained: z.literal(true, {
-    errorMap: () => ({ message: 'Confirmez que le client a accepté d\'être contacté' }),
+    errorMap: () => ({ message: 'validation.clientConsentRequired' }),
   }),
 });
 export type CreateLeadInput = z.infer<typeof createLeadSchema>;
@@ -112,7 +112,7 @@ export const updateLeadSchema = z.object({
 export type UpdateLeadInput = z.infer<typeof updateLeadSchema>;
 
 export const createLeadNoteSchema = z.object({
-  body: z.string().trim().min(1, 'Note vide').max(4000),
+  body: z.string().trim().min(1, 'validation.noteEmpty').max(4000),
 });
 export type CreateLeadNoteInput = z.infer<typeof createLeadNoteSchema>;
 

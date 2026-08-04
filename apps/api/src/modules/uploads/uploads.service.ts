@@ -170,10 +170,10 @@ export class UploadsService {
 export function translateMulterError(error: { code?: string }): AppError {
   if (error.code === 'LIMIT_FILE_SIZE') {
     return new AppError('VALIDATION_FAILED', 'Fichier trop volumineux', {
-      fields: { file: ['Image trop lourde (5 Mo maximum)'] },
+      fields: { file: ['validation.imageTooLarge'] },
     });
   }
   return new AppError('VALIDATION_FAILED', 'Envoi de fichier invalide', {
-    fields: { file: ['Fichier invalide'] },
+    fields: { file: ['validation.fileInvalid'] },
   });
 }

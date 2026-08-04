@@ -39,7 +39,7 @@ export class AgenciesService {
   ): Promise<AgencyForMember> {
     if (RESERVED_AGENCY_SLUGS.includes(input.slug)) {
       throw new AppError('SLUG_TAKEN', 'Cet identifiant est réservé', {
-        fields: { slug: ['Identifiant réservé'] },
+        fields: { slug: ['validation.slugReserved'] },
       });
     }
 
@@ -49,7 +49,7 @@ export class AgenciesService {
     });
     if (taken) {
       throw new AppError('SLUG_TAKEN', 'Cet identifiant est déjà pris', {
-        fields: { slug: ['Déjà utilisé'] },
+        fields: { slug: ['validation.slugTaken'] },
       });
     }
 
@@ -224,8 +224,8 @@ export class AgenciesService {
     if (!agency.registreCommerce || !agency.nif) {
       throw new AppError('VALIDATION_FAILED', 'Registre de commerce et NIF requis', {
         fields: {
-          ...(agency.registreCommerce ? {} : { registreCommerce: ['Requis pour la vérification'] }),
-          ...(agency.nif ? {} : { nif: ['Requis pour la vérification'] }),
+          ...(agency.registreCommerce ? {} : { registreCommerce: ['validation.requiredForVerification'] }),
+          ...(agency.nif ? {} : { nif: ['validation.requiredForVerification'] }),
         },
       });
     }

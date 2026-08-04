@@ -23,8 +23,8 @@ import { algerianPhoneSchema } from '../phone';
  */
 export const passwordSchema = z
   .string()
-  .min(10, 'Le mot de passe doit contenir au moins 10 caractères')
-  .max(200, 'Mot de passe trop long');
+  .min(10, 'validation.passwordTooShort')
+  .max(200, 'validation.passwordTooLong');
 
 export const emailSchema = z.string().trim().toLowerCase().email().max(254);
 
@@ -40,11 +40,11 @@ export const registerSchema = z
     email: emailSchema.optional(),
     phone: algerianPhoneSchema.optional(),
     password: passwordSchema,
-    displayName: z.string().trim().min(2, 'Nom trop court').max(80),
+    displayName: z.string().trim().min(2, 'validation.nameTooShort').max(80),
     locale: localeSchema.default('fr'),
   })
   .refine((v) => Boolean(v.email) || Boolean(v.phone), {
-    message: 'Un email ou un numéro de téléphone est requis',
+    message: 'validation.emailOrPhoneRequired',
     path: ['email'],
   });
 
@@ -87,10 +87,10 @@ export type RefreshInput = z.infer<typeof refreshSchema>;
  */
 export const updateProfileSchema = z
   .object({
-    displayName: z.string().trim().min(2, 'Nom trop court').max(80).optional(),
+    displayName: z.string().trim().min(2, 'validation.nameTooShort').max(80).optional(),
     locale: localeSchema.optional(),
   })
-  .refine((v) => Object.keys(v).length > 0, { message: 'Aucune modification' });
+  .refine((v) => Object.keys(v).length > 0, { message: 'validation.noChanges' });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 

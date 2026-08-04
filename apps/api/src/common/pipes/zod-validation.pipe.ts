@@ -56,9 +56,9 @@ export function zodQuery<T extends z.ZodTypeAny>(schema: T): ZodValidationPipe<T
  * `../../etc/passwd` or a 40 KB string reaches your database otherwise.
  */
 export const uuidParam = (): ZodValidationPipe<z.ZodString> =>
-  new ZodValidationPipe(z.string().uuid('Identifiant invalide'));
+  new ZodValidationPipe(z.string().uuid('validation.idInvalid'));
 
 export const slugParam = (): ZodValidationPipe<z.ZodString> =>
   new ZodValidationPipe(
-    z.string().trim().toLowerCase().min(1).max(120).regex(/^[a-z0-9-]+$/, 'Identifiant invalide'),
+    z.string().trim().toLowerCase().min(1).max(120).regex(/^[a-z0-9-]+$/, 'validation.idInvalid'),
   );

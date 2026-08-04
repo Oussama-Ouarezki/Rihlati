@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { translateFieldErrors } from '@/lib/validation-messages';
 import {
   CHECKPOINT_TYPES,
   MILESTONE_KINDS,
@@ -35,6 +36,7 @@ export function MilestoneForm(props: {
   const t = useTranslations('programme');
   const tKinds = useTranslations('milestoneKinds');
   const tCheckpoint = useTranslations('checkpointTypes');
+  const tValidation = useTranslations('validation');
 
   const [state, formAction, pending] = useActionState<MilestoneFormState, FormData>(props.action, {
     error: null,
@@ -54,9 +56,9 @@ export function MilestoneForm(props: {
           <p className="font-medium">{state.error}</p>
           {state.fields ? (
             <ul className="mt-1 list-disc ps-5 text-xs">
-              {Object.entries(state.fields).map(([field, messages]) => (
+              {translateFieldErrors(tValidation, state.fields).map(([field, message]) => (
                 <li key={field}>
-                  {field}: {messages.join(', ')}
+                  {field}: {message}
                 </li>
               ))}
             </ul>

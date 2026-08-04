@@ -14,8 +14,8 @@ import { offerAttributeSchemas } from './attributes';
 /** Date-only, "2026-03-14". Trips have dates, not timestamps. */
 export const dateOnlySchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Format attendu : AAAA-MM-JJ')
-  .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), { message: 'Date invalide' });
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'validation.dateFormat')
+  .refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), { message: 'validation.dateInvalid' });
 
 /** ISO-3166 alpha-2 country code. */
 export const countryCodeSchema = z.string().trim().length(2).toUpperCase();
@@ -146,18 +146,18 @@ export const offerSearchSchema = paginationSchema
       v.minPriceCentimes === undefined ||
       v.maxPriceCentimes === undefined ||
       v.minPriceCentimes <= v.maxPriceCentimes,
-    { message: 'Le prix minimum doit être inférieur au prix maximum', path: ['minPriceCentimes'] },
+    { message: 'validation.priceMinAboveMax', path: ['minPriceCentimes'] },
   )
   .refine(
     (v) => v.departureFrom === undefined || v.departureTo === undefined || v.departureFrom <= v.departureTo,
-    { message: 'La date de début doit précéder la date de fin', path: ['departureFrom'] },
+    { message: 'validation.startAfterEnd', path: ['departureFrom'] },
   )
   .refine(
     (v) =>
       v.minDurationDays === undefined ||
       v.maxDurationDays === undefined ||
       v.minDurationDays <= v.maxDurationDays,
-    { message: 'Durée minimale supérieure à la durée maximale', path: ['minDurationDays'] },
+    { message: 'validation.durationMinAboveMax', path: ['minDurationDays'] },
   );
 
 export type OfferSearchInput = z.infer<typeof offerSearchSchema>;
@@ -179,7 +179,7 @@ export type OfferSearchInput = z.infer<typeof offerSearchSchema>;
 export const offerBaseSchema = z.object({
   kind: offerKindSchema,
 
-  title: z.string().trim().min(8, 'Titre trop court').max(140),
+  title: z.string().trim().min(8, 'validation.titleTooShort').max(140),
   summary: z.string().trim().max(300).optional(),
   description: z.string().trim().max(8000).optional(),
 
@@ -245,7 +245,7 @@ function refineOffer(
   ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Le prix maximum doit être supérieur au prix minimum',
+      message: 'validation.priceMaxBelowMin',
       path: ['priceToCentimes'],
     });
   }
@@ -254,7 +254,7 @@ function refineOffer(
   if (value.departureDate && value.returnDate && value.returnDate < value.departureDate) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'La date de retour doit suivre la date de départ',
+      message: 'validation.returnBeforeDeparture',
       path: ['returnDate'],
     });
   }

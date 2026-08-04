@@ -33,7 +33,7 @@ export const MAX_PRICE_CENTIMES = 2_000_000_000; // 20 million DZD
 
 export const centimesSchema = z
   .number()
-  .int('Le montant doit être un entier de centimes')
+  .int('validation.amountNotInteger')
   .min(0)
   .max(MAX_PRICE_CENTIMES);
 

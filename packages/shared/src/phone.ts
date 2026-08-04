@@ -66,7 +66,7 @@ export const algerianPhoneSchema = z
     if (!normalized) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Numéro de téléphone algérien invalide',
+        message: 'validation.phoneInvalid',
       });
       return z.NEVER;
     }

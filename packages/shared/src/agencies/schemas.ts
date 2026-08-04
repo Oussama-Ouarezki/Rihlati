@@ -20,9 +20,9 @@ export const agencySlugSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .min(3, 'Identifiant trop court')
+  .min(3, 'validation.slugTooShort')
   .max(60)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Lettres minuscules, chiffres et tirets uniquement');
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'validation.slugFormat');
 
 /**
  * Reserved because they collide with real or planned URL paths, or because
@@ -41,7 +41,7 @@ export const RESERVED_AGENCY_SLUGS: readonly string[] = [
  * could send `status: "verified"` could verify itself.
  */
 export const createAgencySchema = z.object({
-  name: z.string().trim().min(2, 'Nom trop court').max(120),
+  name: z.string().trim().min(2, 'validation.nameTooShort').max(120),
   slug: agencySlugSchema,
   legalName: z.string().trim().max(160).optional(),
   description: z.string().trim().max(4000).optional(),
@@ -90,7 +90,7 @@ export const inviteMemberSchema = z
     role: z.enum(['manager', 'agent']),
   })
   .refine((v) => Boolean(v.email) || Boolean(v.phone), {
-    message: 'Un email ou un numéro de téléphone est requis',
+    message: 'validation.emailOrPhoneRequired',
     path: ['email'],
   });
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
@@ -115,8 +115,8 @@ export const updateMemberRoleSchema = z.object({
 export const MAX_FAQ_ENTRIES = 50;
 
 export const createFaqSchema = z.object({
-  question: z.string().trim().min(5, 'Question trop courte').max(300),
-  answer: z.string().trim().min(1, 'Réponse vide').max(2000),
+  question: z.string().trim().min(5, 'validation.questionTooShort').max(300),
+  answer: z.string().trim().min(1, 'validation.answerEmpty').max(2000),
   /** The language the entry is written in — not who may see it. */
   locale: localeSchema.default('fr'),
   isEnabled: z.boolean().default(true),

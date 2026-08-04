@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { register, type RegisterState } from '@/lib/auth-actions';
+import { translateFieldError } from '@/lib/validation-messages';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,11 +21,13 @@ import { Separator } from '@/components/ui/separator';
  */
 export default function SignupPage() {
   const t = useTranslations('signup');
+  const tValidation = useTranslations('validation');
   const [state, formAction, pending] = useActionState<RegisterState, FormData>(register, {
     error: null,
   });
 
-  const fieldError = (name: string): string | null => state.fields?.[name]?.[0] ?? null;
+  const fieldError = (name: string): string | null =>
+    translateFieldError(tValidation, state.fields?.[name]?.[0]);
 
   return (
     <div className="mx-auto max-w-sm py-12">

@@ -8,6 +8,7 @@
 
 export * from './enums';
 export * from './errors';
+export * from './validation-messages';
 export * from './plans';
 export * from './money';
 export * from './phone';

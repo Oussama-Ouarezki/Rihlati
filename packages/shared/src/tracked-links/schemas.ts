@@ -19,7 +19,7 @@ export const trackedLinkCodeSchema = z
   .trim()
   .min(4)
   .max(24)
-  .regex(/^[A-Za-z0-9]+$/, 'Code invalide');
+  .regex(/^[A-Za-z0-9]+$/, 'validation.codeInvalid');
 
 /**
  * `offerId` absent = the link points at the agency's whole catalogue (an
@@ -29,7 +29,7 @@ export const trackedLinkCodeSchema = z
  * agencies could claim the same one), and both counters.
  */
 export const createTrackedLinkSchema = z.object({
-  label: z.string().trim().min(2, 'Donnez un nom à ce lien').max(80),
+  label: z.string().trim().min(2, 'validation.linkLabelRequired').max(80),
   offerId: z.string().uuid().optional(),
 });
 export type CreateTrackedLinkInput = z.infer<typeof createTrackedLinkSchema>;

@@ -549,6 +549,41 @@ that the badge should say what was actually checked, is in [[Agency Verification
 
 ---
 
+## 026 — Field validation messages are translation keys, not French sentences
+
+**Date:** 2026-08-04
+
+A Zod schema in `packages/shared`, and an API handler rejecting an upload or a taken slug, both
+emit a key such as `validation.slugTaken` in `error.fields`. The client translates it. 37 keys,
+listed in `packages/shared/src/validation-messages.ts`, translated in `fr` / `ar` / `en`.
+
+This closes a violation of "no hardcoded user-facing strings": an Arabic reader who mistyped a
+password got a correctly right-to-left page with a French sentence under the box. The top-level
+`code` already worked this way — field messages were the one place the rule had leaked.
+
+**Rejected:**
+
+- *Send the browser's `Accept-Language` and have the API translate.* Puts a translation file in
+  the API, a second one in the web app, and a third in the eventual mobile app, all needing to
+  agree. The server would also be guessing: the header is the browser's setting, not the
+  language the person picked on the site.
+- *Leave it and fix it when the mobile app exists.* It changes the shape of a public API
+  contract, so the cost only goes up. Today there is exactly one client, so the change is a
+  find-and-replace. That is why it was done now rather than deferred again.
+- *Translate only the shared schemas, not the API's own messages.* Half the problem: the avatar
+  upload error on `/compte` comes from `image.service.ts`, is printed by the same code, and
+  would still have been French.
+
+**Cost:** a schema no longer reads as a sentence — `.min(2, 'validation.nameTooShort')` needs a
+lookup to know what it says. And a key with no translation prints the key itself on the page,
+which is uglier than the wrong language. Both are why `validation-messages.test.ts` exists: it
+scans the source for `'validation.…'` literals and fails if any locale is missing one.
+
+**Not done:** Zod's built-in messages (`.email()`, `.max(120)`) are still English in every
+locale. See the warning in [[Validation at the Boundary]].
+
+---
+
 ## Template for new entries
 
 ```

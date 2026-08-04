@@ -138,20 +138,21 @@ not a translation task. Retrofitting RTL into a finished UI costs more than buil
 
 **Your decision:** which is the default language on first visit?
 
-> [!bug] Known violation of "no hardcoded user-facing strings" — needs your call
-> Field-level validation messages are written **in French inside the shared Zod schemas** (14 of
-> them, in `auth`, `agencies`, `leads` and `reservations`). The API sends them through in
-> `error.fields`, and the client prints them as-is. So an Arabic reader who mistypes their
-> password on `/inscription` gets an Arabic page with a French error under the box. Screenshot
-> evidence taken 2026-08-04.
+> [!success] Fixed 2026-08-04 — validation messages are translated now
+> Field-level messages used to be French prose inside the shared Zod schemas, so an Arabic
+> reader who mistyped a password got a right-to-left page with a French error under the box.
+> They are keys now (`validation.nameTooShort`), translated by whichever client is displaying
+> them. See [[Decision Log]] 026 and [[Validation at the Boundary]].
 >
-> Everything else already follows the right pattern: the API sends an error **code** and the
-> client owns the wording. These field messages are the one place it broke.
->
-> The fix is to make the schemas emit stable keys (`validation.nameTooShort`) that each client
-> translates. **It changes the shape of `error.fields` in the public API contract**, which the
-> mobile app would also have to follow — so it is your decision, not one to make quietly while
-> fixing something else.
+> One piece is still open, and it is a small one: Zod's *own* built-in wording (`.email()`,
+> `.max(120)`) is English in every locale. It shows up rarely, because most fields carry a
+> message we wrote, but it does show up.
+
+> [!question] Still yours to decide: which language a first-time visitor sees
+> Today the default is French, with Arabic and English one click away. The argument for Arabic
+> as the default is that Omra buyers skew older and more Arabic-first; the argument for French
+> is that it is what most Algerian commercial sites use, so it looks familiar. Nobody has
+> tested either.
 
 ---
 

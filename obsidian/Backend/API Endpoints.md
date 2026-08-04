@@ -342,7 +342,7 @@ keep the badge.
   "error": {
     "code": "OFFER_LIMIT_REACHED",
     "message": "…",
-    "fields": { "slug": ["Déjà utilisé"] },
+    "fields": { "slug": ["validation.slugTaken"] },
     "details": { "plan": "free", "limit": 5, "current": 5 },
     "requestId": "0198a0b1-…"
   }
@@ -352,6 +352,11 @@ keep the badge.
 The **code** is what clients switch on — the message is for developers, and the app is Arabic
 and French, so the API has no business choosing which one a user reads. Full list in
 `packages/shared/src/errors.ts`.
+
+`fields` follows the same rule one level down: each entry is a **key**, not a sentence. The
+client looks `validation.slugTaken` up in its own message file and prints Arabic, French or
+English. The keys are listed in `packages/shared/src/validation-messages.ts`, and a test fails
+if a schema emits one that no locale translates. See [[Validation at the Boundary]].
 
 `requestId` is also returned as the `X-Request-Id` header and appears in every log line for
 that request. A user quotes it, you find the exact failure. That is what makes rule #4 usable.

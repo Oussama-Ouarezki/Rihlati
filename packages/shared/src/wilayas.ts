@@ -91,7 +91,7 @@ export function wilayaName(code: string, locale: 'ar' | 'fr' | 'en' = 'fr'): str
 export const wilayaCodeSchema = z
   .string()
   .trim()
-  .refine((code) => WILAYA_BY_CODE.has(code), { message: 'Code wilaya invalide' });
+  .refine((code) => WILAYA_BY_CODE.has(code), { message: 'validation.wilayaInvalid' });
 
 /**
  * The wilayas with an international airport travelers actually depart from.

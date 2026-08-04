@@ -36,17 +36,17 @@ export const createReservationSchema = z
   .object({
     offerId: z.string().uuid().optional(),
     leadId: z.string().uuid().optional(),
-    contactName: z.string().trim().min(2, 'Nom trop court').max(80).optional(),
+    contactName: z.string().trim().min(2, 'validation.nameTooShort').max(80).optional(),
     contactPhone: algerianPhoneSchema.optional(),
     peopleCount: z.number().int().min(1).max(200).default(1),
     notes: z.string().trim().max(500).optional(),
   })
   .refine((v) => Boolean(v.leadId) || (Boolean(v.contactName) && Boolean(v.contactPhone)), {
-    message: 'Indiquez un client existant, ou un nom et un téléphone',
+    message: 'validation.clientOrContactRequired',
     path: ['contactName'],
   })
   .refine((v) => Boolean(v.leadId) || Boolean(v.offerId), {
-    message: 'Indiquez le départ concerné',
+    message: 'validation.departureRequired',
     path: ['offerId'],
   });
 export type CreateReservationInput = z.infer<typeof createReservationSchema>;

@@ -45,7 +45,7 @@ export type CheckpointType = (typeof CHECKPOINT_TYPES)[number];
 const timeOfDaySchema = z
   .string()
   .trim()
-  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Format attendu : HH:MM')
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'validation.timeFormat')
   .optional();
 
 /**
@@ -61,14 +61,14 @@ const timeOfDaySchema = z
 export const MILESTONE_TITLE_MAX = 60;
 
 export const createMilestoneSchema = z.object({
-  title: z.string().trim().min(2, 'Titre trop court').max(MILESTONE_TITLE_MAX),
+  title: z.string().trim().min(2, 'validation.titleTooShort').max(MILESTONE_TITLE_MAX),
   description: z.string().trim().max(1000).optional(),
   kind: milestoneKindSchema.default('other'),
   dayOffset: z.number().int().min(0).max(365).default(0),
   timeOfDay: timeOfDaySchema,
   locationName: z.string().trim().max(200).optional(),
   meetingPoint: z.string().trim().max(500).optional(),
-  mapUrl: z.string().trim().url('Lien invalide').max(2048).optional(),
+  mapUrl: z.string().trim().url('validation.urlInvalid').max(2048).optional(),
   checkpointType: checkpointTypeSchema.default('none'),
 });
 export type CreateMilestoneInput = z.infer<typeof createMilestoneSchema>;

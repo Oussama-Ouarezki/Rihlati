@@ -4,6 +4,7 @@ import { useActionState, useMemo, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { WILAYAS, type AgencyForMember } from '@rihlati/shared';
 import type { AgencyFormState } from '@/lib/agency-actions';
+import { translateFieldError } from '@/lib/validation-messages';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -48,6 +49,7 @@ export function AgencyForm(props: {
   submitLabel: string;
 }) {
   const t = useTranslations('agencyForm');
+  const tValidation = useTranslations('validation');
   const locale = useLocale();
   const [state, formAction, pending] = useActionState<AgencyFormState, FormData>(props.action, {
     error: null,
@@ -67,7 +69,8 @@ export function AgencyForm(props: {
    */
   const initial = (field: TextField): string =>
     state.values?.[field] ?? props.agency?.[field] ?? '';
-  const fieldError = (field: string): string | null => state.fields?.[field]?.[0] ?? null;
+  const fieldError = (field: string): string | null =>
+    translateFieldError(tValidation, state.fields?.[field]?.[0]);
 
 
   // Built once per locale rather than per render: 58 wilayas rebuilt on every
