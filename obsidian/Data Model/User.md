@@ -147,6 +147,21 @@ handled from the first component instead of retrofitted. See [[The Seven Rules]]
 
 ---
 
+## `avatarUrl`
+
+A profile picture, and the only field on `User` that a user cannot set directly.
+
+`PATCH /auth/me` accepts `displayName` and `locale` and nothing else. To change the picture you
+post the **file** to `POST /auth/me/avatar`; the server re-encodes it and writes the URL itself.
+Letting a client put a URL in this column would let anyone point it at a server they control and
+learn the IP address of everyone who loads a page showing that avatar. Full reasoning in
+[[Image Uploads]].
+
+It is a `String?` holding a URL rather than the bytes. Images do not belong in Postgres — they
+would bloat every backup — so the bytes live in object storage and this column points at them.
+
+---
+
 ## Fields you might expect and won't find
 
 - **No `name` split into first/last.** One `displayName`. Algerian naming conventions

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import {
@@ -7,6 +7,7 @@ import {
   logoutSchema,
   refreshSchema,
   registerSchema,
+  updateProfileSchema,
   type AuthResult,
   type AuthTokens,
   type LoginInput,
@@ -16,6 +17,7 @@ import {
   type LinkedProvider,
   type RegisterInput,
   type SessionUser,
+  type UpdateProfileInput,
 } from '@rihlati/shared';
 import { CurrentUser, Public } from '../../common/auth/auth.decorators';
 import { zodBody } from '../../common/pipes/zod-validation.pipe';
@@ -130,6 +132,19 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() actor: AuthenticatedActor): Promise<SessionUser> {
     return this.auth.me(actor.userId);
+  }
+
+  /**
+   * Edit your own profile. Authenticated (no `@Public()`), and the user id is
+   * taken from the token — there is no `:userId` to tamper with.
+   */
+  @Patch('me')
+  updateMe(
+    @CurrentUser() actor: AuthenticatedActor,
+    @Body(zodBody(updateProfileSchema)) input: UpdateProfileInput,
+    @Req() req: Request,
+  ): Promise<SessionUser> {
+    return this.auth.updateProfile(actor.userId, input, this.meta(req));
   }
 
   private meta(req: Request): RequestMeta {

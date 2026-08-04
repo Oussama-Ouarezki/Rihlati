@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { getLocale, getTranslations } from 'next-intl/server';
-import type { AuthResult } from '@rihlati/shared';
+import type { ApiErrorBody, AuthResult } from '@rihlati/shared';
 import { redirect } from '@/i18n/navigation';
 import { formText } from './form';
 import {
@@ -59,6 +59,90 @@ export async function login(_previous: LoginState, formData: FormData): Promise<
 
   redirect({ href: '/console', locale: await getLocale() });
   return { error: null }; // unreachable; redirect throws
+}
+
+export interface RegisterState {
+  error: string | null;
+  /** Per-field messages from the API's typed error, keyed by field name. */
+  fields?: Record<string, string[]>;
+  /** Echoed back so a rejected form does not wipe what was typed. Never the password. */
+  values?: { displayName?: string; email?: string; phone?: string };
+}
+
+/**
+ * Signup, same shape as `login`: the password goes browser → Next server → API
+ * and the tokens land in httpOnly cookies. The API is the only validator that
+ * matters — this action does not pre-check anything the server also checks,
+ * because two copies of a rule drift apart.
+ */
+export async function register(
+  _previous: RegisterState,
+  formData: FormData,
+): Promise<RegisterState> {
+  const t = await getTranslations('signup');
+  const locale = await getLocale();
+
+  const values = {
+    displayName: formText(formData, 'displayName'),
+    email: formText(formData, 'email'),
+    phone: formText(formData, 'phone'),
+  };
+  const password = formText(formData, 'password');
+
+  const response = await fetch(`${API_BASE}/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      displayName: values.displayName,
+      // Omitted rather than sent empty: the schema treats both as optional, and
+      // `email: ""` fails the email format check with a confusing message.
+      ...(values.email ? { email: values.email } : {}),
+      ...(values.phone ? { phone: values.phone } : {}),
+      password,
+      locale,
+    }),
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiErrorBody | null;
+    return {
+      error: signupErrorMessage(body?.error?.code, t),
+      fields: body?.error?.fields,
+      values,
+    };
+  }
+
+  const result = (await response.json()) as AuthResult;
+
+  const store = await cookies();
+  store.set(ACCESS_COOKIE, result.tokens.accessToken, cookieOptions(ACCESS_MAX_AGE));
+  store.set(REFRESH_COOKIE, result.tokens.refreshToken, cookieOptions(REFRESH_MAX_AGE));
+
+  // Straight to the console: a brand-new account has no agency, and the console
+  // layout is where the "create your agency" invitation lives.
+  redirect({ href: '/console', locale });
+  return { error: null }; // unreachable; redirect throws
+}
+
+function signupErrorMessage(
+  code: string | undefined,
+  t: Awaited<ReturnType<typeof getTranslations<'signup'>>>,
+): string {
+  switch (code) {
+    case 'EMAIL_ALREADY_USED':
+      return t('errEmailTaken');
+    case 'PHONE_ALREADY_USED':
+      return t('errPhoneTaken');
+    case 'IDENTIFIER_REQUIRED':
+      return t('errIdentifierRequired');
+    case 'VALIDATION_FAILED':
+      return t('errValidation');
+    case 'RATE_LIMITED':
+      return t('errRateLimited');
+    default:
+      return t('errGeneric');
+  }
 }
 
 export async function logout(): Promise<void> {

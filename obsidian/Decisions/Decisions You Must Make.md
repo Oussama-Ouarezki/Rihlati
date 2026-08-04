@@ -79,6 +79,20 @@ anything.
 **Your decision:** what exactly does "Vérifiée" mean on your site, in one sentence a traveler
 believes? Write that sentence before writing any code.
 
+> [!warning] This section was written before anyone checked whether verifying is *possible*
+> "A real address someone visited, a bank account in the company's name" is a description of a
+> job, not of a check we can perform — and there is **no register we can look an agency up in**.
+> So the honest options are a plausibility check, a documentary check, or an accountability
+> model where we hold real identity documents and pursue fraud after the fact rather than
+> claiming to certify beforehand.
+>
+> That reframes the decision above. It is no longer only "what does the badge mean" but
+> "what can we actually check, and does the badge tell the truth about it?" A weaker label
+> that is true beats « Vérifiée » that is not.
+>
+> Deferred 2026-08-04, with the reasoning, the three options and the open questions written up
+> in [[Agency Verification]]. **Read that before answering this section.**
+
 ---
 
 ## 5. How agencies pay you — in a country without Stripe
@@ -123,6 +137,21 @@ Arabic + French, both, from day one — and Arabic means RTL, which is an archit
 not a translation task. Retrofitting RTL into a finished UI costs more than building it in.
 
 **Your decision:** which is the default language on first visit?
+
+> [!bug] Known violation of "no hardcoded user-facing strings" — needs your call
+> Field-level validation messages are written **in French inside the shared Zod schemas** (14 of
+> them, in `auth`, `agencies`, `leads` and `reservations`). The API sends them through in
+> `error.fields`, and the client prints them as-is. So an Arabic reader who mistypes their
+> password on `/inscription` gets an Arabic page with a French error under the box. Screenshot
+> evidence taken 2026-08-04.
+>
+> Everything else already follows the right pattern: the API sends an error **code** and the
+> client owns the wording. These field messages are the one place it broke.
+>
+> The fix is to make the schemas emit stable keys (`validation.nameTooShort`) that each client
+> translates. **It changes the shape of `error.fields` in the public API contract**, which the
+> mobile app would also have to follow — so it is your decision, not one to make quietly while
+> fixing something else.
 
 ---
 

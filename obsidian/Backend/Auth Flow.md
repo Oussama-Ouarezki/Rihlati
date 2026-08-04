@@ -44,6 +44,38 @@ needs working email delivery, which does not exist yet, and leaves a user starin
 that silently did nothing. Rate limiting is what makes bulk enumeration impractical here.
 Login, where the stakes are higher, does *not* leak (below).
 
+**The web page is `/inscription`.** Until 2026-08-04 this endpoint existed but nothing called
+it, so an agency could only be created by hand in SQL. It now runs through the same server
+action pattern as login: the password is posted to a server action, the Next server calls the
+API, and the tokens land in httpOnly cookies the browser cannot read (see Decision 019 below).
+
+After signing up with no agency, the console shows a dead-end screen with a link to
+`/nouvelle-agence`. That page is deliberately **outside** `/console`, because the console layout
+short-circuits to that same dead-end screen for anyone with no membership — putting the
+create-agency form inside it would make it unreachable by exactly the people who need it.
+
+---
+
+## Profile edits
+
+```
+PATCH /v1/auth/me
+{ displayName?, locale? }
+```
+
+The interesting part is the list of fields it **refuses**:
+
+- `avatarUrl` — a picture is uploaded as bytes to `POST /auth/me/avatar`. See [[Image Uploads]].
+- `email` / `phone` — these are what you log in with. Changing one is account recovery: it needs
+  the current password and a verification round trip, and neither exists yet. The account page
+  shows them read-only with a note to contact support.
+- `isPlatformAdmin`, `emailVerifiedAt`, … — server-owned, always.
+
+None of them are in `updateProfileSchema`, so Zod strips them rather than the handler having to
+remember to ignore them. Two tests post `avatarUrl` and `isPlatformAdmin` and assert nothing
+happened. This is [[Validation at the Boundary]] doing its job: the safe thing is the default,
+not something a future handler has to opt into.
+
 ---
 
 ## Login

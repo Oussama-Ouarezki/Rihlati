@@ -29,6 +29,9 @@ coverage/
 playwright-report/
 test-results/
 
+# locally stored uploads (STORAGE_DRIVER=local) — real users' pictures
+var/
+
 # db dumps — may contain real user data
 *.sql.gz
 *.dump
@@ -49,3 +52,7 @@ playwright-report/
 
 # Claude Code: shared config is settings.json; .local.json is personal
 .claude/settings.local.json
+.claude/.headroom_wrap_marker.json
+
+# Local scratch from editor tooling — machine-specific, not project config
+.serena/

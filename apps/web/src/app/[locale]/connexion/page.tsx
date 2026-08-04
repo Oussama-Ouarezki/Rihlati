@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import { login, type LoginState } from '@/lib/auth-actions';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
  */
 export default function LoginPage() {
   const t = useTranslations('console');
+  const tSignup = useTranslations('signup');
   const [state, formAction, pending] = useActionState<LoginState, FormData>(login, {
     error: null,
   });
@@ -44,7 +46,7 @@ export default function LoginPage() {
 
           {/* A plain link, not a fetch: the OAuth dance is a browser redirect
               and the route sets the state + PKCE cookies on the way out. */}
-          <Button variant="outline" size="lg" className="w-full" render={<a href="/auth/google/start" />}>
+          <Button variant="outline" size="lg" className="w-full" nativeButton={false} render={<a href="/auth/google/start" />}>
             <span aria-hidden className="text-lg">G</span>
             {t('google')}
           </Button>
@@ -81,6 +83,16 @@ export default function LoginPage() {
               {pending ? t('signingIn') : t('submit')}
             </Button>
           </form>
+
+          <p className="text-center text-sm text-muted-foreground">
+            {tSignup('noAccount')}{' '}
+            <Link
+              href="/inscription"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              {tSignup('createAccount')}
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>

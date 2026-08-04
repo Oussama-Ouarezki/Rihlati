@@ -71,6 +71,29 @@ export const refreshSchema = z.object({
 });
 export type RefreshInput = z.infer<typeof refreshSchema>;
 
+/**
+ * What a user may change about their own account.
+ *
+ * Note what is absent, and why each absence is deliberate:
+ *   - `avatarUrl` — a picture is uploaded as BYTES, never as a URL the client
+ *     picks. Letting a client set the URL means it can point a profile picture
+ *     at any server on the internet, turning every page that renders it into a
+ *     tracking beacon (or worse, a way to host content under our domain's
+ *     reputation). The server names the file. See the uploads endpoints.
+ *   - `email` / `phone` — changing an identifier is an account-recovery
+ *     decision, not a profile edit. It needs the current password and a
+ *     verification round trip, so it gets its own endpoint when delivery exists.
+ *   - `isPlatformAdmin`, `emailVerifiedAt`, … — server-owned, always.
+ */
+export const updateProfileSchema = z
+  .object({
+    displayName: z.string().trim().min(2, 'Nom trop court').max(80).optional(),
+    locale: localeSchema.optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'Aucune modification' });
+
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
 export const logoutSchema = z.object({
   refreshToken: z.string().min(20).max(500).optional(),
   /** Log out of every device, not just this one. */

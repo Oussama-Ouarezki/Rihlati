@@ -27,6 +27,14 @@ So: check every agency by hand, forever. Record who verified it and when. And **
 ones that fail** — the refusals are what make the badge mean anything. A badge everyone has
 is decoration.
 
+> [!warning] None of the reviewing exists yet — and there is a harder problem under it
+> An agency can *ask* to be reviewed; nothing can approve it. There is no admin page, no
+> verify endpoint, and no notification, so `verifiedAt` and `verifiedByUserId` are always
+> null. Deferred deliberately on 2026-08-04, because **we have no register to check an agency
+> against** — which means "check by hand" above needs a definition before it can be built.
+> The whole problem, including whether the badge should even say « Vérifiée », is in
+> [[Agency Verification]].
+
 > [!important] Write down what "Vérifiée" means, in one sentence, before you launch
 > A traveler has to believe it. "We have seen this agency's trade register and tourism
 > licence, and confirmed the address" is a claim you can defend. "Trusted partner" is not.
@@ -114,6 +122,20 @@ one field covers both means agencies get contacted on a phone nobody answers.
 `wilayaCode` is a two-digit string (`"16"` = Alger), never an integer — `"01"` must not
 become `1`. The full list of 58 is in `packages/shared/src/wilayas.ts` with French and
 Arabic names.
+
+An agency fills all of this in itself, at `/nouvelle-agence` on the web, and edits it at
+`/console/agence`. `wilayaCode` and `description` are the two that decide whether it is findable
+at all — the wilaya is a search filter, and the description is searched as text. See
+[[Search and Filters]].
+
+---
+
+## `logoUrl`
+
+Same rule as [[User]]'s `avatarUrl`: the client posts the **file** to
+`POST /agencies/{agencyId}/logo`, never a URL, and the server names it. Manager or owner only —
+a logo appears next to the "verified" badge, so it is not an ordinary agent's to change.
+See [[Image Uploads]].
 
 ---
 

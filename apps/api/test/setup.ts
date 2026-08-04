@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import { beforeAll } from 'vitest';
 
@@ -60,6 +61,14 @@ process.env['DATABASE_URL'] = testUrl;
 process.env['JWT_ACCESS_SECRET'] ??= 'test-access-secret-that-is-long-enough-0123456789';
 process.env['JWT_REFRESH_SECRET'] ??= 'test-refresh-secret-that-is-long-enough-9876543210';
 process.env['LOG_LEVEL'] = 'error';
+
+/**
+ * Uploads go to a scratch directory, not the one `npm run dev` uses. Tests
+ * that write into the developer's working storage leave debris that later
+ * makes a real bug look like a stale file.
+ */
+process.env['STORAGE_DRIVER'] = 'local';
+process.env['STORAGE_LOCAL_DIR'] = path.join(os.tmpdir(), 'rihlati-test-uploads');
 
 beforeAll(() => {
   const testDbName = new URL(testUrl).pathname.replace(/^\//, '');

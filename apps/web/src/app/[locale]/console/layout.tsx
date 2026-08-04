@@ -3,6 +3,7 @@ import { Link } from '@/i18n/navigation';
 import { getSession, redirectToLogin } from '@/lib/session';
 import { logout } from '@/lib/auth-actions';
 import { ConsoleNav, type ConsoleNavLink } from '@/components/console/ConsoleNav';
+import { Button } from '@/components/ui/button';
 
 /**
  * The agency console shell. The session check here is UX — the API rejects an
@@ -17,6 +18,7 @@ export default async function ConsoleLayout(props: { children: React.ReactNode }
   const tManifest = await getTranslations('manifest');
   const tLinks = await getTranslations('links');
   const tOffers = await getTranslations('offerForm');
+  const tAgency = await getTranslations('agencyForm');
   const membership = session!.membership;
 
   if (!membership) {
@@ -24,6 +26,9 @@ export default async function ConsoleLayout(props: { children: React.ReactNode }
       <div className="mx-auto max-w-md py-16 text-center">
         <h1 className="text-xl font-semibold">{t('noAgencyTitle')}</h1>
         <p className="mt-2 text-slate-600">{t('noAgencyBody')}</p>
+        <Button className="mt-6" size="lg" nativeButton={false} render={<Link href="/nouvelle-agence" />}>
+          {tAgency('createSubmit')}
+        </Button>
       </div>
     );
   }
@@ -35,6 +40,7 @@ export default async function ConsoleLayout(props: { children: React.ReactNode }
     { href: '/console/links', label: tLinks('nav') },
     { href: '/console/stats', label: t('navStats') },
     { href: '/console/faq', label: t('navFaq') },
+    { href: '/console/agence', label: tAgency('nav') },
   ];
 
   return (

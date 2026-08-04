@@ -29,7 +29,7 @@ export async function createTestApp(): Promise<TestContext> {
 
   const app = moduleRef.createNestApplication();
   app.use(requestIdMiddleware);
-  app.setGlobalPrefix('v1', { exclude: ['health'] });
+  app.setGlobalPrefix('v1', { exclude: ['health', 'media/*key'] });
   await app.init();
 
   return {

@@ -23,10 +23,11 @@ export type AuditAction =
   // identity
   | 'user.registered' | 'user.logged_in' | 'user.login_failed'
   | 'user.token_reuse_detected' | 'user.logged_out' | 'user.oauth_linked'
+  | 'user.profile_updated' | 'user.avatar_changed'
   // agencies
   | 'agency.created' | 'agency.updated' | 'agency.submitted_for_review'
   | 'agency.verified' | 'agency.rejected' | 'agency.suspended'
-  | 'agency.plan_changed' | 'agency.offer_limit_overridden'
+  | 'agency.plan_changed' | 'agency.offer_limit_overridden' | 'agency.logo_changed'
   | 'agency.faq_created' | 'agency.faq_updated' | 'agency.faq_deleted'
   | 'member.invited' | 'member.role_changed' | 'member.removed'
   // offers

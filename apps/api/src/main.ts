@@ -74,7 +74,7 @@ async function bootstrap(): Promise<void> {
   // is either a bug or someone probing for a memory exhaustion bug.
   app.useBodyParser('json', { limit: '1mb' });
 
-  app.setGlobalPrefix('v1', { exclude: ['health'] });
+  app.setGlobalPrefix('v1', { exclude: ['health', 'media/*key'] });
   app.enableShutdownHooks();
 
   await app.listen(config.API_PORT, '0.0.0.0');

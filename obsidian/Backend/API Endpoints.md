@@ -39,6 +39,22 @@ health endpoint is public by necessity and every extra field is free reconnaissa
 
 ---
 
+## Media
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/media/{key}` | public |
+
+Note the missing `/v1`. Both `/health` and `/media` are in the `exclude` list of
+`setGlobalPrefix` in `main.ts`, because an image URL gets stored in the database and pasted
+into pages — it should not carry an API version that we may want to bump.
+
+This route exists **only in development**, where images are written to local disk. In
+production `STORAGE_DRIVER=s3` and the controller returns 404 for everything, because the
+object store serves its own URLs. See [[Image Uploads]].
+
+---
+
 ## Auth — `/v1/auth`
 
 | Method | Path | Permission | Rate limit |
@@ -50,12 +66,24 @@ health endpoint is public by necessity and every extra field is free reconnaissa
 | POST | `/auth/logout` | logged in | default |
 | GET | `/auth/me` | logged in | default |
 | GET | `/auth/me/providers` | logged in | default |
+| PATCH | `/auth/me` | logged in | default |
+| POST | `/auth/me/avatar` | logged in | 20 / hour |
+| DELETE | `/auth/me/avatar` | logged in | default |
 
 `/auth/refresh` is public because an *expired* access token is exactly when you call it — the
 refresh token in the body is the credential. Full detail in [[Auth Flow]].
 
 `GET /auth/me` returns the user **and their memberships**, which is how a client knows which
 agencies to offer in a switcher.
+
+`PATCH /auth/me` accepts **only** `displayName` and `locale`. It cannot set `avatarUrl` — a
+picture is uploaded as bytes and the server names the file, see [[Image Uploads]]. It cannot
+change `email` or `phone` either: those are what you log in with, so changing one is an
+account-recovery flow (needs the current password and a verification round trip), not a
+profile edit. Neither flow exists yet.
+
+`POST /auth/me/avatar` is `multipart/form-data` with a single `file` part, and returns the
+updated user. See [[Image Uploads]] for what the server does to that file before storing it.
 
 ---
 
@@ -214,6 +242,8 @@ Response time is the metric agencies are sold on, so it is measured rather than 
 | GET | `/agencies/{agencyId}` | member |
 | PATCH | `/agencies/{agencyId}` | manager |
 | POST | `/agencies/{agencyId}/submit-for-review` | owner |
+| POST | `/agencies/{agencyId}/logo` | manager, 20 / hour |
+| DELETE | `/agencies/{agencyId}/logo` | manager |
 | GET | `/agencies/{agencyId}/faq` | member (sees disabled entries too) |
 | POST | `/agencies/{agencyId}/faq` | manager |
 | PATCH | `/agencies/{agencyId}/faq/{faqId}` | manager |

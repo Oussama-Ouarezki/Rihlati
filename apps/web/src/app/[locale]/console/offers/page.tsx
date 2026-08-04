@@ -32,7 +32,7 @@ export default async function OffersPage(props: { params: Promise<{ locale: stri
       {/* ---- one obvious primary action: create an offer ---- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-bold">{t('title')}</h2>
-        <Button render={<Link href="/console/offers/new" />} disabled={full}>
+        <Button nativeButton={false} render={<Link href="/console/offers/new" />} disabled={full}>
           {t('new')}
         </Button>
       </div>

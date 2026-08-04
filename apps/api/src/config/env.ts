@@ -49,6 +49,33 @@ const envSchema = z
     GOOGLE_CLIENT_ID: z.string().optional(),
     GOOGLE_CLIENT_SECRET: z.string().optional(),
 
+    /**
+     * UPLOADED IMAGES — where the bytes go.
+     *
+     * `local` writes to a directory on this machine and the API serves it back.
+     * That is right for development and wrong for production: containers get
+     * replaced, and every replacement takes the users' avatars with it. The
+     * refinement below makes production say so at boot rather than at the first
+     * lost file.
+     */
+    STORAGE_DRIVER: z.enum(['local', 's3']).default('local'),
+    STORAGE_LOCAL_DIR: z.string().default('./var/uploads'),
+
+    /**
+     * Public prefix the stored key is appended to, e.g.
+     * `https://cdn.rihlati.dz` + `/avatars/xyz.webp`. Not a secret.
+     */
+    MEDIA_BASE_URL: z.string().url().default('http://localhost:4000/media'),
+
+    // S3-compatible object storage (Scaleway, Backblaze, Wasabi, MinIO…).
+    // Deliberately not Stripe-style "one blessed vendor": the S3 API is the one
+    // storage interface every provider implements, including Algerian hosts.
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_REGION: z.string().optional(),
+    S3_BUCKET: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
+
     SENTRY_DSN: z.string().optional(),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   })
@@ -94,6 +121,21 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   if (env.NODE_ENV === 'production' && corsOrigins.includes('*')) {
     throw new Error("CORS_ORIGINS='*' en production autorise n'importe quel site à appeler l'API.");
+  }
+  if (env.NODE_ENV === 'production' && env.STORAGE_DRIVER === 'local') {
+    // Local disk in production means uploads live on one container's filesystem:
+    // they vanish on the next deploy and cannot be served by a second instance.
+    throw new Error(
+      "STORAGE_DRIVER='local' en production — les images seraient perdues au prochain déploiement. " +
+        'Utilisez un stockage objet (S3).',
+    );
+  }
+  if (env.STORAGE_DRIVER === 's3') {
+    const missing = (['S3_ENDPOINT', 'S3_REGION', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'] as const)
+      .filter((key) => !env[key]);
+    if (missing.length > 0) {
+      throw new Error(`STORAGE_DRIVER='s3' mais il manque: ${missing.join(', ')}`);
+    }
   }
   if (env.NODE_ENV === 'production' && !env.SENTRY_DSN) {
     // Rule #4. An unmonitored production API means users are your error tracker.

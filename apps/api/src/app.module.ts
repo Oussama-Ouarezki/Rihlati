@@ -17,6 +17,7 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { MilestonesModule } from './modules/milestones/milestones.module';
 import { TripsModule } from './modules/trips/trips.module';
 import { TrackedLinksModule } from './modules/tracked-links/tracked-links.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { HealthModule } from './modules/health/health.module';
 
 /**
@@ -57,6 +58,7 @@ import { HealthModule } from './modules/health/health.module';
     MilestonesModule,
     TripsModule,
     TrackedLinksModule,
+    UploadsModule,
     HealthModule,
   ],
   providers: [

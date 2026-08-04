@@ -5,6 +5,7 @@ import type {
   RegisterInput,
   SessionMembership,
   SessionUser,
+  UpdateProfileInput,
 } from '@rihlati/shared';
 import { normalizeAlgerianPhone } from '@rihlati/shared';
 import { AppError } from '../../common/errors/app-error';
@@ -173,6 +174,47 @@ export class AuthService {
     // The guard already proved this user exists; a miss means it was deleted
     // between the guard and here, which is a 404 either way.
     if (!user) throw new AppError('NOT_FOUND', 'Utilisateur introuvable');
+
+    return this.toSessionUser(user, await this.loadMemberships(userId));
+  }
+
+  /**
+   * `PATCH /auth/me` — edit your own profile.
+   *
+   * The id comes from the access token, never from the body. There is no
+   * `:userId` on this route on purpose: a route that takes one invites a bug
+   * where a missing check lets anyone rename anyone.
+   */
+  async updateProfile(
+    userId: string,
+    input: UpdateProfileInput,
+    meta: RequestMeta,
+  ): Promise<SessionUser> {
+    const before = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { displayName: true, locale: true },
+    });
+    if (!before) throw new AppError('NOT_FOUND', 'Utilisateur introuvable');
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: input,
+      select: USER_SELECT,
+    });
+
+    await this.audit.record({
+      action: 'user.profile_updated',
+      entityType: 'user',
+      entityId: userId,
+      agencyId: null,
+      actorUserId: userId,
+      // Only the changed fields, and only non-sensitive ones. A display name is
+      // fine in an audit row; an email or phone would not be (rule #4).
+      before,
+      after: { displayName: user.displayName, locale: user.locale },
+      ipHash: meta.ipHash ?? null,
+      requestId: meta.requestId,
+    });
 
     return this.toSessionUser(user, await this.loadMemberships(userId));
   }

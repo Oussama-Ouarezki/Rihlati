@@ -467,6 +467,88 @@ this page ever needs to show more, it needs real authentication — not a longer
 
 ---
 
+## 023 — A picture is uploaded as bytes; the client never names a URL
+
+**Date:** 2026-08-04
+
+No endpoint accepts an image *URL* from a client. The browser posts the file, the server
+re-encodes it and picks the filename from a hash of the resulting bytes. `avatarUrl` and
+`logoUrl` are absent from every input schema, so Zod strips them.
+
+**Rejected:**
+- *Accept a URL and store it.* Much less code, and it is what most tutorials show. It also
+  means a user can point their avatar at a server they control and collect the IP address of
+  everyone who loads a page showing it — and can swap the content after it passed moderation.
+- *Accept the upload but store the original bytes.* Then we are serving a file a stranger
+  composed. EXIF GPS from a phone photo leaks the uploader's home address, and a polyglot file
+  that is simultaneously a valid JPEG and valid HTML is stored XSS on our own domain.
+  Re-encoding through sharp closes both, plus decompression bombs, in one step.
+- *Client-side validation only.* Anything decided in a browser can be skipped by not using a
+  browser. The client checks are kept, but as a courtesy over a slow connection, not security.
+
+**Cost:** every upload costs CPU to decode and re-encode, and we discard the user's original —
+so we cannot ever offer "download the file I uploaded". We also lose intentional metadata like
+a photographer's copyright tag. For avatars and logos that is the right trade; for a future
+offer gallery aimed at professional photography it may not be.
+
+---
+
+## 024 — Storage is a driver interface: local disk in dev, S3-compatible in production
+
+**Date:** 2026-08-04
+
+`StorageDriver` (`put` / `remove` / `urlFor`) has two implementations, picked once at boot from
+`STORAGE_DRIVER`. Nothing outside `modules/uploads` knows which is running.
+
+**Rejected:**
+- *Local disk everywhere.* Simplest, and wrong the moment there is more than one server or a
+  container is redeployed — every uploaded image vanishes, silently. The config now **refuses
+  to boot** if `NODE_ENV=production` and `STORAGE_DRIVER=local`, so this cannot happen by
+  accident.
+- *The AWS SDK's S3 client used directly in the service.* Same amount of code today, but it
+  welds us to AWS. Algeria-adjacent hosting is more likely to be an S3-*compatible* provider
+  (Scaleway, Hetzner, Backblaze), so the endpoint is configurable and the driver is behind an
+  interface. **Verify the provider's terms and pricing before launch — not yet done.**
+- *Storing images as bytes in Postgres.* Keeps backups in one place, and makes the database
+  enormous and every backup slow. Object storage is what object storage is for.
+
+**Cost:** two code paths, and the S3 one has never run against a real bucket — it is written
+and typechecked, nothing more. That is a real risk flagged in [[Image Uploads]], not a
+finished feature.
+
+---
+
+## 025 — The agency review tool is deferred until we know what a review checks
+
+**Date:** 2026-08-04
+
+Agencies can now sign themselves up and ask to be verified, but nothing can approve them —
+no admin page, no verify endpoint, no notification. That is deliberate. The blocker is not
+code: **there is no register we can check an agency against**, so building a review screen
+first would produce a button that grants a trust badge on a hunch, with no defensible meaning
+behind it.
+
+**Rejected:**
+- *Ship the admin panel now and figure out the criteria later.* Fastest, and the worst option.
+  The moment the button exists it gets used, and « Vérifiée » starts appearing next to agencies
+  on the strength of a number they typed in themselves. Undoing a badge is far harder than
+  never granting it.
+- *Auto-verify everyone so the marketplace has stock.* Solves the cold-start problem by
+  destroying the only thing that makes this product different from a Facebook group.
+- *Keep verifying by hand in SQL and call it done.* This is the status quo, and it is
+  acceptable **only** while the agency count is near zero. It bypasses the audit log, so
+  `verifiedByUserId` stays null and nobody can answer "who granted this badge" — which is the
+  first question asked after a fraud.
+
+**Cost:** no agency can be verified through the product, so no agency is publicly visible, so
+the marketplace has no supply until this is built or done by hand. That is a real launch
+blocker and it is now the critical path — not a background nicety.
+
+Full analysis, including the accountability-instead-of-certification model and the argument
+that the badge should say what was actually checked, is in [[Agency Verification]].
+
+---
+
 ## Template for new entries
 
 ```

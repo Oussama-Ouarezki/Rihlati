@@ -39,7 +39,7 @@ export default async function EditMilestonePage(props: {
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-xl font-bold">{milestone.title}</h2>
           {milestone.checkpointType !== 'none' ? (
-            <Button render={<Link href={`/console/offers/${offerId}/programme/${milestone.id}/check-ins`} />}>
+            <Button nativeButton={false} render={<Link href={`/console/offers/${offerId}/programme/${milestone.id}/check-ins`} />}>
               {t('attendance')}
             </Button>
           ) : null}
