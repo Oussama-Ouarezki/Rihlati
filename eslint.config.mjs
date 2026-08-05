@@ -140,7 +140,13 @@ export default tseslint.config(
   },
 
   {
-    files: ['apps/api/prisma/seed.ts', '**/*.config.ts', '**/*.config.mjs'],
+    // Operator-facing scripts: printing to the terminal IS their interface.
+    files: [
+      'apps/api/prisma/seed.ts',
+      'apps/api/scripts/**/*.ts',
+      '**/*.config.ts',
+      '**/*.config.mjs',
+    ],
     rules: {
       'no-console': 'off',
       'no-restricted-syntax': 'off',

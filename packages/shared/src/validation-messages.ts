@@ -18,6 +18,7 @@
 export const VALIDATION_MESSAGE_KEYS = [
   'amountNotInteger',
   'answerEmpty',
+  'checkedNoteTooShort',
   'clientConsentRequired',
   'clientOrContactRequired',
   'codeInvalid',
@@ -42,6 +43,7 @@ export const VALIDATION_MESSAGE_KEYS = [
   'priceMaxBelowMin',
   'priceMinAboveMax',
   'questionTooShort',
+  'rejectionReasonTooShort',
   'requiredForVerification',
   'returnBeforeDeparture',
   'slugFormat',

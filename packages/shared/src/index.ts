@@ -18,6 +18,7 @@ export * from './analytics';
 export * from './auth/schemas';
 export * from './auth/oauth';
 export * from './agencies/schemas';
+export * from './admin/schemas';
 export * from './offers/attributes';
 export * from './offers/schemas';
 export * from './offers/form-fields';

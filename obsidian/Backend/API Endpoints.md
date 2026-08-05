@@ -294,6 +294,67 @@ chart can plot it as-is. Collection itself is never gated; see [[Offer Analytics
 
 ---
 
+## The back office — `/v1/admin`
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/admin/agencies?status=&q=&cursor=&limit=` | **admin** |
+| POST | `/admin/agencies/{id}/verify` | **admin** |
+| POST | `/admin/agencies/{id}/reject` | **admin** |
+
+This is the **first deliberately cross-tenant surface in the app**, and it deserves the
+paragraph.
+
+Every other endpoint in this document answers *"what may this agency see?"*, and the answer is
+enforced by `agencyId` sitting in a `where` clause ([[Multi-Tenancy]]). These three answer
+*"what may Rihlati see?"*, and the answer is everything: the queue returns the RC, the NIF, the
+licence number and the owner's phone for agencies the caller has no relationship with. That is
+the job — you cannot review a stranger's documents without reading them.
+
+Which means the whole protection is `@PlatformAdminOnly()` on the controller class, checked in
+`JwtAuthGuard`. One boolean. A bug there exposes every agency at once, where a bug in a
+tenant-scoped service exposes one. That is why the tests for this module spend most of their
+lines on who is *shut out* rather than on the happy path.
+
+> [!note] Look at the path parameter: it is `{id}`, not `{agencyId}`
+> Not a naming whim. `AgencyMembershipGuard` switches itself on for any route containing
+> `:agencyId`, and for a platform admin it hands back a tenant context with `role: 'owner'` —
+> i.e. it frames the request as *staff acting **as** the agency*. That is right for support
+> work and wrong for judging them: a reviewer acts on Rihlati's behalf, not the agency's.
+> So this is the one route family where the guard staying silent is intentional.
+
+**Three rules the endpoints enforce that are worth knowing:**
+
+1. **Only `pending_review` can be decided.** A draft that never applied, and an agency someone
+   else already handled, both get `409 INVALID_STATUS_TRANSITION`. The status is repeated
+   inside the `UPDATE`'s `where` clause, so two admins clicking at once cannot overwrite each
+   other's decision — the second one loses and is told so.
+2. **Verification requires a written note** (`checkedNote`, 10 chars minimum). It is private,
+   it goes only to the audit log, and it exists because [[Agency Verification]] is built around
+   one fear: that the badge claims more than was actually done. This makes the answer to
+   *"what exactly did you verify?"* get written down by the person who decided, at the moment
+   they decided.
+3. **An admin cannot decide on an agency they belong to.** `403 FORBIDDEN` with
+   `details.reason = "self_review"`. Not because staff are expected to cheat — because a badge
+   granted by its own owner is worthless as evidence, and evidence is the only thing the badge
+   is for.
+
+Rejection carries **two** texts, and keeping them apart is the point: `reason` is shown
+verbatim to the agency owner in the red banner on `/console/agence`, and `internalNote` never
+leaves the audit log. Before the second field existed, a private suspicion had nowhere to go
+except the sentence the applicant reads.
+
+Both decisions write an audit row **in the same transaction** as the status change, and
+`verify` sets `verifiedByUserId`. That column had been sitting in the schema unused since the
+first migration, because verification was a hand-written `UPDATE` — which is exactly the
+record you want when a verified agency later turns out to be fraudulent, and exactly the one
+that could not be reconstructed afterwards.
+
+**Becoming an admin is not an endpoint.** See [[Accounts]] — it is a CLI command, and the
+chicken-and-egg reason is written down there.
+
+---
+
 ## The traveler's trip page — `/v1/trips`
 
 | Method | Path | Permission |
@@ -380,8 +441,11 @@ the reason would only confuse them.
   nothing beyond "received".
 - **Staff invitations are not built.** The schema and `inviteMemberSchema` exist; the endpoint
   does not, because it needs email or SMS delivery to be useful.
-- **The admin back-office is not built** — verification, duplicate resolution and report triage
-  are direct database work today. Fine now, not fine at 50 agencies.
+- **The back office covers verification only.** Duplicate resolution and report triage are
+  still direct database work. The queue proves the shape; the other two follow it.
+- **Nobody is told when an agency joins the queue.** It sits there until an admin opens
+  `/admin`. That is fine for one person checking daily and wrong the first week it is missed —
+  see the open questions in [[Agency Verification]].
 - **Saved offers** (`SavedOffer`) has a table and no endpoints yet.
 
 ---

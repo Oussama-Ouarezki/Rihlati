@@ -521,6 +521,8 @@ finished feature.
 ## 025 — The agency review tool is deferred until we know what a review checks
 
 **Date:** 2026-08-04
+**Superseded by 027 (2026-08-05)** — the mechanism was built; the criteria question this entry
+was waiting on is still open. Kept as written, because the reasoning is what 027 argues against.
 
 Agencies can now sign themselves up and ask to be verified, but nothing can approve them —
 no admin page, no verify endpoint, no notification. That is deliberate. The blocker is not
@@ -581,6 +583,57 @@ scans the source for `'validation.…'` literals and fails if any locale is miss
 
 **Not done:** Zod's built-in messages (`.email()`, `.max(120)`) are still English in every
 locale. See the warning in [[Validation at the Boundary]].
+
+---
+
+## 027 — Build the review *mechanism* now, leave the review *criteria* open
+
+**Date:** 2026-08-05
+
+Supersedes the deferral in **025**, and does so without answering the question 025 was waiting
+on. The queue, the verify/reject decision and the audit trail are now built; what a reviewer
+should actually *check* is still undecided, because there is still no register to check
+against.
+
+The reasoning for splitting it that way: 025 was right that a button granting a badge on a
+hunch is worse than no button, but it conflated two things. The **criteria** need an answer we
+do not have. The **mechanism** — a queue ordered by who asked first, a decision attributable to
+a named person, an audit row written in the same transaction — is correct under every possible
+answer to the criteria question, and it was the actual launch blocker: no agency could become
+publicly visible through the product at all.
+
+Three choices inside it, each trading convenience for evidence:
+
+- **Verification requires a written note** (`checkedNote`, private, ≥10 chars). One click would
+  be faster. But the entire worry in [[Agency Verification]] is the gap between what « Vérifiée »
+  claims and what was done, and the only honest moment to record what was done is while looking
+  at the documents.
+- **An admin may not decide on an agency they belong to** (`403`, `self_review`). Not distrust
+  of staff — a badge granted by its own owner proves nothing, and proving something is the
+  badge's only purpose.
+- **The route parameter is `{id}`, not `{agencyId}`**, which deliberately keeps
+  `AgencyMembershipGuard` from firing. The guard would frame the request as *staff acting as
+  the agency*, which is right for support work and wrong for judging them.
+
+**Rejected:**
+
+- *Keep waiting for the CNRC answer.* It may never come, and meanwhile no agency can go live.
+  The mechanism does not depend on it; only the wording of the badge does.
+- *Let the membership guard handle the admin routes by naming the parameter `:agencyId`.*
+  Tempting — it is one character and the guard already grants admins `owner` rank. But it
+  encodes "the reviewer is acting for this agency", which is the opposite of what a review is,
+  and it would have silently allowed an admin to sign off on their own agency.
+- *Bootstrap the first admin from an endpoint that only works while zero admins exist.* A
+  public "make me god" route armed on every fresh deployment, with a race between deploying and
+  registering. A CLI moves the boundary to shell access instead ([[Accounts]]).
+- *Collect identity documents in the same slice.* Explicitly refused. It needs a legal answer
+  and a private-bucket storage driver; combining them is how a passport lands in the public
+  bucket. Still deferred, with the design written down.
+
+**Cost:** the badge still says « Vérifiée » while the review behind it is a plausibility check,
+so the wording question from 025 is now *more* urgent, not less — the button exists and will be
+used. And manual review is now a standing job with no notification attached to it: the queue is
+a page someone has to remember to open.
 
 ---
 

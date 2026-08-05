@@ -153,6 +153,12 @@ model Agency {
   verifiedByUserId String?
   rejectionReason  String?
 
+  /// When this agency entered the review queue. Not `updatedAt`: that moves
+  /// every time anyone edits a phone number, so it cannot answer "who has been
+  /// waiting longest", which is the only fair way to order a manual queue.
+  /// Kept after review so "we took 9 days to answer them" stays measurable.
+  submittedForReviewAt DateTime?
+
   // Algerian legal identifiers, checked BY HAND by an admin.
   // This manual work is the product's moat, not an inconvenience.
   registreCommerce String? // RC
@@ -200,6 +206,9 @@ model Agency {
 
   @@index([status])
   @@index([wilayaCode, status])
+  /// The admin review queue: "pending_review, oldest first". Without this the
+  /// queue page scans every agency on the platform to find the handful waiting.
+  @@index([status, submittedForReviewAt])
   @@map("agencies")
 }
 

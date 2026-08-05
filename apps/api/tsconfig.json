@@ -44,6 +44,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "prisma/**/*.ts",
+    "scripts/**/*.ts",
     "prisma.config.ts",
     "vitest.config.ts"
   ],

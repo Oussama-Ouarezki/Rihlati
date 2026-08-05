@@ -24,6 +24,10 @@ export type AuditAction =
   | 'user.registered' | 'user.logged_in' | 'user.login_failed'
   | 'user.token_reuse_detected' | 'user.logged_out' | 'user.oauth_linked'
   | 'user.profile_updated' | 'user.avatar_changed'
+  // The most powerful permission change there is: a platform admin can read
+  // every agency on the platform. Granted from a CLI, never from an endpoint —
+  // so this row is the only trace it ever happened.
+  | 'user.platform_admin_granted' | 'user.platform_admin_revoked'
   // agencies
   | 'agency.created' | 'agency.updated' | 'agency.submitted_for_review'
   | 'agency.verified' | 'agency.rejected' | 'agency.suspended'

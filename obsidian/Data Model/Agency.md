@@ -8,14 +8,20 @@ private side of the app. See [[Multi-Tenancy]].
 ## Verification: the actual product
 
 ```
-registreCommerce   String?   -- RC
-nif                String?   -- numéro d'identification fiscale
-tourismLicence     String?   -- agrément d'agence de tourisme et de voyage
-status             AgencyStatus
-verifiedAt         DateTime?
-verifiedByUserId   String?
-rejectionReason    String?
+registreCommerce      String?   -- RC
+nif                   String?   -- numéro d'identification fiscale
+tourismLicence        String?   -- agrément d'agence de tourisme et de voyage
+status                AgencyStatus
+submittedForReviewAt  DateTime?  -- when they asked
+verifiedAt            DateTime?  -- when we answered yes
+verifiedByUserId      String?    -- who answered
+rejectionReason       String?    -- shown VERBATIM to the owner
 ```
+
+`submittedForReviewAt` looks redundant next to `updatedAt`, and is not: `updatedAt` moves every
+time anyone edits a phone number, so it cannot answer *"who has been waiting longest?"* — the
+only fair way to order a manual queue. It is kept after the decision too, so "we took nine days
+to answer them" stays a measurable fact rather than a feeling.
 
 Anyone can build a listings website in a month. What's slow, boring and defensible is being
 the place where **every agency has actually been checked**.
@@ -27,12 +33,15 @@ So: check every agency by hand, forever. Record who verified it and when. And **
 ones that fail** — the refusals are what make the badge mean anything. A badge everyone has
 is decoration.
 
-> [!warning] None of the reviewing exists yet — and there is a harder problem under it
-> An agency can *ask* to be reviewed; nothing can approve it. There is no admin page, no
-> verify endpoint, and no notification, so `verifiedAt` and `verifiedByUserId` are always
-> null. Deferred deliberately on 2026-08-04, because **we have no register to check an agency
-> against** — which means "check by hand" above needs a definition before it can be built.
-> The whole problem, including whether the badge should even say « Vérifiée », is in
+> [!success] The reviewing exists now — the harder problem under it does not go away
+> Since 2026-08-05 there is a queue at `/admin`, a verify/reject decision, and
+> `verifiedByUserId` is finally populated by something other than a hand-written `UPDATE`.
+> Granting the badge requires the reviewer to write down what they checked, and that sentence
+> goes to the audit log.
+>
+> What is still unanswered is what they *should* check: **there is no register to check an
+> agency against**. So the fields below are filled in by a human exercising judgement, not by a
+> lookup. Whether the badge should therefore say « Vérifiée » at all is still open — see
 > [[Agency Verification]].
 
 > [!note] Planned: documents, not just numbers

@@ -16,6 +16,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "admin:grant": "tsx scripts/platform-admin.ts grant",
+    "admin:revoke": "tsx scripts/platform-admin.ts revoke",
+    "admin:list": "tsx scripts/platform-admin.ts list",
     "db:validate": "prisma validate",
     "db:format": "prisma format"
   },

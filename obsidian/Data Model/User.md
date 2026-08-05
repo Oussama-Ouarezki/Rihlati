@@ -115,6 +115,17 @@ Rihlati's own staff. Verifies agencies, moderates offers, resolves reports.
 > client list at once. It's the highest-value target in the app, and the defence is that
 > there's simply no code path that writes it. See [[Validation at the Boundary]].
 
+**It is set from a CLI, never from HTTP:** `npm run admin:grant -- someone@rihlati.dz`. The
+chicken-and-egg reasoning — why the first admin cannot be created through any endpoint, and why
+"an endpoint that only works while zero admins exist" is worse than a shell command — is in
+[[Accounts]]. The command writes an audit row with a null actor, because it genuinely does not
+know who was at the keyboard.
+
+The flag is read from the **database on every request**, not from the access token's `adm`
+claim. So revoking it bites immediately rather than whenever the token happens to expire, and
+there is a test that holds a still-valid token across a demotion and asserts the next request
+is refused.
+
 Every action an admin takes is written to the [[Audit Log]]. Not because you distrust your
 staff, but because "who un-verified this agency?" must have an answer.
 

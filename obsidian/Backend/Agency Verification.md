@@ -1,36 +1,57 @@
 # Agency Verification
 
-> [!warning] Deferred — planned, not built
-> Decided 2026-08-04: not in this slice. The blocker is not code, it is that **we have no
-> authoritative source to check an agency against**. Building a review screen before deciding
-> what a review actually *checks* would produce a button that grants a badge on a hunch.
-> Everything below is the plan and the open questions. Nothing here is implemented.
+> [!success] The mechanism is built — 2026-08-05. The *policy* is still yours.
+> There is now a review queue, a verify/reject decision that is attributable to a named
+> person, and a way to become an admin. What is **not** decided is what a review actually
+> *checks*, because we still have no authoritative source to check against. The machine is
+> built; what you feed it is the open question below.
+>
+> Still deferred, deliberately: **collecting identity documents** (see the section further
+> down). It needs a legal answer and its own storage driver, and bolting it onto this slice is
+> how a passport ends up in the public bucket.
 
 ---
 
 ## What exists today, precisely
 
-An agency can already ask to be reviewed. `POST /v1/agencies/{id}/submit-for-review` (owner
-only) sets `status = 'pending_review'`, clears `rejectionReason`, and writes an audit row.
+**The agency's side.** `POST /v1/agencies/{id}/submit-for-review` (owner only) sets
+`status = 'pending_review'`, clears any old `rejectionReason`, stamps `submittedForReviewAt`
+and writes an audit row.
 
-Then it stops. There is:
+**Rihlati's side** — new, `apps/api/src/modules/admin/`:
 
-- **no admin page** — no `/admin` route in the web app;
-- **no approve or reject endpoint** — nothing anywhere writes `status = 'verified'`;
-- **no notification** — a pending agency sits in the table until someone runs a query;
-- **no way to become an admin** — `isPlatformAdmin` has no path to `true` except SQL.
+| | |
+|---|---|
+| `GET /v1/admin/agencies` | the queue, oldest request first, with the RC / NIF / licence / owner contact on one screen |
+| `POST /v1/admin/agencies/{id}/verify` | grants the badge, sets `verifiedByUserId`, requires a written note of what was checked |
+| `POST /v1/admin/agencies/{id}/reject` | refuses, with an owner-visible reason and a private internal note |
+| `/admin` in the web app | the queue, the two buttons, and the panels that demand a sentence first |
+| `npm run admin:grant -- email` | the only way to create a platform admin |
 
-The rails are laid and unused: `isPlatformAdmin` is on [[User]], it is a claim in the access
-token, `JwtAuthGuard` enforces it, and `@RequirePlatformAdmin()` exists in
-`common/auth/auth.decorators.ts`. **Zero controllers use it.**
+Permissions, transitions and the reasoning behind each are in [[API Endpoints]]; the
+cross-tenant design is the interesting part.
 
-So today, verification is a hand-written `UPDATE`. Two consequences worth stating out loud:
+**What this fixed.** Verification used to be a hand-written `UPDATE`, which meant it bypassed
+the audit log entirely: `verifiedByUserId` stayed null and there was no record of who granted
+a badge. That is precisely the record you want if a verified agency later turns out to be
+fraudulent — and precisely the one that cannot be reconstructed after the fact. It is now
+written in the same transaction as the status change, with the reviewer's note attached.
 
-- It **bypasses the audit log**, so `verifiedByUserId` stays null and there is no record of who
-  granted the badge. That is exactly the record you would want if a verified agency later turns
-  out to be fraudulent.
-- `rejectionReason` is **shown verbatim to the agency owner** in the red banner on
-  `/console/agence`. It is not a place for private notes.
+**What is still missing:**
+
+- **Nobody is notified.** A pending agency sits in the queue until an admin opens `/admin`.
+  There is no email, no digest, no badge count.
+- **No suspension endpoint.** `suspended` is a valid status with no route that sets it, so
+  pulling a fraudulent agency down is still a database edit. The audit action
+  `agency.suspended` already exists, waiting.
+- **No reviewer-facing history.** You can see an agency's current state, not "this is their
+  third attempt". The audit rows hold it; nothing reads them back.
+
+> [!tip] A note that was wrong, and why it is worth recording
+> This page previously said the decorator was `@RequirePlatformAdmin()`. It is
+> `@PlatformAdminOnly()`, in `common/auth/auth.decorators.ts`. The note had drifted from the
+> code, and CLAUDE.md's rule applies: when a note and the code disagree, the code is right and
+> the note is the bug.
 
 ---
 
@@ -224,29 +245,40 @@ for accountability and carries none of the risk.
 
 ---
 
-## When it gets built: the slice
+## The slice as built — and the three choices inside it
 
-Four pieces, one vertical, same shape as everything else:
+All four pieces landed together on 2026-08-05. Documents were held back on purpose: the order
+was always "get the queue and the audit trail working against fields that already exist, then
+add `AgencyDocument` as its own vertical with its own storage driver and the legal answer in
+hand." Building both at once is how the passport ends up in the public bucket.
 
-1. `GET /v1/admin/agencies?status=pending_review` — `@RequirePlatformAdmin()`, finally using
-   the decorator that already exists.
-2. `POST /v1/admin/agencies/{id}/verify` and `.../reject` (reason required). **Both audited**,
-   and `verify` sets `verifiedByUserId` — the column is already in the schema waiting for it.
-   That is the whole point: the badge must be attributable to a person.
-3. `/admin` in the web app: the queue, the submitted documents, approve and reject.
-4. A path to the **first** admin — a seed script or a CLI command, since nothing today can set
-   `isPlatformAdmin`.
+Three decisions inside the slice are worth understanding, because each one traded convenience
+for something:
 
-Documents are a **separate, later slice** and should not be bolted onto this one. Order:
-get the queue and the verify/reject audit trail working against the fields that already
-exist, then add `AgencyDocument` as its own vertical with its own storage driver, its own
-tests, and the legal answer in hand. Building both at once is how the passport ends up in
-the public bucket.
+**1. Verifying costs you a sentence.** `checkedNote` is required, minimum ten characters,
+private to the audit log. It would have been faster to make approval one click. But the fear
+this whole note is built around is the gap between what the badge claims and what was done,
+and a required sentence closes it at the only moment it can be closed honestly — while you are
+looking at the documents. A year later, during a complaint, it cannot be reconstructed.
 
-Note this is the first genuinely **cross-tenant** surface in the app. Every other query is
-scoped by `agencyId` ([[Multi-Tenancy]]); this one deliberately is not, which makes it the most
-dangerous endpoint in the codebase and the one most worth testing hard. A bug in
-`@RequirePlatformAdmin()` exposes every agency at once.
+**2. An admin cannot decide on their own agency.** `403`, with `details.reason =
+"self_review"`. The membership guard cannot catch this — it happily grants an admin `owner`
+rank anywhere — so the service checks it itself. The reasoning is not that staff will cheat;
+it is that a badge granted by its own owner proves nothing, and proving something is the
+badge's only function.
+
+**3. The route says `{id}`, not `{agencyId}`.** That one character keeps
+`AgencyMembershipGuard` from firing, which is intentional: the guard would frame the request
+as *staff acting as the agency*, and a reviewer acts on Rihlati's behalf, not the agency's.
+The cost is that this route family opts out of the app's automatic tenant protection, so it
+carries its own checks. See [[API Endpoints]].
+
+This is the first genuinely **cross-tenant** surface in the app. Every other query is scoped by
+`agencyId` ([[Multi-Tenancy]]); this one deliberately is not, which makes it the most dangerous
+code in the repository. A bug in `@PlatformAdminOnly()` exposes every agency at once, which is
+why `apps/api/test/admin-agencies.e2e.test.ts` spends most of its length on who is shut out —
+anonymous, traveler, agency owner, another agency's manager, and an admin whose rights were
+revoked while holding a valid token.
 
 ---
 
@@ -273,6 +305,15 @@ dangerous endpoint in the codebase and the one most worth testing hard. A bug in
   one left up for a week takes more money.
 - **Who does this work when there are 200 agencies?** Manual review is the moat, and it is also
   a job. It does not scale to one person forever.
+- **How does a reviewer find out there is work?** Nothing notifies anyone today — the queue is
+  a page you have to remember to open. An agency that applies on a Friday may wait until you
+  next think of it, and "we never replied" is a worse first impression than "we said no".
+- **How long may an agency wait before that is a failure?** The queue shows a waiting counter
+  and turns it red past seven days, which was a guess, not a policy. Pick the number you would
+  be comfortable publishing on the signup page.
+- **May an agency see why it was verified?** `checkedNote` is private today. Showing it would
+  make the badge more credible to the agency; keeping it private lets a reviewer write frankly.
+  Both are defensible; only one is currently true.
 
 ## Related
 

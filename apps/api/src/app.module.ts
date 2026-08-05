@@ -11,6 +11,7 @@ import { AgencyMembershipGuard } from './common/auth/agency-membership.guard';
 import { requestIdMiddleware } from './common/http/request-context';
 import { AuthModule } from './modules/auth/auth.module';
 import { AgenciesModule } from './modules/agencies/agencies.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { OffersModule } from './modules/offers/offers.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
@@ -52,6 +53,7 @@ import { HealthModule } from './modules/health/health.module';
 
     AuthModule,
     AgenciesModule,
+    AdminModule,
     OffersModule,
     LeadsModule,
     ReservationsModule,

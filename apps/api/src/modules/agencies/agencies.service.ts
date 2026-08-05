@@ -157,7 +157,9 @@ export class AgenciesService {
         where: { id: tenant.agencyId, deletedAt: null },
         data: {
           ...input,
-          ...(resetToReview ? { status: 'pending_review', verifiedAt: null } : {}),
+          ...(resetToReview
+            ? { status: 'pending_review', verifiedAt: null, submittedForReviewAt: new Date() }
+            : {}),
         },
       });
       if (result.count === 0) throw notFound('Agence');
@@ -233,7 +235,14 @@ export class AgenciesService {
     await this.prisma.$transaction(async (tx) => {
       const result = await tx.agency.updateMany({
         where: { id: tenant.agencyId, status: { in: ['draft', 'rejected'] } },
-        data: { status: 'pending_review', rejectionReason: null },
+        data: {
+          status: 'pending_review',
+          rejectionReason: null,
+          // Stamped here, not in the admin queue, because the clock that
+          // matters is "how long have they been waiting for us" — it starts
+          // when they ask, not when we get round to looking.
+          submittedForReviewAt: new Date(),
+        },
       });
       if (result.count === 0) throw notFound('Agence');
 
