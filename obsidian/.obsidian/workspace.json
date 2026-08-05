@@ -56,7 +56,9 @@
               "type": "file-explorer",
               "state": {
                 "sortOrder": "alphabetical",
-                "autoReveal": false
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
               },
               "icon": "lucide-folder-closed",
               "title": "Files"
@@ -203,9 +205,19 @@
   },
   "active": "671375330a8bd636",
   "lastOpenFiles": [
-    "Decisions/Decision Log.md.tmp.30701.6c660ff1b206",
-    "Decisions/Decision Log.md.tmp.30701.9ee2b3dd8c49",
-    "Decisions/Decision Log.md.tmp.30701.d24d89095859",
+    "Start Here.md.tmp.128241.a06c4266098b",
+    "Concepts/Multi-Tenancy.md.tmp.128241.c675d9e142c8",
+    "Concepts/The Seven Hops of a Request.md",
+    "Concepts/The Seven Hops of a Request.md.tmp.128241.054d2741aa7a",
+    "Start Here.md.tmp.128241.ea49b628b703",
+    "Data Model/Agency.md.tmp.128241.914157513045",
+    "Backend/Image Uploads.md.tmp.128241.f6b31ae73f9a",
+    "Backend/Agency Verification.md.tmp.128241.57e205264706",
+    "Backend/Agency Verification.md.tmp.128241.1d6f72783485",
+    "Backend/Agency Verification.md.tmp.128241.c200a9c72cdd",
+    "Decisions/Decisions You Must Make.md.tmp.128241.66eb2f0c024f",
+    "Decisions/Decision Log.md.tmp.128241.e3426a6a5d79",
+    "Backend/Agency Verification.md",
     "Backend/Plan Limits and Quotas.md",
     "Backend/Offer Analytics.md",
     "Backend/Search and Filters.md",
@@ -226,18 +238,8 @@
     "Data Model/Offer.md",
     "Data Model/User.md",
     "Accounts.md",
-    "Backend/Trip Programme.md.tmp.30701.ac4d3b450e3a",
-    "Backend/Trip Programme.md.tmp.30701.f6db4867fee9",
-    "Backend/Trip Programme.md.tmp.30701.54bf22e59543",
-    "Backend/API Endpoints.md.tmp.30701.ff075203ee19",
-    "Backend/API Endpoints.md.tmp.30701.a4bae67177af",
-    "Backend/Trip Manifest.md.tmp.30701.9c347fb9dfdf",
-    "Decisions/Decision Log.md.tmp.30701.3c804afba18d",
-    "Backend/Trip Programme.md.tmp.30701.4ccbc610a5ee",
     "Glossary.md",
     "Runbooks/Local Setup.md",
-    "Frontend/CRM Redesign.md",
-    "Frontend/Interface Plan.md",
-    "Concepts/What the API Is.md"
+    "Frontend/CRM Redesign.md"
   ]
 }

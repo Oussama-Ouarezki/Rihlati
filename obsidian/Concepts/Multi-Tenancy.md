@@ -58,14 +58,22 @@ no owner. Same for `LeadNote`, `LeadActivity`, `Tag`, `Offer`, `Review`.
 deliberate duplication: it means a note can be scoped without a join, so the safe query is
 also the easy query. **When the safe path is the lazy path, people take it.**
 
-### 2. Queries go through a scoped helper, not through Prisma directly
+### 2. Every tenant-scoped query names the agency in its `where`
 
-Rather than every service calling `prisma.lead.findUnique`, they ask a helper that has
-already been told which agency it's allowed to see. There is no code path that can express
-"find lead 123" without also saying "belonging to my agency" — the function simply doesn't
-take that shape.
+Services call Prisma directly, but never with a bare id. The agency comes from the session
+(`tenant.agencyId`), never from the URL or the body, and it sits in the `where` clause
+beside the id:
 
-The rule in `CLAUDE.md`:
+```ts
+where: { agencyId: tenant.agencyId, deletedAt: null, ... }
+```
+
+Putting it in the `where` rather than checking the row afterwards is the point: a check
+after the fetch can be refactored away, skipped by an early return, or missed when the
+query is reused. A condition inside the query cannot be accidentally skipped, because there
+is nothing to skip.
+
+What makes this hard to forget is ESLint, not discipline. The rule in `CLAUDE.md`:
 
 > No raw `findUnique({ id })` on tenant data — always `findFirst({ where: { id, agencyId } })`.
 

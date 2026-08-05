@@ -50,9 +50,11 @@ Thumbs.db
 test-results/
 playwright-report/
 
-# Claude Code: shared config is settings.json; .local.json is personal
-.claude/settings.local.json
-.claude/.headroom_wrap_marker.json
+# Claude Code: shared config is settings.json; .local.json is personal.
+# Globbed, not anchored: a nested vault or app can have its own .claude/ too,
+# and the root-anchored pattern silently missed obsidian/.claude/.
+**/.claude/settings.local.json
+**/.claude/.headroom_wrap_marker.json
 
 # Local scratch from editor tooling — machine-specific, not project config
 .serena/

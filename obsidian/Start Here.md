@@ -10,6 +10,11 @@ become clickable and the graph view works.
 > when you don't understand something in the code, find its note here and ask me about it.
 > If a note is missing or wrong, tell me — keeping this accurate is part of my job.
 
+> [!tip] Want to learn the code itself, not just read about it?
+> The list below is *what* to read. [[How to Study This Codebase]] is *how* — seven
+> hands-on sessions, about ten hours, each ending in something you must be able to do
+> from memory before moving on.
+
 ---
 
 ## Reading order
@@ -21,6 +26,7 @@ become clickable and the graph view works.
 - [[Vision and Roadmap]] — your product vision, structured: who pays, what's next, what's yours to decide
 - [[System Overview]] — one API, many faces, and why the shape is what it is
 - [[What the API Is]] — what "backend" actually means in practice
+- [[The Seven Hops of a Request]] — one real request traced end to end, the shape every endpoint repeats
 
 **3 — The concepts that decide whether the app is safe.**
 - [[Multi-Tenancy]] — how Agency A is stopped from reading Agency B's clients
@@ -59,7 +65,9 @@ become clickable and the graph view works.
 
 ```
 Rihlati/
+├── README.md                  the doorway: what this is, how to run it
 ├── CLAUDE.md                  the rules I must follow when writing code
+├── AGENTS.md                  a pointer to CLAUDE.md, for non-Claude tools
 ├── obsidian/                  you are here — the explanation
 ├── eslint.config.mjs          lint rules, incl. three that encode past bugs
 ├── .github/workflows/ci.yml   typecheck + lint + test on every push

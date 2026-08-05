@@ -1,5 +1,11 @@
 # Migrations
 
+> [!tip] In plain words
+> Editing `schema.prisma` is just a wish on paper — nothing in the real database changes yet.
+> Running `db:migrate` is what makes it real: like a phone installing pending updates, it
+> applies whatever changes haven't happened yet, in order, without erasing anything already
+> there. It never "refreshes" (wipes and reloads) — it only adds on top.
+
 ## What they are
 
 A **migration** is a recorded change to the database structure — add a column, add a table,
