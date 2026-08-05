@@ -1,12 +1,17 @@
 import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import {
+  copyProgrammeFromOfferSchema,
   createMilestoneSchema,
+  duplicateMilestoneDaySchema,
   reorderMilestonesSchema,
   setMilestoneCompletionSchema,
   updateMilestoneSchema,
+  type CopyProgrammeFromOfferInput,
   type CreateMilestoneInput,
+  type DuplicateMilestoneDayInput,
   type MilestoneItem,
+  type ProgrammeCopySource,
   type ReorderMilestonesInput,
   type SetMilestoneCompletionInput,
   type UpdateMilestoneInput,
@@ -64,6 +69,57 @@ export class OfferMilestonesController {
     @Req() req: Request,
   ): Promise<MilestoneItem[]> {
     return this.milestones.reorder(tenant, actor.userId, offerId, input, this.meta(req));
+  }
+
+  /**
+   * The offers this one may copy a programme from. Read-only and member-level,
+   * like `list` — seeing which of your own offers has a programme is not a
+   * privileged act, even though acting on it is.
+   *
+   * Declared before `:milestoneId` for the same reason as `reorder`.
+   */
+  @Get('copy-sources')
+  copySources(
+    @Tenant() tenant: TenantContext,
+    @Param('offerId', uuidParam()) offerId: string,
+  ): Promise<ProgrammeCopySource[]> {
+    return this.milestones.listCopySources(tenant, offerId);
+  }
+
+  /**
+   * Copy one day's steps onto another day of this same offer. `manager`, like
+   * every other edit to the programme — this writes several rows at once, so
+   * if anything here it is the stricter case, not the looser one.
+   */
+  @RequireAgencyRole('manager')
+  @Post('duplicate-day')
+  duplicateDay(
+    @Tenant() tenant: TenantContext,
+    @Param('offerId', uuidParam()) offerId: string,
+    @Body(zodBody(duplicateMilestoneDaySchema)) input: DuplicateMilestoneDayInput,
+    @CurrentUser() actor: AuthenticatedActor,
+    @Req() req: Request,
+  ): Promise<MilestoneItem[]> {
+    return this.milestones.duplicateDay(tenant, actor.userId, offerId, input, this.meta(req));
+  }
+
+  /**
+   * Copy another of the agency's offers' programmes into this one.
+   *
+   * Note that `sourceOfferId` is a client-sent id for tenant data — the
+   * service re-scopes it to the session's agency, so naming another agency's
+   * offer here returns 404 and copies nothing.
+   */
+  @RequireAgencyRole('manager')
+  @Post('copy-from-offer')
+  copyFromOffer(
+    @Tenant() tenant: TenantContext,
+    @Param('offerId', uuidParam()) offerId: string,
+    @Body(zodBody(copyProgrammeFromOfferSchema)) input: CopyProgrammeFromOfferInput,
+    @CurrentUser() actor: AuthenticatedActor,
+    @Req() req: Request,
+  ): Promise<MilestoneItem[]> {
+    return this.milestones.copyFromOffer(tenant, actor.userId, offerId, input, this.meta(req));
   }
 
   /**

@@ -60,6 +60,15 @@ const timeOfDaySchema = z
  */
 export const MILESTONE_TITLE_MAX = 60;
 
+/**
+ * A ceiling on one offer's programme. Not a plan limit and not a sales lever —
+ * a sanity bound, so that the two bulk operations below (which write many rows
+ * from one tap) cannot grow a programme without end. A 200-step trip is not a
+ * real trip; the API's list read is capped at the same number, so a programme
+ * past this point would silently stop rendering in full.
+ */
+export const MILESTONE_MAX_PER_OFFER = 200;
+
 export const createMilestoneSchema = z.object({
   title: z.string().trim().min(2, 'validation.titleTooShort').max(MILESTONE_TITLE_MAX),
   description: z.string().trim().max(1000).optional(),
@@ -99,6 +108,65 @@ export const setMilestoneCompletionSchema = z.object({
   isDone: z.boolean(),
 });
 export type SetMilestoneCompletionInput = z.infer<typeof setMilestoneCompletionSchema>;
+
+// ---------------------------------------------------------------------------
+// THE TWO BULK OPERATIONS — see Trip Programme.md §7.6
+//
+// Both exist for the same reason: an Omra programme is repetitive, and typing
+// the same five steps out again is the point at which an agency stops using
+// the feature and goes back to a paragraph of prose. Both are ADDITIVE — they
+// only ever append rows, never move or delete an existing one. Undoing an
+// unwanted copy is deleting the rows it made; undoing a copy that had silently
+// rewritten the programme underneath it would be impossible.
+// ---------------------------------------------------------------------------
+
+/**
+ * Copy every step of one day onto another day of the SAME offer.
+ *
+ * `targetDayOffset` is explicit rather than "the next day" because agencies do
+ * not build programmes strictly in order — day 6 gets duplicated onto day 9
+ * after the middle is filled in. The console defaults it to the day after the
+ * source, which is the common case, but the server never assumes it.
+ *
+ * Copies land after anything already on the target day. Other days are never
+ * shifted: a bulk action that renumbered the rest of the trip would be a
+ * destructive edit wearing a convenience label.
+ */
+export const duplicateMilestoneDaySchema = z.object({
+  sourceDayOffset: z.number().int().min(0).max(365),
+  targetDayOffset: z.number().int().min(0).max(365),
+});
+export type DuplicateMilestoneDayInput = z.infer<typeof duplicateMilestoneDaySchema>;
+
+/**
+ * Copy another offer's whole programme into this one — next season's Ramadan
+ * trip is last season's with new dates.
+ *
+ * `sourceOfferId` is a client-sent id pointing at tenant-scoped data, so the
+ * server re-checks that it belongs to the caller's agency; a foreign id is a
+ * 404 like everywhere else (rule #3). This is the field to look at first if
+ * this endpoint is ever reviewed for isolation bugs.
+ *
+ * Day offsets and relative order are preserved. Because `dayOffset` is a
+ * relative number and not a date (§4), the copied programme lands correctly on
+ * a departure date it has never heard of.
+ */
+export const copyProgrammeFromOfferSchema = z.object({
+  sourceOfferId: z.string().uuid(),
+});
+export type CopyProgrammeFromOfferInput = z.infer<typeof copyProgrammeFromOfferSchema>;
+
+/**
+ * One candidate in the "copy from another offer" picker. `milestoneCount` is
+ * here so the agency can tell last season's full 14-day programme from the
+ * two-step draft without opening either.
+ */
+export interface ProgrammeCopySource {
+  offerId: string;
+  title: string;
+  departureDate: string | null;
+  milestoneCount: number;
+}
 
 export interface MilestoneItem {
   id: string;

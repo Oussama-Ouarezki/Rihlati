@@ -414,7 +414,19 @@
     "markArrived": "✓ Arrived",
     "markAbsent": "✗ Absent",
     "markExpected": "↩ Expected",
-    "dragHint": "Drag a step to move it, or use the arrows."
+    "dragHint": "Drag a step to move it, or use the arrows.",
+    "duplicateDay": "Duplicate a day",
+    "duplicateDayHint": "Copies every step of one day onto another. No other day moves.",
+    "duplicateFrom": "Copy day",
+    "duplicateTo": "Onto day",
+    "newDay": "new",
+    "duplicateDayAction": "Duplicate the steps",
+    "copyFromOffer": "Copy from another offer",
+    "copyFromOfferHint": "Takes the whole programme of one of your offers, days and order included. It is added to the end of this one.",
+    "copySource": "Offer to copy",
+    "stepCount": "{count, plural, one {# step} other {# steps}}",
+    "copyFromOfferAction": "{count, plural, one {Add # step} other {Add the # steps}}",
+    "limitReached": "This programme has reached its step limit. Delete some before copying more."
   },
   "trip": {
     "greeting": "Hello {name},",

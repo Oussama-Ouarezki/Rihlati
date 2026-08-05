@@ -257,6 +257,9 @@ Response time is the metric agencies are sold on, so it is measured rather than 
 | GET | `/agencies/{agencyId}/offers/{offerId}/milestones` | member |
 | POST | `/agencies/{agencyId}/offers/{offerId}/milestones` | manager |
 | POST | `/agencies/{agencyId}/offers/{offerId}/milestones/reorder` | manager |
+| GET | `/agencies/{agencyId}/offers/{offerId}/milestones/copy-sources` | member |
+| POST | `/agencies/{agencyId}/offers/{offerId}/milestones/duplicate-day` | manager |
+| POST | `/agencies/{agencyId}/offers/{offerId}/milestones/copy-from-offer` | manager |
 | PATCH | `/agencies/{agencyId}/offers/{offerId}/milestones/{milestoneId}` | manager |
 | POST | `/agencies/{agencyId}/offers/{offerId}/milestones/{milestoneId}/completion` | member |
 | DELETE | `/agencies/{agencyId}/offers/{offerId}/milestones/{milestoneId}` | manager |
@@ -283,6 +286,21 @@ person on the trip — so gating it on `manager` would mean passing a phone arou
 takes `{ isDone: boolean }` rather than being a one-way "done", because the tap that matters
 right after a wrong tap is the undo. One tick advances the "vous êtes ici" marker on every
 traveler's map at once.
+
+The two **bulk copies** — `duplicate-day` and `copy-from-offer` — are `manager` for the same
+reason `POST .../milestones` is: they create steps. `GET .../copy-sources` is member-level, and
+only lists this agency's *other* offers that already have a programme, with a step count so the
+picker can say "8 étapes" instead of showing a UUID. Both writes are **additive**: they append
+copies and never move or delete an existing step, so the undo is "delete the rows it just made".
+Both refuse past `MILESTONE_MAX_PER_OFFER` (200) with `409 MILESTONE_LIMIT_REACHED` — a limit on
+one programme's sanity, not a plan gate.
+
+`copy-from-offer` is the place in this API where a **client sends the id of tenant data**
+(`sourceOfferId`). It is re-scoped like any other: both the target and the source go through
+the same owned-offer check against the session's `agencyId`, so naming another agency's offer id
+returns `404`, with no hint that the offer exists. Copies deliberately drop `completedAt` — a
+copied step has not happened, and inheriting a tick would park the "vous êtes ici" marker
+somewhere the group has never been.
 
 `POST .../reservations/{id}/trip-link` mints this family's `/mon-voyage/{code}` link if they
 haven't got one, and is **idempotent** — an existing code is returned, never rotated. Rotating

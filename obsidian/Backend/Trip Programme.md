@@ -336,10 +336,25 @@ plus a preview link for the agent. A reservation created before `publicCode` exi
   buttons are the path that works on a touchscreen and by keyboard) / delete
 - Each row: kind (icon), title, day, time, location, meeting point, map link,
   **attendance tracking: off / mandatory / optional**
-- **Duplicate a day** — Omra programmes repeat, and retyping five identical days is how
-  agencies give up on a feature
+Two bulk actions sit **above** the add form, because on an empty programme the fastest route
+to a finished one is copying last season's, and an agency that has started typing step 1 by
+hand will never scroll back up to discover that:
+
+- **Duplicate a day** — pick a source day and a target day. Omra programmes repeat, and
+  retyping five identical days is how agencies give up on a feature. The target is *explicit*,
+  not "the next day": the console proposes source + 1 because that is the order agencies build
+  in, but the server never guesses. Only days that already have steps are offered as a source
+  — a button that can only fail is worse than no button.
 - **Copy the programme from another offer** — the single biggest time-saver, because next
-  season's Ramadan trip is last season's with new dates
+  season's Ramadan trip is last season's with new dates. Because `dayOffset` is a *relative*
+  integer (§4), the whole shape transplants with no date arithmetic at all; that is the payoff
+  for that decision.
+
+Both are **additive**. They append to the end of the target and never move or delete an
+existing step, so an unwanted copy is undone by deleting the new rows. Copies keep
+`checkpointType` — it is part of the plan being copied — and drop `completedAt`: a copied step
+has not happened yet. Both stop at 200 steps per offer (`MILESTONE_MAX_PER_OFFER`) with a
+translated message. See [[Decision Log]] 029 for the alternatives that lost.
 
 ### 7.7 Agency live view — ticking milestones and checking people off
 
@@ -369,8 +384,10 @@ big targets. Two related but separate taps:
    `OfferDetail.milestones`, buyer-shaped via `toBuyerMilestone`.
 5. ~~The programme map component~~ — **BUILT** (2026-08-02).
    `apps/web/src/components/ProgrammeMap.tsx`, used by both client surfaces. §7.1.
-6. The console editor's remaining time-savers: duplicate-day and copy-from-offer.
-   (The editor itself, with the attendance-tracking toggle, is built.)
+6. ~~The console editor's remaining time-savers: duplicate-day and copy-from-offer~~ —
+   **BUILT** (2026-08-05). `POST .../milestones/duplicate-day`,
+   `POST .../milestones/copy-from-offer`, `GET .../milestones/copy-sources`;
+   `apps/web/src/components/console/ProgrammeBulkActions.tsx`. §7.6 and [[Decision Log]] 029.
 7. ~~`Reservation.publicCode` + `/mon-voyage/{code}` traveler page~~ — **BUILT** (2026-08-02).
    Migration `20260802100000_reservation_public_code`, `TripsService`, and the page at
    `apps/web/src/app/[locale]/mon-voyage/[code]/page.tsx`. Security tests in
@@ -379,9 +396,9 @@ big targets. Two related but separate taps:
    `POST .../milestones/{id}/completion`, member-level (§7.2 and open question 3).
 9. *Later:* notify travelers when a milestone completes (needs task #18 notifications)
 
-**Next:** item 6 — duplicate-day and copy-from-offer in the editor. Retyping five identical
-Omra days is how an agency gives up on this feature, and next season's Ramadan trip is last
-season's with new dates.
+**Next:** item 9 — notifying travelers when a milestone completes. It is the one piece that
+turns "vous êtes ici" from something a family has to open the page to discover into something
+that reaches them. It is blocked on the notifications work (task #18), not on this feature.
 
 ---
 

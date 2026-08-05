@@ -414,7 +414,19 @@
     "markArrived": "✓ Arrivé",
     "markAbsent": "✗ Absent",
     "markExpected": "↩ Attendu",
-    "dragHint": "Glissez une étape pour la déplacer, ou utilisez les flèches."
+    "dragHint": "Glissez une étape pour la déplacer, ou utilisez les flèches.",
+    "duplicateDay": "Dupliquer un jour",
+    "duplicateDayHint": "Copie toutes les étapes d'un jour vers un autre. Les autres jours ne bougent pas.",
+    "duplicateFrom": "Copier le",
+    "duplicateTo": "Vers le",
+    "newDay": "nouveau",
+    "duplicateDayAction": "Dupliquer les étapes",
+    "copyFromOffer": "Copier depuis une autre offre",
+    "copyFromOfferHint": "Reprend le programme complet d'une de vos offres, jours et ordre compris. Il s'ajoute à la fin de celui-ci.",
+    "copySource": "Offre à copier",
+    "stepCount": "{count, plural, one {# étape} other {# étapes}}",
+    "copyFromOfferAction": "{count, plural, one {Ajouter # étape} other {Ajouter les # étapes}}",
+    "limitReached": "Ce programme a atteint sa limite d'étapes. Supprimez-en avant d'en copier d'autres."
   },
   "trip": {
     "greeting": "Bonjour {name},",

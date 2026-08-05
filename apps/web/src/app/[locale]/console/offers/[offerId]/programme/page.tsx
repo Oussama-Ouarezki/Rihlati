@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import type { MilestoneItem, OfferForAgency } from '@rihlati/shared';
+import type { MilestoneItem, OfferForAgency, ProgrammeCopySource } from '@rihlati/shared';
 import { Link } from '@/i18n/navigation';
 import { authedFetch, authedGet, getSession, redirectToLogin } from '@/lib/session';
 import { createMilestone } from '@/lib/milestone-actions';
 import { MilestoneForm } from '@/components/console/MilestoneForm';
 import { MilestoneDragList } from '@/components/console/MilestoneDragList';
+import { ProgrammeBulkActions } from '@/components/console/ProgrammeBulkActions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const dynamic = 'force-dynamic';
@@ -31,9 +32,15 @@ export default async function ProgrammePage(props: {
   if (!offerResponse.ok) throw new Error(`API ${offerResponse.status}`);
   const offer = (await offerResponse.json()) as OfferForAgency;
 
-  const milestones = await authedGet<MilestoneItem[]>(
-    `/v1/agencies/${agencyId}/offers/${offerId}/milestones`,
-  );
+  // Two reads, one round trip: the copy picker needs to know which of the
+  // agency's OTHER offers have a programme, and that question is the API's to
+  // answer — the count comes from a join it can do in one query.
+  const [milestones, copySources] = await Promise.all([
+    authedGet<MilestoneItem[]>(`/v1/agencies/${agencyId}/offers/${offerId}/milestones`),
+    authedGet<ProgrammeCopySource[]>(
+      `/v1/agencies/${agencyId}/offers/${offerId}/milestones/copy-sources`,
+    ),
+  ]);
 
   const t = await getTranslations('programme');
   const createAction = createMilestone.bind(null, offerId);
@@ -59,6 +66,16 @@ export default async function ProgrammePage(props: {
           <MilestoneDragList offerId={offerId} milestones={milestones} />
         </>
       )}
+
+      {/* Above the add form on purpose. On an empty programme the fastest way
+          to a finished one is copying last season's, and an agency that has
+          already started typing step 1 by hand will never scroll back up to
+          find that out. */}
+      <ProgrammeBulkActions
+        offerId={offerId}
+        milestones={milestones}
+        copySources={copySources}
+      />
 
       <Card className="border-dashed">
         <CardHeader>

@@ -414,7 +414,19 @@
     "markArrived": "✓ وصل",
     "markAbsent": "✗ غائب",
     "markExpected": "↩ منتظر",
-    "dragHint": "اسحب أي مرحلة لتغيير ترتيبها، أو استخدم الأسهم."
+    "dragHint": "اسحب أي مرحلة لتغيير ترتيبها، أو استخدم الأسهم.",
+    "duplicateDay": "تكرار يوم",
+    "duplicateDayHint": "ينسخ كل مراحل يوم إلى يوم آخر. الأيام الأخرى لا تتغيّر.",
+    "duplicateFrom": "نسخ من",
+    "duplicateTo": "إلى",
+    "newDay": "جديد",
+    "duplicateDayAction": "تكرار المراحل",
+    "copyFromOffer": "النسخ من عرض آخر",
+    "copyFromOfferHint": "ينسخ البرنامج الكامل لأحد عروضك، بأيامه وترتيبه. يُضاف إلى نهاية هذا البرنامج.",
+    "copySource": "العرض المراد نسخه",
+    "stepCount": "{count, plural, one {مرحلة واحدة} two {مرحلتان} few {# مراحل} other {# مرحلة}}",
+    "copyFromOfferAction": "{count, plural, one {إضافة مرحلة واحدة} two {إضافة مرحلتين} few {إضافة # مراحل} other {إضافة # مرحلة}}",
+    "limitReached": "بلغ هذا البرنامج الحد الأقصى للمراحل. احذف بعضها قبل نسخ المزيد."
   },
   "trip": {
     "greeting": "مرحبًا {name}،",

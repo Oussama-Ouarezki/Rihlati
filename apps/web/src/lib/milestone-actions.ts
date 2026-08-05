@@ -21,16 +21,27 @@ import { authedFetch, getSession } from './session';
 export interface MilestoneFormState {
   error: string | null;
   fields?: Record<string, string[]>;
+  /**
+   * The typed error code, when the API sent one. `error` carries the API's
+   * developer-facing French sentence; a caller that recognises the code can
+   * show a translated string instead — which is what the bulk-copy forms do
+   * for the one failure an agency actually meets, the per-programme ceiling.
+   */
+  code?: string;
 }
 
 interface ApiError {
-  error: { message: string; fields?: Record<string, string[]> };
+  error: { code?: string; message: string; fields?: Record<string, string[]> };
 }
 
 async function toState(response: Response): Promise<MilestoneFormState> {
   try {
     const body = (await response.json()) as ApiError;
-    return { error: body.error.message, ...(body.error.fields ? { fields: body.error.fields } : {}) };
+    return {
+      error: body.error.message,
+      ...(body.error.fields ? { fields: body.error.fields } : {}),
+      ...(body.error.code ? { code: body.error.code } : {}),
+    };
   } catch {
     return { error: `HTTP ${response.status}` };
   }
@@ -195,6 +206,74 @@ export async function setMilestoneCompletion(
   );
 
   revalidatePath('/', 'layout');
+}
+
+/**
+ * THE TWO BULK COPIES (Trip Programme.md §7.6).
+ *
+ * Both return a `MilestoneFormState` rather than swallowing failures, unlike
+ * the taps above: these write many rows at once, and the one failure that
+ * really happens — the per-programme ceiling — has to be readable, not a
+ * button that appears to do nothing.
+ */
+export async function duplicateMilestoneDay(
+  offerId: string,
+  _previous: MilestoneFormState,
+  formData: FormData,
+): Promise<MilestoneFormState> {
+  const session = await getSession();
+  const agencyId = session?.membership?.agencyId;
+  if (!agencyId) return { error: 'unauthenticated' };
+
+  const sourceDayOffset = Number(formText(formData, 'sourceDayOffset'));
+  const targetDayOffset = Number(formText(formData, 'targetDayOffset'));
+  if (!Number.isInteger(sourceDayOffset) || !Number.isInteger(targetDayOffset)) {
+    return { error: 'validation.dayInvalid' };
+  }
+
+  const response = await authedFetch(
+    `/v1/agencies/${agencyId}/offers/${offerId}/milestones/duplicate-day`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceDayOffset, targetDayOffset }),
+    },
+  );
+
+  if (!response.ok) return toState(response);
+
+  revalidatePath('/', 'layout');
+  return { error: null };
+}
+
+export async function copyProgrammeFromOffer(
+  offerId: string,
+  _previous: MilestoneFormState,
+  formData: FormData,
+): Promise<MilestoneFormState> {
+  const session = await getSession();
+  const agencyId = session?.membership?.agencyId;
+  if (!agencyId) return { error: 'unauthenticated' };
+
+  const sourceOfferId = formText(formData, 'sourceOfferId');
+  if (!sourceOfferId) return { error: 'validation.required' };
+
+  // No check here that the source belongs to this agency — that is the API's
+  // job and it does it (rule #2: this action runs on our server, but the id
+  // still came from a browser).
+  const response = await authedFetch(
+    `/v1/agencies/${agencyId}/offers/${offerId}/milestones/copy-from-offer`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceOfferId }),
+    },
+  );
+
+  if (!response.ok) return toState(response);
+
+  revalidatePath('/', 'layout');
+  return { error: null };
 }
 
 /**

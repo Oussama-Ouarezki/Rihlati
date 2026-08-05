@@ -681,6 +681,49 @@ Two bugs surfaced while building it, both worth a sentence:
 
 ---
 
+## 029 — Programme bulk copies only ever add rows
+
+**Date:** 2026-08-05
+
+Duplicating a day and copying a programme from another offer both **append** to the end of the
+target programme. Neither ever moves, overwrites or deletes an existing step. The target day of
+a duplicate is chosen explicitly by the agency — the console proposes source + 1, the server
+assumes nothing — and both operations stop at 200 steps per offer
+(`MILESTONE_MAX_PER_OFFER`) with `409 MILESTONE_LIMIT_REACHED`.
+
+The reason is undo. An unwanted copy leaves rows the agency can see and delete, one by one, in
+the editor they are already looking at. There is nothing to explain and nothing to restore.
+
+`copy-from-offer` is the first endpoint where a client legitimately sends the **id of tenant
+data** — `sourceOfferId`. It goes through the same owned-offer check as the target, so naming
+another agency's offer id returns 404 and reveals nothing. That case is a test, not a comment:
+`apps/api/test/milestones.e2e.test.ts` asserts the 404, asserts the response body does not
+contain the source offer's title, and asserts zero rows were written ([[The Seven Rules]] #3).
+
+Copies keep `checkpointType` — an agency that decided "présence obligatoire à l'aéroport" meant
+it for next season too — but drop `completedAt` and `completedByUserId`. A copied step has not
+happened. Inheriting a tick would park the "vous êtes ici" marker on every traveler's map at a
+place the group has never been, and the wrong marker is worse than no marker.
+
+**Rejected:**
+- *A "replace the programme" mode.* The obvious ask, and it has no undo: the rows it overwrote
+  are gone, and the agency discovers that after the thing they wanted to keep is already gone.
+  Additive plus manual delete costs a few taps and can always be stopped halfway.
+- *Duplicating a day to "the next day" implicitly.* Reads as convenient until an agency has a
+  gap in its day numbering, at which point the server has silently guessed wrong. The picker
+  makes the choice visible, and defaulting it to source + 1 keeps the common case one tap.
+- *Copying a programme by cloning the offer.* A different feature with different consequences
+  — price, seats, dates, publication state. The agency wanted the itinerary, not the offer.
+- *No ceiling.* A 14-day Omra is ~50 steps; 200 is unreachable by hand and reachable by
+  repeated taps on a copy button. This is a sanity limit on one programme, deliberately **not**
+  a plan gate — it must not become a thing to sell.
+
+**Cost:** copying twice by mistake silently doubles the programme. Nothing warns; the agency
+sees 16 steps where they expected 8 and deletes half. A "this offer already has a programme —
+copy anyway?" confirmation would fix it and is the first thing to add if it happens in practice.
+
+---
+
 ## Template for new entries
 
 ```

@@ -97,7 +97,9 @@ export function MilestoneForm(props: {
           <Label>{t('kind')}</Label>
           <Select name="kind" defaultValue={milestone?.kind ?? 'other'}>
             <SelectTrigger className="w-full">
-              <SelectValue />
+              {/* Base UI prints the raw `value` unless handed a formatter, so
+                  without this the trigger reads "free_time", not "Temps libre". */}
+              <SelectValue>{(value: string) => tKinds(value)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {MILESTONE_KINDS.map((kind) => (
@@ -113,7 +115,7 @@ export function MilestoneForm(props: {
           <Label>{t('checkpointType')}</Label>
           <Select name="checkpointType" defaultValue={milestone?.checkpointType ?? 'none'}>
             <SelectTrigger className="w-full">
-              <SelectValue />
+              <SelectValue>{(value: string) => tCheckpoint(value)}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {CHECKPOINT_TYPES.map((type) => (

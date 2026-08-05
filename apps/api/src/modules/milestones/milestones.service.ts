@@ -1,15 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import {
+  MILESTONE_MAX_PER_OFFER,
+  type CopyProgrammeFromOfferInput,
   type CreateMilestoneInput,
+  type DuplicateMilestoneDayInput,
   type MilestoneItem,
+  type ProgrammeCopySource,
   type ReorderMilestonesInput,
   type SetMilestoneCompletionInput,
   type UpdateMilestoneInput,
 } from '@rihlati/shared';
 import { AppError, notFound } from '../../common/errors/app-error';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { AuditService } from '../../common/audit/audit.service';
+import { AuditService, type AuditAction } from '../../common/audit/audit.service';
 import type { TenantContext } from '../../common/auth/tenant-context';
 import type { RequestMeta } from '../auth/auth.service';
 
@@ -31,7 +35,7 @@ export class MilestonesService {
       where: { offerId, agencyId: tenant.agencyId, deletedAt: null },
       select: MILESTONE_SELECT,
       orderBy: [{ dayOffset: 'asc' }, { sortOrder: 'asc' }],
-      take: 200, // a 200-step programme is not a real trip
+      take: MILESTONE_MAX_PER_OFFER, // a 200-step programme is not a real trip
     });
 
     return rows.map(toItem);
@@ -290,6 +294,227 @@ export class MilestonesService {
     });
 
     return updated.map(toItem);
+  }
+
+  /**
+   * DUPLICATE A DAY — copy every step of one day onto another day of the same
+   * offer. Omra programmes repeat, and retyping five identical days is the
+   * point at which an agency abandons the feature (Trip Programme.md §7.6).
+   *
+   * Purely additive: copies land after whatever is already on the target day,
+   * and no other day is touched or renumbered. Undo is deleting the new rows.
+   */
+  async duplicateDay(
+    tenant: TenantContext,
+    actorUserId: string,
+    offerId: string,
+    input: DuplicateMilestoneDayInput,
+    meta: RequestMeta,
+  ): Promise<MilestoneItem[]> {
+    await this.requireOwnedOffer(tenant, offerId);
+
+    const sourceRows = await this.prisma.offerMilestone.findMany({
+      where: {
+        offerId,
+        agencyId: tenant.agencyId,
+        deletedAt: null,
+        dayOffset: input.sourceDayOffset,
+      },
+      select: MILESTONE_SELECT,
+      orderBy: [{ sortOrder: 'asc' }],
+    });
+
+    if (sourceRows.length === 0) {
+      throw new AppError('VALIDATION_FAILED', "Ce jour ne contient aucune étape à dupliquer");
+    }
+
+    return this.appendCopies(tenant, actorUserId, offerId, sourceRows, {
+      dayOffset: input.targetDayOffset,
+      action: 'offer_milestone.day_duplicated',
+      auditAfter: {
+        sourceDayOffset: input.sourceDayOffset,
+        targetDayOffset: input.targetDayOffset,
+        copied: sourceRows.length,
+      },
+      meta,
+    });
+  }
+
+  /**
+   * COPY A WHOLE PROGRAMME FROM ANOTHER OFFER — next season's Ramadan trip is
+   * last season's with new dates.
+   *
+   * `sourceOfferId` arrives in the request body, pointing at tenant-scoped
+   * data. It is therefore re-checked against the session's agency exactly like
+   * the target offer: `requireOwnedOffer` on BOTH. Without that second check,
+   * any agency could name a competitor's offer id and read their entire
+   * programme back out of the response. This is the isolation-critical line of
+   * this file (rule #3).
+   *
+   * Day offsets survive the copy, which is only possible because a milestone
+   * stores `dayOffset` and not a date (§4) — the same rows land correctly on a
+   * departure date they have never seen.
+   */
+  async copyFromOffer(
+    tenant: TenantContext,
+    actorUserId: string,
+    offerId: string,
+    input: CopyProgrammeFromOfferInput,
+    meta: RequestMeta,
+  ): Promise<MilestoneItem[]> {
+    await this.requireOwnedOffer(tenant, offerId);
+    await this.requireOwnedOffer(tenant, input.sourceOfferId);
+
+    if (input.sourceOfferId === offerId) {
+      throw new AppError('VALIDATION_FAILED', 'Une offre ne peut pas copier son propre programme');
+    }
+
+    const sourceRows = await this.prisma.offerMilestone.findMany({
+      where: { offerId: input.sourceOfferId, agencyId: tenant.agencyId, deletedAt: null },
+      select: MILESTONE_SELECT,
+      orderBy: [{ dayOffset: 'asc' }, { sortOrder: 'asc' }],
+      take: MILESTONE_MAX_PER_OFFER,
+    });
+
+    if (sourceRows.length === 0) {
+      throw new AppError('VALIDATION_FAILED', "Cette offre n'a pas de programme à copier");
+    }
+
+    return this.appendCopies(tenant, actorUserId, offerId, sourceRows, {
+      action: 'offer_milestone.programme_copied',
+      auditAfter: { sourceOfferId: input.sourceOfferId, copied: sourceRows.length },
+      meta,
+    });
+  }
+
+  /**
+   * The agency's OTHER offers that actually have a programme — what the copy
+   * picker lists. Offers with no milestones are filtered out server-side
+   * rather than shown and disabled: an empty option is a dead end the agency
+   * has to read and reject.
+   */
+  async listCopySources(
+    tenant: TenantContext,
+    offerId: string,
+  ): Promise<ProgrammeCopySource[]> {
+    await this.requireOwnedOffer(tenant, offerId);
+
+    const offers = await this.prisma.offer.findMany({
+      where: {
+        agencyId: tenant.agencyId,
+        deletedAt: null,
+        id: { not: offerId },
+        milestones: { some: { deletedAt: null } },
+      },
+      select: {
+        id: true,
+        title: true,
+        departureDate: true,
+        _count: { select: { milestones: { where: { deletedAt: null } } } },
+      },
+      // Most recent departure first: the programme worth copying is almost
+      // always the last one built, not the oldest.
+      orderBy: [{ departureDate: 'desc' }, { createdAt: 'desc' }],
+      take: 50,
+    });
+
+    return offers.map((offer) => ({
+      offerId: offer.id,
+      title: offer.title,
+      departureDate: offer.departureDate?.toISOString() ?? null,
+      milestoneCount: offer._count.milestones,
+    }));
+  }
+
+  /**
+   * The shared write behind both bulk operations: clone rows onto the end of
+   * one offer's programme and return the new full list.
+   *
+   * Two things are deliberately NOT carried over:
+   *  - `completedAt` / `completedByUserId` — a copied step has not happened.
+   *    Inheriting a tick would show travelers a "vous êtes ici" marker parked
+   *    somewhere the group has never been.
+   *  - check-ins — attendance belongs to a family at a specific stop of a
+   *    specific trip, and `MilestoneCheckIn` rows hang off the milestone id,
+   *    so the new rows simply start with none.
+   *
+   * `checkpointType` IS carried over: it is part of the plan being copied, and
+   * re-marking which stops need a headcount is exactly the retyping this
+   * feature exists to remove.
+   */
+  private async appendCopies(
+    tenant: TenantContext,
+    actorUserId: string,
+    offerId: string,
+    sourceRows: MilestoneRow[],
+    options: {
+      /** Force every copy onto one day. Omitted keeps each row's own day. */
+      dayOffset?: number;
+      action: AuditAction;
+      auditAfter: Prisma.JsonObject;
+      meta: RequestMeta;
+    },
+  ): Promise<MilestoneItem[]> {
+    const existingCount = await this.prisma.offerMilestone.count({
+      where: { offerId, agencyId: tenant.agencyId, deletedAt: null },
+    });
+
+    if (existingCount + sourceRows.length > MILESTONE_MAX_PER_OFFER) {
+      throw new AppError('MILESTONE_LIMIT_REACHED', 'Ce programme a atteint sa limite d’étapes', {
+        details: {
+          limit: MILESTONE_MAX_PER_OFFER,
+          current: existingCount,
+          requested: sourceRows.length,
+        },
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const last = await tx.offerMilestone.aggregate({
+        where: { offerId, agencyId: tenant.agencyId, deletedAt: null },
+        _max: { sortOrder: true },
+      });
+      const firstSortOrder = (last._max.sortOrder ?? -1) + 1;
+
+      await tx.offerMilestone.createMany({
+        data: sourceRows.map((row, index) => ({
+          agencyId: tenant.agencyId, // the verified tenant, never a copied value
+          offerId, // the TARGET offer, never the source's
+          title: row.title,
+          description: row.description,
+          kind: row.kind,
+          dayOffset: options.dayOffset ?? row.dayOffset,
+          timeOfDay: row.timeOfDay,
+          locationName: row.locationName,
+          meetingPoint: row.meetingPoint,
+          mapUrl: row.mapUrl,
+          checkpointType: row.checkpointType,
+          sortOrder: firstSortOrder + index,
+        })),
+      });
+
+      await this.audit.record(
+        {
+          action: options.action,
+          entityType: 'offer_milestone',
+          entityId: offerId,
+          agencyId: tenant.agencyId,
+          actorUserId,
+          after: options.auditAfter,
+          ipHash: options.meta.ipHash ?? null,
+          requestId: options.meta.requestId,
+        },
+        tx,
+      );
+
+      const rows = await tx.offerMilestone.findMany({
+        where: { offerId, agencyId: tenant.agencyId, deletedAt: null },
+        select: MILESTONE_SELECT,
+        orderBy: [{ dayOffset: 'asc' }, { sortOrder: 'asc' }],
+        take: MILESTONE_MAX_PER_OFFER,
+      });
+      return rows.map(toItem);
+    });
   }
 
   /** The offer must be OURS. A foreign offer id is a 404, as everywhere. */

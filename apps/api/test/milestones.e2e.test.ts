@@ -111,6 +111,45 @@ describe('trip programme — milestones & checkpoint attendance', () => {
         .expect(401);
     });
 
+    /**
+     * The isolation case specific to copy-from-offer: `sourceOfferId` is a
+     * client-sent id for tenant data, and it is READ, so a missing scope here
+     * would not just be an unauthorised write — it would hand agency B a copy
+     * of agency A's entire programme in the response body.
+     */
+    it("agency B cannot copy agency A's programme by naming its offer id", async () => {
+      const agencyA = await createAgencyWithUser(ctx);
+      const agencyB = await createAgencyWithUser(ctx);
+      const offerA = await createOffer(ctx, agencyA);
+      const offerB = await createOffer(ctx, agencyB);
+      await addMilestone(agencyA, offerA.id, { title: 'Secret de A', dayOffset: 0 });
+
+      const attempt = await request(ctx.http)
+        .post(`/v1/agencies/${agencyB.agencyId}/offers/${offerB.id}/milestones/copy-from-offer`)
+        .set('Authorization', `Bearer ${agencyB.owner.accessToken}`)
+        .send({ sourceOfferId: offerA.id })
+        .expect(404);
+
+      // Not merely refused — nothing about A's programme came back.
+      expect(JSON.stringify(attempt.body)).not.toContain('Secret de A');
+
+      // And nothing was written into B's offer.
+      const copied = await ctx.prisma.offerMilestone.count({ where: { offerId: offerB.id } });
+      expect(copied).toBe(0);
+
+      // A's own offer is not a copy source that B may even see listed.
+      await request(ctx.http)
+        .get(`/v1/agencies/${agencyB.agencyId}/offers/${offerA.id}/milestones/copy-sources`)
+        .set('Authorization', `Bearer ${agencyB.owner.accessToken}`)
+        .expect(404);
+
+      const sources = await request(ctx.http)
+        .get(`/v1/agencies/${agencyB.agencyId}/offers/${offerB.id}/milestones/copy-sources`)
+        .set('Authorization', `Bearer ${agencyB.owner.accessToken}`)
+        .expect(200);
+      expect(sources.body).toEqual([]);
+    });
+
     it('an agent cannot edit the programme, but CAN check families in', async () => {
       const agency = await createAgencyWithUser(ctx, { plan: 'pro' });
       const agent = await addMember(ctx, agency.agencyId, 'agent');
@@ -194,6 +233,200 @@ describe('trip programme — milestones & checkpoint attendance', () => {
         ['offer_milestone.created', 'offer_milestone.created', 'offer_milestone.created',
          'offer_milestone.deleted', 'offer_milestone.reordered', 'offer_milestone.updated'].sort(),
       );
+    });
+  });
+
+  describe('the two bulk copies — what saves an agency from retyping', () => {
+    it('duplicates one day onto another without disturbing the rest', async () => {
+      const agency = await createAgencyWithUser(ctx);
+      const offer = await createOffer(ctx, agency);
+
+      const wake = await addMilestone(agency, offer.id, {
+        title: 'Fajr', dayOffset: 1, timeOfDay: '05:00', checkpointType: 'optional',
+      });
+      await addMilestone(agency, offer.id, { title: 'Ziyara', dayOffset: 1, timeOfDay: '09:00' });
+      await addMilestone(agency, offer.id, { title: 'Retour', dayOffset: 9 });
+
+      // Day 1 already happened — the copies must NOT inherit that tick, or
+      // every traveler's "vous êtes ici" marker jumps to a day 2 nobody has
+      // reached yet.
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${offer.id}/milestones/${wake.id}/completion`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ isDone: true })
+        .expect(201);
+
+      const after = await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${offer.id}/milestones/duplicate-day`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ sourceDayOffset: 1, targetDayOffset: 2 })
+        .expect(201);
+
+      const body = after.body as {
+        title: string; dayOffset: number; timeOfDay: string | null;
+        checkpointType: string; completedAt: string | null;
+      }[];
+
+      // Day 9 was never renumbered — a bulk convenience must not silently
+      // rewrite the rest of the trip.
+      expect(body.map((m) => [m.dayOffset, m.title])).toEqual([
+        [1, 'Fajr'], [1, 'Ziyara'], [2, 'Fajr'], [2, 'Ziyara'], [9, 'Retour'],
+      ]);
+
+      const copies = body.filter((m) => m.dayOffset === 2);
+      expect(copies.map((m) => m.timeOfDay)).toEqual(['05:00', '09:00']);
+      // The plan is copied…
+      expect(copies[0]?.checkpointType).toBe('optional');
+      // …the history is not.
+      expect(copies.every((m) => m.completedAt === null)).toBe(true);
+
+      // A day with nothing on it is a mistake, not an empty copy.
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${offer.id}/milestones/duplicate-day`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ sourceDayOffset: 5, targetDayOffset: 6 })
+        .expect(422);
+    });
+
+    it("copies another offer's whole programme, days and order intact", async () => {
+      const agency = await createAgencyWithUser(ctx, { plan: 'pro' });
+      const lastSeason = await createOffer(ctx, agency, {
+        title: 'Omra Ramadan 2026', departureDate: '2026-03-01', returnDate: '2026-03-15',
+      });
+      const nextSeason = await createOffer(ctx, agency, {
+        title: 'Omra Ramadan 2027', departureDate: '2027-03-01', returnDate: '2027-03-15',
+      });
+
+      const flight = await addMilestone(agency, lastSeason.id, {
+        title: 'Vol Alger', dayOffset: 0, checkpointType: 'mandatory',
+      });
+      await addMilestone(agency, lastSeason.id, { title: 'Installation', dayOffset: 0 });
+      await addMilestone(agency, lastSeason.id, { title: 'Omra', dayOffset: 1 });
+
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${lastSeason.id}/milestones/${flight.id}/completion`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ isDone: true })
+        .expect(201);
+
+      // The picker offers last season, with a count, and never the offer you
+      // are standing in.
+      const sources = await request(ctx.http)
+        .get(`/v1/agencies/${agency.agencyId}/offers/${nextSeason.id}/milestones/copy-sources`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .expect(200);
+      expect(sources.body).toEqual([
+        expect.objectContaining({ offerId: lastSeason.id, milestoneCount: 3 }),
+      ]);
+
+      const copied = await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${nextSeason.id}/milestones/copy-from-offer`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ sourceOfferId: lastSeason.id })
+        .expect(201);
+
+      const body = copied.body as {
+        offerId: string; title: string; dayOffset: number;
+        checkpointType: string; completedAt: string | null;
+      }[];
+
+      expect(body.map((m) => [m.dayOffset, m.title])).toEqual([
+        [0, 'Vol Alger'], [0, 'Installation'], [1, 'Omra'],
+      ]);
+      // New rows on the TARGET offer, not references to the source's.
+      expect(body.every((m) => m.offerId === nextSeason.id)).toBe(true);
+      expect(body[0]?.checkpointType).toBe('mandatory');
+      expect(body.every((m) => m.completedAt === null)).toBe(true);
+
+      // The source is untouched — this reads it, it does not move it.
+      const sourceStill = await ctx.prisma.offerMilestone.count({
+        where: { offerId: lastSeason.id, deletedAt: null },
+      });
+      expect(sourceStill).toBe(3);
+
+      // An offer cannot copy from itself.
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${nextSeason.id}/milestones/copy-from-offer`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ sourceOfferId: nextSeason.id })
+        .expect(422);
+
+      const audits = await ctx.prisma.auditLog.findMany({
+        where: { action: 'offer_milestone.programme_copied' },
+        select: { entityId: true },
+      });
+      expect(audits).toEqual([expect.objectContaining({ entityId: nextSeason.id })]);
+    });
+
+    it('refuses a copy that would push the programme past its ceiling', async () => {
+      const agency = await createAgencyWithUser(ctx, { plan: 'pro' });
+      const source = await createOffer(ctx, agency, { title: 'Grand programme' });
+      const target = await createOffer(ctx, agency, {
+        title: 'Programme cible', departureDate: '2027-06-01', returnDate: '2027-06-20',
+      });
+
+      // Seeded directly: 200 HTTP round-trips would test the transport, not
+      // the ceiling.
+      await ctx.prisma.offerMilestone.createMany({
+        data: Array.from({ length: 150 }, (_, index) => ({
+          agencyId: agency.agencyId,
+          offerId: source.id,
+          title: `Étape ${index}`,
+          dayOffset: 0,
+          sortOrder: index,
+        })),
+      });
+      await addMilestone(agency, target.id, { title: 'Déjà là' });
+
+      // 150 + 1 fits.
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${target.id}/milestones/copy-from-offer`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ sourceOfferId: source.id })
+        .expect(201);
+
+      // A second copy would be 301. Nothing partial is written.
+      const refused = await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${target.id}/milestones/copy-from-offer`)
+        .set('Authorization', `Bearer ${agency.owner.accessToken}`)
+        .send({ sourceOfferId: source.id })
+        .expect(409);
+      expect(refused.body.error.code).toBe('MILESTONE_LIMIT_REACHED');
+
+      const total = await ctx.prisma.offerMilestone.count({
+        where: { offerId: target.id, deletedAt: null },
+      });
+      expect(total).toBe(151);
+    });
+
+    it('an agent cannot run either bulk copy', async () => {
+      const agency = await createAgencyWithUser(ctx, { plan: 'pro' });
+      const agent = await addMember(ctx, agency.agencyId, 'agent');
+      const source = await createOffer(ctx, agency, { title: 'Programme source' });
+      const target = await createOffer(ctx, agency, {
+        title: 'Programme cible', departureDate: '2027-09-01', returnDate: '2027-09-15',
+      });
+      await addMilestone(agency, source.id, { title: 'Vol', dayOffset: 0 });
+      await addMilestone(agency, target.id, { title: 'Vol', dayOffset: 0 });
+
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${target.id}/milestones/duplicate-day`)
+        .set('Authorization', `Bearer ${agent.accessToken}`)
+        .send({ sourceDayOffset: 0, targetDayOffset: 1 })
+        .expect(403);
+
+      await request(ctx.http)
+        .post(`/v1/agencies/${agency.agencyId}/offers/${target.id}/milestones/copy-from-offer`)
+        .set('Authorization', `Bearer ${agent.accessToken}`)
+        .send({ sourceOfferId: source.id })
+        .expect(403);
+
+      // But an agent may still SEE which offers have a programme — reading
+      // your own agency's offer list is not a privileged act.
+      await request(ctx.http)
+        .get(`/v1/agencies/${agency.agencyId}/offers/${target.id}/milestones/copy-sources`)
+        .set('Authorization', `Bearer ${agent.accessToken}`)
+        .expect(200);
     });
   });
 

@@ -47,6 +47,8 @@ export type AuditAction =
   // trip programme — milestones & per-checkpoint attendance
   | 'offer_milestone.created' | 'offer_milestone.updated' | 'offer_milestone.deleted'
   | 'offer_milestone.reordered'
+  // the two bulk copies: one tap, many rows — worth being able to see which tap
+  | 'offer_milestone.day_duplicated' | 'offer_milestone.programme_copied'
   | 'milestone_check_in.status_changed'
   // tracked links
   | 'tracked_link.created' | 'tracked_link.deleted'
