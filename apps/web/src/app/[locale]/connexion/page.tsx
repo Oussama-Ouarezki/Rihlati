@@ -36,7 +36,12 @@ export default function LoginPage() {
     <div className="mx-auto max-w-sm py-12">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">{t('loginTitle')}</CardTitle>
+          {/* An <h1>, not just big text: CardTitle renders a plain div, so a
+              screen reader had no heading to land on — and the e2e test that
+              looks for one was failing for exactly that reason. */}
+          <CardTitle className="text-2xl">
+            <h1>{t('loginTitle')}</h1>
+          </CardTitle>
           <CardDescription>{t('loginSubtitle')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

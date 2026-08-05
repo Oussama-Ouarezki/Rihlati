@@ -4,12 +4,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { Link } from '@/i18n/navigation';
 import { LogOut } from 'lucide-react';
 
 export interface AccountMenuUser {
@@ -29,10 +31,20 @@ export interface AccountMenuUser {
  * No "security" section yet (no password-change endpoint exists — see
  * obsidian/Backend/Auth Flow.md open questions). Adding a menu item for a
  * page that doesn't exist would be worse than not having the menu.
+ *
+ * The same component serves the public site header and the console header, so
+ * "where do I sign out" has one answer everywhere. What differs is passed in:
+ * the console already shows the agency name and the language switcher in its
+ * header, the public site puts the links inside the menu.
  */
 export function AccountMenu(props: {
   user: AccountMenuUser;
-  agencyName: string;
+  /** Shown under the name. Absent for a traveler with no agency. */
+  agencyName?: string;
+  /** Menu entries above the sign-out row — account page, agency console, … */
+  links?: { href: string; label: string }[];
+  /** Off when the surrounding header already shows the switcher on its own. */
+  showLanguageSwitcher?: boolean;
   logoutLabel: string;
   logoutAction: () => Promise<void>;
 }) {
@@ -54,19 +66,43 @@ export function AccountMenu(props: {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="flex flex-col items-start gap-0.5 font-normal">
-          <span className="text-sm font-semibold text-foreground">{props.user.displayName}</span>
-          <span className="text-xs text-muted-foreground" dir="ltr">
-            {props.user.email ?? props.user.phone}
-          </span>
-          <span className="text-xs text-muted-foreground">{props.agencyName}</span>
-        </DropdownMenuLabel>
+        {/* The Group wrapper is not decoration: Base UI's GroupLabel reads a
+            context only Menu.Group provides, and throws at render without it. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex flex-col items-start gap-0.5 font-normal">
+            <span className="text-sm font-semibold text-foreground">{props.user.displayName}</span>
+            <span className="text-xs text-muted-foreground" dir="ltr">
+              {props.user.email ?? props.user.phone}
+            </span>
+            {props.agencyName ? (
+              <span className="text-xs text-muted-foreground">{props.agencyName}</span>
+            ) : null}
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
 
-        <DropdownMenuSeparator />
+        {props.links?.length ? (
+          <>
+            <DropdownMenuSeparator />
+            {props.links.map((link) => (
+              <DropdownMenuItem
+                key={link.href}
+                nativeButton={false}
+                render={<Link href={link.href} />}
+              >
+                {link.label}
+              </DropdownMenuItem>
+            ))}
+          </>
+        ) : null}
 
-        <div className="px-1.5 py-1">
-          <LanguageSwitcher />
-        </div>
+        {props.showLanguageSwitcher === false ? null : (
+          <>
+            <DropdownMenuSeparator />
+            <div className="px-1.5 py-1">
+              <LanguageSwitcher />
+            </div>
+          </>
+        )}
 
         <DropdownMenuSeparator />
 

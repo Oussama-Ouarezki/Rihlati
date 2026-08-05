@@ -106,14 +106,33 @@ export function InquiryForm(props: { offerId: string }) {
         <label className="block">
           <span className="mb-1 block text-sm font-medium">{t('phone')}</span>
           {/* dir=ltr even in Arabic: phone numbers read left-to-right everywhere */}
-          <input name="phone" type="tel" inputMode="tel" dir="ltr" autoComplete="tel" className={input} />
+          <input
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            dir="ltr"
+            autoComplete="tel"
+            className={input}
+            suppressHydrationWarning
+          />
           <p className="mt-1 text-xs text-slate-400">{t('phoneHint')}</p>
           {errors['phone'] ? <p className={errorText}>{errors['phone']}</p> : null}
         </label>
 
         <label className="block">
           <span className="mb-1 block text-sm font-medium">{t('email')}</span>
-          <input name="email" type="email" dir="ltr" autoComplete="email" className={input} />
+          {/* suppressHydrationWarning: password managers and burner-mail extensions
+              inject style/data-* attributes into email and phone inputs before React
+              hydrates, which React reports as a server/client mismatch. Nothing we
+              render differs — suppress it on the fields extensions target. */}
+          <input
+            name="email"
+            type="email"
+            dir="ltr"
+            autoComplete="email"
+            className={input}
+            suppressHydrationWarning
+          />
         </label>
 
         <label className="block">

@@ -14,7 +14,6 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
-import { AccountMenu, type AccountMenuUser } from '@/components/console/AccountMenu';
 
 export interface ConsoleNavLink {
   href: string;
@@ -25,19 +24,16 @@ export interface ConsoleNavLink {
  * The console's whole navigation surface — one component so mobile and
  * desktop never drift into two different link lists.
  *
- * Desktop: a plain row of links, plus the account avatar (§AccountMenu) —
- * NOT a language switcher and a logout button loose in the same row. That
- * used to sit at the far end of six links in muted gray text and nobody
- * found it. Mobile: a hamburger opens a drawer with the same links, stacked
- * and thumb-sized; the account avatar sits next to the hamburger, same as
- * desktop, so "where's my account" is answered identically either way.
+ * Desktop: a plain row of links. Mobile: a hamburger opens a drawer with the
+ * same links, stacked and thumb-sized.
+ *
+ * No account avatar here — the site header sits directly above this one on
+ * every console page and already carries it (§SiteAccountNav). Two avatars
+ * stacked ten pixels apart is worse than one, and "where do I sign out" must
+ * have exactly one answer.
  */
 export function ConsoleNav(props: {
   links: ConsoleNavLink[];
-  user: AccountMenuUser;
-  agencyName: string;
-  logoutLabel: string;
-  logoutAction: () => Promise<void>;
   openMenuLabel: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,15 +45,6 @@ export function ConsoleNav(props: {
   const drawerSide = isRtl(locale) ? 'right' : 'left';
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-
-  const accountMenu = (
-    <AccountMenu
-      user={props.user}
-      agencyName={props.agencyName}
-      logoutLabel={props.logoutLabel}
-      logoutAction={props.logoutAction}
-    />
-  );
 
   return (
     <div className="flex items-center gap-3">
@@ -107,8 +94,6 @@ export function ConsoleNav(props: {
           </SheetContent>
         </Sheet>
       </div>
-
-      {accountMenu}
     </div>
   );
 }

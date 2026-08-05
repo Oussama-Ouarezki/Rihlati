@@ -5,6 +5,7 @@ import { getMessages, getTranslations } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { Link } from '@/i18n/navigation';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { SiteAccountNav } from '@/components/SiteAccountNav';
 import '../globals.css';
 
 export async function generateMetadata(props: {
@@ -24,7 +25,6 @@ export default async function LocaleLayout(props: {
 
   const messages = await getMessages();
   const t = await getTranslations({ locale, namespace: 'common' });
-  const tNav = await getTranslations({ locale, namespace: 'nav' });
   const tFooter = await getTranslations({ locale, namespace: 'footer' });
 
   return (
@@ -39,13 +39,8 @@ export default async function LocaleLayout(props: {
                 {t('appName')}
               </Link>
               <div className="flex items-center gap-3">
-                <Link
-                  href="/console"
-                  className="rounded-full border border-brand-200 px-4 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
-                >
-                  {tNav('agencySpace')}
-                </Link>
                 <LanguageSwitcher />
+                <SiteAccountNav />
               </div>
             </div>
           </header>

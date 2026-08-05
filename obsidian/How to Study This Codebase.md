@@ -8,15 +8,20 @@ recognising it.
 
 | | |
 |---|---|
-| TypeScript, all apps | ~25,500 lines |
-| The backend — the part that matters to you | ~8,600 lines, 8 modules |
-| Endpoints | 61 |
-| Database models | 25, in ~1,000 lines of schema |
-| Integration tests | 129, against real Postgres |
-| Notes in this vault | 42 |
+| TypeScript, all apps | ~27,000 lines |
+| The backend — the part that matters to you | ~9,000 lines, 11 modules |
+| Endpoints | 67 |
+| Database models | 22, in ~1,000 lines of schema |
+| Integration tests | 151, against real Postgres |
+| Notes in this vault | 43 |
 
-You cannot read 25,000 lines. You don't need to. Roughly 6,000 lines carry all the ideas;
+You cannot read 27,000 lines. You don't need to. Roughly 6,000 lines carry all the ideas;
 the rest is those same ideas repeated. This plan finds the 6,000.
+
+> [!note] These numbers go stale, and that is fine
+> They are here to size up the job, not to be precise. Recount them whenever you want:
+> `ls apps/api/src/modules` (modules), `grep -rc '@Get(\|@Post(\|@Patch(\|@Delete('
+> apps/api/src` (endpoints), `grep -c '^model' apps/api/prisma/schema.prisma` (models).
 
 ---
 
@@ -54,7 +59,7 @@ Follow [[Local Setup]]. In short:
 npm run db:up        # Postgres in Docker
 npm run db:migrate   # build the tables
 npm run db:seed      # fake agencies, offers, leads
-npm run dev:api      # backend on :4200
+npm run dev:api      # backend on :4000, routes prefixed /v1
 npm run dev:web      # site on :3000
 ```
 
@@ -63,11 +68,13 @@ Then do these four things, in this order:
 1. **Look at the actual data.** `npm run db:studio` opens a table browser. Click through
    `User`, `Agency`, `Membership`, `Offer`, `Lead`. Don't study it — just see that rows are
    rows. Most database confusion is people reasoning about tables they've never looked at.
-2. **Call a public endpoint.** `curl localhost:4200/offers` — works, no login.
-3. **Call a protected one.** `curl localhost:4200/agencies/<some-id>/leads` — you get a 401.
-   Good. That 401 is [[The Seven Rules]] rule 2 working.
-4. **Log in and retry.** Log in through the site, or `POST /auth/login` with a seeded
-   account, take the token, and retry step 3 with `-H "Authorization: Bearer <token>"`.
+2. **Call a public endpoint.** `curl localhost:4000/v1/offers` — works, no login.
+3. **Call a protected one.** `curl -i localhost:4000/v1/agencies/<some-id>/leads` — you get
+   a 401. Good. That 401 is [[The Seven Rules]] rule 2 working.
+4. **Log in and retry.** Log in through the site, or `POST /v1/auth/login` with a seeded
+   account (body: `{"identifier": "...", "password": "..."}` — `identifier` because login
+   accepts email or phone), take the `accessToken`, and retry step 3 with
+   `-H "Authorization: Bearer <token>"`.
 
 > **Gate:** you can list one seeded agency's leads over `curl`, and then find those exact
 > same rows in Studio. Two views of one truth.
@@ -133,6 +140,7 @@ cd apps/api && npx vitest run test/tenant-isolation.e2e.test.ts
 | Remove the guard from `leads.controller.ts` | does *anything* still stop Agency B? | guards and query scoping are two layers, not one |
 | Change a `404` to a `403` for a forbidden lead | one test fails — which, and why does it care? | why a 403 leaks the existence of a record |
 | Delete a `@Public()` from `auth.controller.ts` | which flow breaks? | that "public" is an exception you grant, never a default |
+| Delete `@PlatformAdminOnly()` from `admin-agencies.controller.ts` | who can now read every agency's RC, NIF and owner's phone? | that one line is the *entire* protection on the only cross-tenant surface — run `npx vitest run test/admin-agencies.e2e.test.ts` |
 
 The last one is worth sitting with. Nothing here says "make this route private." Routes are
 private *because nobody said otherwise*. That inversion is the single design decision that
@@ -172,7 +180,7 @@ That list *is* the history of this schema.
 
 ---
 
-## Session 5 — The eight modules, for their differences only (~60 min)
+## Session 5 — The modules, for their differences only (~60 min)
 
 You now know the shape every module repeats. So skim for what's *unusual* about each one and
 ignore everything that's the pattern from Session 2.
@@ -185,13 +193,24 @@ ignore everything that's the pattern from Session 2.
 | `reservations` · `milestones` · `trips` | travellers have **no account**. Access is a secret code in a URL. [[Trip Programme]] |
 | `tracked-links` | attribution — which link produced which lead. [[Tracked Links]] |
 | `uploads` | files never touch your server's disk unexamined. [[Image Uploads]] |
-| `agencies` | onboarding + the review queue. [[Agency Verification]] |
+| `agencies` | onboarding — an agency creating itself, and asking to be reviewed |
+| `admin` | the exception to everything: **not scoped to a tenant at all**. [[Agency Verification]] |
 
-That third row is the one people get wrong. Tenant isolation stops Agency B; **role checks
+Two rows are worth more than the rest.
+
+**The `leads` row** is the one people get wrong. Tenant isolation stops Agency B; **role checks
 inside Agency A are a second, separate problem** with a separate answer. Session 3 covered
 the first. This is the second.
 
-> **Gate:** one sentence per module on what's unusual about it, from memory.
+**The `admin` row** is worth reading properly rather than skimming, because it is the only
+place in the codebase where the rule from Session 3 is deliberately broken. Every other query
+is scoped by `agencyId`; these are not, because Rihlati staff review agencies they are by
+definition not members of. Ask yourself what is left protecting the data once that scoping is
+gone — the answer is one boolean, and it is why that module's tests are mostly about who gets
+refused rather than what happens when it works.
+
+> **Gate:** one sentence per module on what's unusual about it, from memory. For `admin`,
+> two: what it can see, and what stops everyone else seeing it.
 
 ---
 

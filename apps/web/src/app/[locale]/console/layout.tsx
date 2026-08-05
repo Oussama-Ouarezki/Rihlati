@@ -1,7 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { getSession, redirectToLogin } from '@/lib/session';
-import { logout } from '@/lib/auth-actions';
 import { ConsoleNav, type ConsoleNavLink } from '@/components/console/ConsoleNav';
 import { Button } from '@/components/ui/button';
 
@@ -50,19 +49,7 @@ export default async function ConsoleLayout(props: { children: React.ReactNode }
           {membership.agencyName}
         </Link>
 
-        <ConsoleNav
-          links={navLinks}
-          user={{
-            displayName: session!.user.displayName,
-            email: session!.user.email,
-            phone: session!.user.phone,
-            avatarUrl: session!.user.avatarUrl,
-          }}
-          agencyName={membership.agencyName}
-          logoutLabel={t('logout')}
-          logoutAction={logout}
-          openMenuLabel={t('openMenu')}
-        />
+        <ConsoleNav links={navLinks} openMenuLabel={t('openMenu')} />
       </header>
 
       {props.children}

@@ -60,6 +60,12 @@ anyone with `curl` could already do. That is rule #2 working as intended.
 
 ## The session (built)
 
+**Signing in and out lives in one place: the avatar in the top-right of the site header**, on
+every page including the console (Decision 028). Signed out, that corner offers « Se connecter »
+and « Créer un compte ». The menu is built server-side from the session cookie, so the browser
+is never handed a "logged in" flag — and showing or hiding it grants nothing either way, since
+the API authorises every request on its own.
+
 **No token ever exists in browser JavaScript.** Login is a server action that stores both
 tokens in httpOnly cookies; console reads are server components and writes are server
 actions, each attaching the Bearer header server-side; refresh rotation runs in the

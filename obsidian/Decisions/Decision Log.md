@@ -637,6 +637,50 @@ a page someone has to remember to open.
 
 ---
 
+## 028 — One account menu, in the site header, on every page
+
+**Date:** 2026-08-05
+
+The avatar in the top-right corner of the public header is the single place to sign in, see who
+you are, and sign out — on the marketplace, on an offer page, and inside the agency console
+alike. Signed out, that corner shows « Se connecter » and « Créer un compte » instead. The
+console's own header no longer carries a second avatar: it sits ten pixels below the site
+header, so there were briefly two.
+
+The session is read **server-side** in `SiteAccountNav`, from the httpOnly cookie. The browser
+never receives a "logged in" flag it could flip. Worth being explicit about why that changes
+nothing about security: showing the menu is a UX decision, not a permission. Every API route
+still authorises itself ([[The Seven Rules]] #2). If someone forged the signed-in header in
+their own browser, they would see their own name in a box and every request behind it would
+still 401.
+
+**Rejected:**
+- *A "Espace agence" link in the header for everyone.* That is what was there. It sent
+  travelers — who are most visitors — to a page inviting them to create a travel agency. The
+  console link now only appears for someone who is actually in an agency.
+- *Leaving the account menu only in the console.* Sign-out then existed on exactly the pages
+  agency staff use, and a traveler who had signed up had no way to sign out at all.
+- *Two menus, one per header.* Rejected on sight once it was on screen: "where do I sign out"
+  must have one answer.
+- *Moving the language switcher into the menu on the public site too.* It stays visible in the
+  header, because a visitor who landed on the wrong language must not have to open a menu
+  labelled with a name they can't read to fix it. Inside the console header there is no room,
+  so the console keeps it in the menu.
+
+**Cost:** every page in the public layout now awaits `getSession()`, so every render of the
+marketplace makes one call to `/v1/auth/me`. It is `cache()`d per request and it is the same
+call the console already made, but it is a call on pages that used to need none — the first
+thing to look at if the homepage gets slow.
+
+Two bugs surfaced while building it, both worth a sentence:
+- Base UI's `DropdownMenuLabel` throws unless it is inside a `DropdownMenuGroup`. The console
+  menu had the same bug and had simply never been opened in a test.
+- The login page's title was a styled `div`, so the page had no `<h1>` for a screen reader to
+  land on. The e2e assertion looking for a heading had been failing on `main` because of it.
+  Now it is an `<h1>` and the test is true.
+
+---
+
 ## Template for new entries
 
 ```

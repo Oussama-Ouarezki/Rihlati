@@ -27,12 +27,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Accounts.md",
+                "file": "Concepts/The Seven Hops of a Request.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Accounts"
+              "title": "The Seven Hops of a Request"
             }
           }
         ],
@@ -203,20 +203,21 @@
       "bases:Create new base": false
     }
   },
-  "active": "671375330a8bd636",
+  "active": "3ed72ea3cb092fd7",
   "lastOpenFiles": [
+    "How to Study This Codebase.md.tmp.170364.deddb87f25b2",
+    "Decisions/Decision Log.md.tmp.170364.fa5233c1fab6",
+    "Backend/Trip Programme.md.tmp.170364.10595c97ac7a",
+    "Backend/Trip Programme.md.tmp.170364.e1809c7fb44a",
+    "Backend/Trip Programme.md.tmp.170364.f7fb9c042218",
+    "Backend/API Endpoints.md.tmp.170364.0b0a37a79a40",
+    "How to Study This Codebase.md.tmp.43175.2f669364f621",
+    "How to Study This Codebase.md.tmp.43175.8263811372d8",
+    "How to Study This Codebase.md.tmp.43175.e278c98b928f",
+    "How to Study This Codebase.md.tmp.43175.be2120a88f1c",
+    "Accounts.md",
     "Start Here.md.tmp.128241.a06c4266098b",
-    "Concepts/Multi-Tenancy.md.tmp.128241.c675d9e142c8",
     "Concepts/The Seven Hops of a Request.md",
-    "Concepts/The Seven Hops of a Request.md.tmp.128241.054d2741aa7a",
-    "Start Here.md.tmp.128241.ea49b628b703",
-    "Data Model/Agency.md.tmp.128241.914157513045",
-    "Backend/Image Uploads.md.tmp.128241.f6b31ae73f9a",
-    "Backend/Agency Verification.md.tmp.128241.57e205264706",
-    "Backend/Agency Verification.md.tmp.128241.1d6f72783485",
-    "Backend/Agency Verification.md.tmp.128241.c200a9c72cdd",
-    "Decisions/Decisions You Must Make.md.tmp.128241.66eb2f0c024f",
-    "Decisions/Decision Log.md.tmp.128241.e3426a6a5d79",
     "Backend/Agency Verification.md",
     "Backend/Plan Limits and Quotas.md",
     "Backend/Offer Analytics.md",
@@ -237,7 +238,6 @@
     "Data Model/Agency.md",
     "Data Model/Offer.md",
     "Data Model/User.md",
-    "Accounts.md",
     "Glossary.md",
     "Runbooks/Local Setup.md",
     "Frontend/CRM Redesign.md"
