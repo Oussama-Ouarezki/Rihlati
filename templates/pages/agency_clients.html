@@ -1,0 +1,158 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Clients — {{ agency.name }}{% endblock %}
+
+{% block agency_action %}
+  <a href="{% url 'agency-leads' agency.id %}" class="btn btn-secondary">Inquiries →</a>
+{% endblock %}
+
+{% block agency_content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Client book</p>
+      <h2 class="page-title">Clients</h2>
+      <p class="page-lede">The people behind the inquiries — every request, every trip, in one place.</p>
+    </div>
+    <details class="w-full sm:w-auto" {% if form.errors %}open{% endif %}>
+      <summary class="btn btn-primary list-none">+ Add a client</summary>
+      <form method="post" novalidate class="card mt-3 grid gap-3 p-4 sm:w-96">
+        {% csrf_token %}
+        {% for field in form %}
+          <div>
+            <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Add client</button>
+      </form>
+    </details>
+  </header>
+
+  <div class="mt-5 flex flex-wrap items-center gap-3">
+    <form method="get" class="flex items-center gap-2">
+      <label for="client-search" class="sr-only">Search clients</label>
+      <input id="client-search" type="search" name="q" value="{{ q }}" placeholder="Name or phone…"
+             class="field-input w-56 py-2 text-sm">
+      {% if filter %}<input type="hidden" name="filter" value="{{ filter }}">{% endif %}
+      <button type="submit" class="btn btn-secondary">Search</button>
+    </form>
+    {% if q %}
+      <a href="{% url 'agency-clients' agency.id %}{% if filter %}?filter={{ filter }}{% endif %}"
+         class="text-sm font-medium text-slate-500 hover:text-brand-700">Clear</a>
+    {% endif %}
+  </div>
+
+  <div class="mt-4 flex flex-wrap gap-2" aria-label="Filter clients">
+    {% for value, label, count in chips %}
+      <a href="{% url 'agency-clients' agency.id %}?{% if value %}filter={{ value }}{% endif %}{% if q %}{% if value %}&{% endif %}q={{ q|urlencode }}{% endif %}"
+         class="pill px-3 py-1.5 {% if filter == value %}bg-brand-600 text-white{% else %}border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900{% endif %}">
+        {{ label }} <span class="tabular-nums opacity-70">{{ count }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="card mt-4 overflow-hidden">
+    <!-- Desktop table -->
+    <div class="hidden md:block overflow-x-auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Phone</th>
+            <th>Trips</th>
+            <th>Last departure</th>
+            <th>Inquiries</th>
+            <th>Contact</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for client in clients %}
+            <tr>
+              <td>
+                <div class="flex items-center gap-3">
+                  <span class="avatar avatar-sm" aria-hidden="true">{{ client.full_name|slice:":1"|upper }}</span>
+                  <div>
+                    <a href="{% url 'agency-client-detail' agency.id client.id %}"
+                       class="font-semibold text-slate-900 hover:text-brand-700">{{ client.full_name }}</a>
+                    <span class="block text-xs text-slate-500">Client since {{ client.created_at|date:"M Y" }}</span>
+                  </div>
+                </div>
+              </td>
+              <td class="whitespace-nowrap text-slate-600 tabular-nums">{{ client.phone_e164 }}</td>
+              <td>
+                {% if client.trip_count %}
+                  <span class="pill pill-brand tabular-nums">{{ client.trip_count }}</span>
+                {% else %}
+                  <span class="text-xs text-slate-400">—</span>
+                {% endif %}
+              </td>
+              <td class="whitespace-nowrap text-slate-600">{{ client.last_trip_on|date:"j M Y"|default:"—" }}</td>
+              <td class="text-slate-600 tabular-nums">{{ client.lead_count }}</td>
+              <td>
+                <div class="flex gap-3">
+                  <a href="tel:{{ client.phone_e164 }}" class="text-xs font-semibold text-brand-700 hover:underline">Call</a>
+                  <a href="https://wa.me/{{ client.phone_e164|cut:"+" }}" target="_blank" rel="noopener"
+                     class="text-xs font-semibold text-brand-700 hover:underline">WhatsApp</a>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="empty-state m-4">
+                  <span class="empty-state-icon" aria-hidden="true">👤</span>
+                  <h3 class="mt-3 text-base font-semibold text-slate-900">
+                    {% if q or filter %}No client matches this filter{% else %}No clients yet{% endif %}
+                  </h3>
+                  <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+                    {% if q or filter %}Try another search, or clear the filter.{% else %}They appear here automatically after the first inquiry — or add one by hand.{% endif %}
+                  </p>
+                  {% if q or filter %}
+                    <a href="{% url 'agency-clients' agency.id %}" class="btn btn-primary mt-4">Clear filters</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <ul class="record-list md:hidden">
+      {% for client in clients %}
+        <li class="p-4">
+          <div class="flex items-start gap-3">
+            <span class="avatar" aria-hidden="true">{{ client.full_name|slice:":1"|upper }}</span>
+            <div class="min-w-0 flex-1">
+              <a href="{% url 'agency-client-detail' agency.id client.id %}" class="font-semibold text-slate-900">{{ client.full_name }}</a>
+              <p class="mt-0.5 text-xs text-slate-500">{{ client.phone_e164 }} · client since {{ client.created_at|date:"M Y" }}</p>
+            </div>
+            {% if client.trip_count %}<span class="pill pill-brand">{{ client.trip_count }} trip{{ client.trip_count|pluralize }}</span>{% endif %}
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+            <span>{{ client.lead_count }} inquir{{ client.lead_count|pluralize:"y,ies" }}</span>
+            <span>Last trip {{ client.last_trip_on|date:"j M Y"|default:"—" }}</span>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-1.5">
+            <a href="tel:{{ client.phone_e164 }}" class="btn btn-secondary btn-sm">Call</a>
+            <a href="https://wa.me/{{ client.phone_e164|cut:"+" }}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">WhatsApp</a>
+            <a href="{% url 'agency-client-detail' agency.id client.id %}" class="btn btn-ghost btn-sm">Open</a>
+          </div>
+        </li>
+      {% empty %}
+        <li class="empty-state m-4">
+          <span class="empty-state-icon" aria-hidden="true">👤</span>
+          <h3 class="mt-3 text-base font-semibold text-slate-900">
+            {% if q or filter %}No client matches this filter{% else %}No clients yet{% endif %}
+          </h3>
+          <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+            {% if q or filter %}Try another search, or clear the filter.{% else %}They appear here after the first inquiry — or add one by hand.{% endif %}
+          </p>
+          {% if q or filter %}<a href="{% url 'agency-clients' agency.id %}" class="btn btn-primary mt-4">Clear filters</a>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

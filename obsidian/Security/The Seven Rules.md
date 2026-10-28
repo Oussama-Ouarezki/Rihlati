@@ -8,22 +8,35 @@ here.
 
 Violating one is a bug, not a style disagreement.
 
+> [!tip] The one thing to take from this note
+> Every rule below is either **enforced by a mechanism** (something that makes the wrong code
+> impossible) or **enforced by a test** (something that makes the wrong code fail loudly). A
+> rule enforced by "remember to do this" is not enforced. Where this port had to trade a
+> mechanism for a test, the note says so.
+
 ---
 
 ## 1. No secrets in code
 
-**The failure:** an API key committed to the repo, or shipped to the browser in frontend
-code. Anyone who clones the repo — or opens devtools — has it.
+**The failure:** an API key committed to the repo, or rendered into a page. Anyone who clones
+the repo — or opens devtools — has it.
 
 **Here:**
-- Secrets live in `.env`, which `.gitignore` covers on **line 2**, before the first commit
-  ever happened. That ordering matters: a secret committed once is in git history forever,
-  even if you delete it in the next commit.
-- Only `.env.example` is committed, with empty values.
-- Anything named `NEXT_PUBLIC_*` or `EXPO_PUBLIC_*` is **published to the world**. Never a
-  secret there.
-- Your `.env` was generated with random secrets, mode `600`, and git was verified not to
-  see it.
+- Secrets live in `.env`, which `.gitignore` covers on **its first lines**, before the first
+  commit ever happened. That ordering matters: a secret committed once is in git history
+  forever, even if you delete it in the next commit.
+- Only `.env.example` is committed, with empty values and a comment saying what each is for.
+- `SecretsTests` in `apps/common/tests_house_rules.py` fails the build if anyone writes a
+  literal key into `settings.py` instead of reading it from the environment.
+- CI has a **separate `secrets` job** that scans the *full history*, refuses a tracked `.env`,
+  and refuses a tracked `.sqlite3` file — a development database is real data.
+
+> [!warning] The Django-shaped version of this failure is `DEBUG`
+> There is no `NEXT_PUBLIC_` here to accidentally publish a key through. The equivalent
+> mistake is `DJANGO_DEBUG=1` on a public server: Django's 500 page then renders your settings
+> module, the SQL it was running, and the whole environment — including `SECRET_KEY` — to
+> whoever triggered the error. It is an environment variable rather than an inference about
+> which machine you are on, precisely so it is a visible decision.
 
 **Check yourself:** `git diff --staged | grep -iE "sk-|secret|password|api[_-]?key"`
 
@@ -34,19 +47,28 @@ nothing — the old commit still has it.
 
 ## 2. The UI is never the security
 
-**The failure:** the delete button is hidden from non-admins, but `DELETE /agencies/abc`
+**The failure:** the delete button is hidden from non-managers, but `DELETE /api/offers/abc`
 answers anyone who calls it. Attackers don't use your interface.
 
 **Here:**
-- Deny by default: `JwtAuthGuard` is registered globally, so every endpoint needs a logged-in
-  user unless explicitly marked `@Public()`. Forgetting a check leaves the door **locked**.
-- Role checks run in a server-side guard, never inferred from anything the client sent.
-- `userId`, `agencyId`, `role` and prices are read from the session and the database —
-  never from the request. Server-owned fields are simply **absent from the input schemas**, so
-  Zod strips them; there is a test proving `isPlatformAdmin: true` in a signup body does
-  nothing, and another proving `agencyId`/`status`/`isFeatured` in an offer body do nothing.
-- The role is re-read from the database **every request**, not taken from the token. Fire
-  someone at 09:00 and they lose access at 09:00, not whenever their token expires.
+- **Deny by default at the root.** `NinjaAPI(auth=API_AUTH)` in `config/api.py` is set once,
+  so every route needs a logged-in caller unless it says `auth=None`. Forgetting a check
+  leaves the door **locked**, which is the only safe direction for a mistake to fall.
+- `auth=None` is the only exit, and it is **pinned by a test**:
+  `test_public_endpoints_are_the_ones_we_expect` reads the generated OpenAPI document and
+  compares the set of unauthenticated operations against a hand-written list. Adding a public
+  route is an edit to that list, with a reviewer attached. The test reads the *schema* rather
+  than grepping the source, so a route that became public by inheriting from a public router
+  is caught too.
+- Server-owned fields are **absent from the input schemas**, so there is nothing to ignore.
+  `AgencyProfileIn` has no `status` or `plan`; `OfferForm.Meta.fields` has no `agency` or
+  `is_featured`. `Strict` sets `extra="forbid"`, so sending one is a 422 rather than a
+  silently dropped field.
+- The role is re-read from the database **every request**, never taken from the token — the
+  access token contains a user id and nothing else. Fire someone at 09:00 and they lose access
+  at 09:00, not whenever their token expires.
+- Page views carry the same rule through a different door: `@login_required` plus
+  `require_membership_or_404`, not a hidden button.
 
 Full explanation: [[Authentication vs Authorization]] and [[Auth Flow]].
 
@@ -58,18 +80,36 @@ Full explanation: [[Authentication vs Authorization]] and [[Auth Flow]].
 second. It works far more often than anyone expects.
 
 **Here:** the whole of [[Multi-Tenancy]]. Four layers:
-- every tenant table has a non-null `agencyId`
-- `AgencyMembershipGuard` runs on **any route with an `:agencyId` parameter** — the thing that
-  makes a route tenant-scoped is the same thing that switches the guard on, so there is no
-  decorator to forget
-- every query uses `findFirst({ id, agencyId })` and `updateMany`, never `findUnique({ id })`.
-  **An ESLint rule fails the build** if anyone writes the unsafe form on a tenant table
-- **every resource has a test where Agency B tries it and gets `404`** — 17 of them in
-  `apps/api/test/tenant-isolation.e2e.test.ts`, against a real Postgres
+
+1. Every tenant table has a **non-null `agency`** column, checked by a test that reads the
+   model metadata — a nullable one means a row can exist belonging to nobody, invisible to
+   every scoped query, and it surfaces as "the customer says it vanished".
+2. Every query goes through `scoped(queryset, agency_id)` — the filter lives **inside the
+   queryset**, not in an `if` after the row is in hand. A condition inside a queryset cannot
+   be accidentally skipped, because there is nothing to skip.
+3. **A house-rules test bans the unsafe shape.** `Offer.objects.get(pk=…)` cannot also require
+   an agency id, so an AST test walks every source file and fails the build on it.
+4. **Every resource has a test where Agency B tries it and gets `404`** — 10 in
+   `apps/offers/tests.py`, 5 more for the page views in `apps/pages/tests.py`.
 
 A missing row and a forbidden row return the same `404`. `403` would confirm the row exists,
-which is enough to count a competitor's clients without reading one. One test asserts the two
-responses are identical in status, code **and** message.
+which is enough to count a competitor's clients without reading one.
+
+> [!warning] What the port lost, and what replaced it
+> In NestJS the membership check was a **global guard** that armed itself on any route with an
+> `:agencyId` parameter — the thing that made a route tenant-scoped was the same thing that
+> switched the check on, so there was no decorator to forget.
+>
+> Django Ninja has no equivalent hook, so here `require_membership()` is a plain function call
+> at the top of each handler, and a plain function call **can be left out**. What replaces the
+> guarantee is `MembershipCheckTests`: it finds every handler taking an `agency_id` — 56 of
+> them today — and fails if one never calls a gate. Handlers that are public on purpose sit in
+> a named `EXEMPT` list with the reason written next to them, and a second test fails if that
+> list ever names a handler that no longer exists.
+>
+> A convention plus a test that fails when the convention is broken is weaker than a
+> mechanism, and enormously stronger than trusting a reviewer to spot a missing line in a
+> forty-line diff.
 
 **A feature without that test is not done.**
 
@@ -80,39 +120,36 @@ responses are identical in status, code **and** message.
 **The failure:** users don't report bugs. They leave, silently, and you never find out.
 
 **Here:**
-- Sentry (or self-hosted GlitchTip) in the API and web app before the first real user.
-- Structured JSON logs with a `requestId` on every request, returned to the client — so a
-  user can quote an id and you can find the exact request.
-- **Never logged:** tokens, passwords, OTP codes, full phone numbers, payment identifiers.
-  There's a `maskPhone()` function for this, with a test.
-- An unhandled `500` is an incident.
+- **Structured JSON logs** with a `requestId` on every request, echoed in the `X-Request-Id`
+  header **and** inside every error body. A user quotes the id; you find the exact request.
+- The inbound `X-Request-Id` is **not trusted** — it is generated server-side, because a
+  client-chosen id is a free way to poison your own logs by claiming someone else's.
+- **Redaction happens at the exit**, in `JsonFormatter`, not at each call site. One
+  `logger.info(f"lead {lead}")` written in a hurry would otherwise put a phone number in the
+  aggregator forever. Passwords, tokens, OTP codes and secrets become `***`; phone numbers
+  become `+21355***222` — enough for an agent to confirm on a call, not enough to dial.
+- A house-rules test **bans logging a phone field** at the call site as well. Both layers,
+  because the regex catches what the reviewer missed and the ban catches what the regex
+  cannot see.
+- An unhandled `500` is an incident, and the API's error handlers deliberately **do not**
+  catch it — swallowing an unexpected error into a tidy envelope is how an incident becomes a
+  mystery.
 
-Status: **logging built, Sentry not yet.**
-
-- `AppLogger` writes one JSON object per line and **redacts at the exit** rather than trusting
-  every future caller to remember: password, token, secret, OTP, NIF and card fields become
-  `[redacted]`; phone fields are masked automatically.
-- `requestId` on every request, echoed in the `X-Request-Id` header **and** inside every error
-  body. An inbound one is honoured only if it matches `[A-Za-z0-9._-]{8,64}`, so a client
-  cannot inject newlines and forge log lines.
-- `AllExceptionsFilter` translates Prisma errors instead of forwarding them — `P2002` would
-  otherwise tell the caller your exact constraint and column names. A client never sees a
-  stack trace, and there is a test asserting it.
-- An ESLint rule fails the build on logging a full phone number.
-
-**Error reporting is wired** (`src/common/observability/sentry.ts`). It works with Sentry
-or a self-hosted GlitchTip — same protocol, and [[Decision Log|Decision 017]] picks
-GlitchTip. No DSN configured = a silent no-op, which is why local and CI stay quiet; and
-`loadConfig()` **refuses to boot production** without one.
+**Error reporting is wired** (`apps/common/observability.py`). It works with Sentry or a
+self-hosted GlitchTip — same protocol, and [[Decision Log|Decision 017]] picks GlitchTip
+because the reports contain travelers' names and numbers. No `SENTRY_DSN` = a silent no-op,
+which is why local runs and CI stay quiet.
 
 Two details worth knowing:
 - Only **unexpected** errors are reported. A 404 or a validation failure is the app working
   correctly, and flooding a tracker with those is how people learn to ignore the alerts.
-- Everything leaving for the tracker goes through the **same `redact()`** the logs use. A
-  crash report naturally carries the request that caused it — which here means a traveler's
-  phone number — and an error tracker is very much "anywhere".
+- Everything leaving for the tracker goes through the **same redaction the logs use**, plus a
+  second pass the logs do not need. A crash report is *structured*: the field name is a dict
+  key and the value is somewhere else, so the log regex — which has to see `token=value` in
+  one string — walks straight past an `{"Authorization": "Bearer …"}` pair. A test caught
+  that, and `is_sensitive_key()` now drops the value by its key.
 
-**Still to do:** set `SENTRY_DSN` when you deploy, and add the browser SDK to the web app.
+**Still to do:** set `SENTRY_DSN` when you deploy.
 
 ---
 
@@ -121,22 +158,19 @@ Two details worth knowing:
 **The failure:** everyone has backups. Almost nobody has restored one. Until you have, you
 have hope.
 
-**Here:** `npm run db:restore-rehearsal` — one command that dumps, restores into a scratch
-database, checks the rows and the CHECK constraints, then **starts the real API against the
-restored data** and confirms an agency can log in, sees its own leads, and gets a 404 for
-another agency's. Scripted rather than a checklist, because a procedure you have to remember
-at 3am is a procedure you will get wrong at 3am.
+> [!danger] This is the weakest rule in the project right now
+> There is **no production database, no backup, and no rehearsal**. The runbook in
+> [[Restore From Backup]] describes the procedure; nothing has executed it. That is an honest
+> ⬜, not a 🟡, and it is the line to fix before a single real agency is invited in.
 
-Status: **procedure rehearsed 2026-08-01, passed in 3 seconds. Production backups: none.**
+What the NestJS repo had and this one does not: a scripted rehearsal that dumps, restores into
+a scratch database, and then **starts the real API against the restored data** to confirm an
+agency can log in, sees its own leads, and gets a 404 for another agency's. Scripted rather
+than a checklist, because a procedure you have to remember at 3am is a procedure you will get
+wrong at 3am. Port it before launch, not after.
 
-That distinction matters and the runbook keeps both lines separate. A rehearsal against a
-local Docker Postgres proves the *steps*; it proves nothing about your provider's PITR, your
-off-site copy, or whether anyone can find the dump at 3am. Still needed before launch:
-managed Postgres with PITR, a nightly dump to *separate* storage, encryption, and one
-rehearsal against the real thing. See [[Restore From Backup]].
-
-> [!warning] `docker compose down -v` deletes your local database
-> Without `-v` your data survives. With it, gone. Worth knowing before you type it.
+Still needed: managed Postgres with PITR, a nightly dump to *separate* storage, encryption,
+and one rehearsal against the real thing with the date written down.
 
 ---
 
@@ -145,17 +179,25 @@ rehearsal against the real thing. See [[Restore From Backup]].
 **The failure:** the frontend sends the price. Webhook signatures unverified. Someone buys a
 400 000 DZD Omra for 1 dinar by editing one number.
 
-**Here:** no payment code exists yet. When it does:
-- prices and plan tiers are read from the **database**, server-side; the client sends an
-  item id and nothing else
+**Here:** no payment code exists yet. What already holds:
+- Prices are stored as **integer centimes** and never as floats — there is a house-rules test
+  that fails the build on any `FloatField` anywhere in the schema, because 0.1 + 0.2 is not
+  0.3 and a rounding error in a price is a refund conversation.
+- The offer form takes a price in **dinars as an integer** and multiplies by 100 server-side.
+  No float touches money at any point in the round trip.
+
+When payments arrive:
+- prices and plan tiers are read from the **database**, server-side; the client sends an item
+  id and nothing else
 - every webhook verifies its signature and is idempotent (dedupe on the provider's event id)
 - payment state changes only on a verified webhook — **never** on a client redirect saying
   "success"
 
 **Algeria note:** Stripe doesn't operate there, so the boring-and-correct Stripe checklist
 everyone recommends doesn't apply directly. Local CIB/Edahabia rails plus manual
-CCP/BaridiMob confirmation. Same principle, different provider. Verify current terms
-yourself. See [[Plan Limits and Quotas]].
+CCP/BaridiMob confirmation. Same principle, different provider. **Verify current terms
+yourself** — this is exactly the kind of fact nobody should take from a note. See
+[[Plan Limits and Quotas]].
 
 ---
 
@@ -165,35 +207,33 @@ yourself. See [[Plan Limits and Quotas]].
 find out from a user.
 
 **Here:**
-- Typecheck, lint and tests run in CI on every change (`.github/workflows/ci.yml`).
-- **187 checks**: 96 unit tests in `packages/shared`, 82 integration tests in `apps/api`
-  against a real Postgres, and 9 Playwright browser tests. They have caught six real bugs I
-  wrote: a price-bucketing function that split offers at band boundaries,
-  `z.coerce.boolean()` turning `"false"` into `true`, an agent-scoping filter that could be
-  widened by a query parameter, two `OR` clauses silently overwriting each other in search,
-  a money ceiling four times larger than its database column, and a login form that wiped
-  the user's email after a wrong password.
-- ESLint with type-aware rules. Three custom rules encode mistakes already made, so nobody
-  has to catch them by eye again: no `z.coerce.boolean()`, no `findUnique` on a tenant table,
-  no logging a full phone number.
-- Migrations reviewed by hand — the CHECK constraints in
-  `20260801090500_check_constraints/` were written by hand precisely because Prisma cannot
-  express them.
-- One shared type definition, so changing a field surfaces every place that uses it.
-
-Status: **live.** CI runs typecheck, lint, unit + integration tests, **and Playwright** on
-every push, plus a secret scan over full history.
-
-**Playwright covers the five pages** with a behaviour assertion *and* a screenshot each:
-search, offer detail, inquiry submission, login, agency lead inbox — plus an Arabic RTL
-check. Nine tests, ~7 seconds. On its very first run it found a **real production bug**:
-`MAX_PRICE_CENTIMES` was four times larger than the `Int` column could hold, so a big price
-filter crashed the search with a 500. It also caught a login form that wiped the user's
-email after a wrong password. Both fixed, both now pinned by tests.
+- **One command**, `./scripts/check.sh`: lint, format check, Django system checks, a
+  missing-migration check, and the tests. CI runs *that script*, not a parallel list of steps
+  — two lists drift, and the one that drifts is always the local one, so "it passed on my
+  machine" quietly stops meaning anything.
+- **153 tests**, run against a real **Postgres** in CI rather than SQLite. The bugs they exist
+  to catch — a missing `agency_id` in a `WHERE`, a constraint that rejects a legal value, a
+  JSON lookup that only works on one backend — are invisible to SQLite.
+- The **missing-migration check** is the quiet hero: a model change with no migration works
+  perfectly on your laptop, because your database already has the column. It fails on a fresh
+  deploy, which is the worst possible place to find out.
+- **House rules encoded as AST tests** rather than review comments, in
+  `apps/common/tests_house_rules.py`: no unscoped read on a tenant model, no nullable tenant
+  column, no handler that names an agency without checking membership, no phone number in a
+  log call, no float field, no literal secret in settings, and a pinned list of public routes.
+  Each one is a bug that has actually happened somewhere.
+- Migrations reviewed by hand.
 
 > [!warning] CI is only half of this rule
 > The other half is a GitHub setting: protect `main` and require the `check` job to pass.
 > Until you click that, CI is a notification — and people learn to scroll past notifications.
+
+> [!danger] The gap: no browser tests
+> `CLAUDE.md` requires Playwright over the five pages that matter — search, offer detail,
+> inquiry submission, agency lead inbox, login — with a screenshot assertion on each. **None
+> of that exists in this port yet.** Every test here is a Django test; nothing has ever opened
+> a real browser at this application. A template that renders an empty page passes the entire
+> suite.
 
 ---
 
@@ -202,27 +242,19 @@ email after a wrong password. Both fixed, both now pinned by tests.
 | Rule | Status | What is still missing |
 |---|---|---|
 | 1 — No secrets in code | ✅ enforced | — (CI scans the diff and full history) |
-| 2 — UI is never security | ✅ enforced | admin back-office endpoints not built |
+| 2 — UI is never security | ✅ enforced | no self-registration, so no signup surface to defend yet |
 | 3 — No cross-tenant reads | ✅ enforced | add a test per new resource, always |
-| 4 — Errors and logs | 🟡 partly | set `SENTRY_DSN` on deploy; browser SDK for the web app |
-| 5 — Tested backups | 🟡 partly | **procedure rehearsed; production backups do not exist yet** |
+| 4 — Errors and logs | 🟡 partly | set `SENTRY_DSN` on deploy |
+| 5 — Tested backups | ⬜ **not started** | **no backup, no rehearsal, no production database** |
 | 6 — Money not from client | ⬜ n/a | no payment code exists yet |
-| 7 — Nothing silent | ✅ enforced | switch on branch protection in GitHub |
+| 7 — Nothing silent | 🟡 partly | **browser tests**; branch protection in GitHub |
 
-> [!warning] Rule 5 is still the one to watch
-> The **procedure** is proven: `npm run db:restore-rehearsal` dumps, restores into a scratch
-> database, and confirms the real API can serve the restored data *with tenant isolation
-> intact*. Passed 2026-08-01 in 3 seconds.
->
-> What that does **not** prove: your hosting provider's PITR, an off-site copy, or that
-> anyone can find the dump at 3am — because there is no production database yet. See
-> [[Restore From Backup]]. Do not launch until that line has a date too.
-
-> [!note] Two rules are one setting away from done
-> Rule 7 needs **branch protection** switched on in GitHub (require the `check` job), and
-> rule 4 needs a **`SENTRY_DSN`** in the deploy environment. Neither is code.
+> [!warning] Rule 5 is the one to watch
+> Rules 4 and 7 are each one setting or one task away from done and would cost you a bad
+> afternoon. Rule 5 is the one that costs you the company. Nothing in this repository has ever
+> been backed up or restored.
 
 ---
 
 Related: [[Multi-Tenancy]] · [[Authentication vs Authorization]] ·
-[[Validation at the Boundary]] · [[Start Here]]
+[[Validation at the Boundary]] · [[Restore From Backup]] · [[Start Here]]

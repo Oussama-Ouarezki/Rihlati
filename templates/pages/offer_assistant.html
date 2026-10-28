@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Assistant — {{ offer.title_fr }}{% endblock %}
+
+{% block content %}
+  <a href="{% url 'offer-detail' offer.id %}" class="text-sm font-medium text-slate-500 hover:text-brand-700">
+    ← Back to the offer
+  </a>
+
+  <div class="mt-4 grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
+    {% comment %} The chat is the page, so it takes the wide column. The offer summary
+       sits beside it to keep the traveller oriented. {% endcomment %}
+    <div>
+      {% include "pages/_chat.html" with chat_full_page=True %}
+    </div>
+
+    <aside class="card overflow-hidden">
+      <div class="relative aspect-[16/9] bg-sand-100">
+        {% if offer.cover_image_url %}
+          <img src="{{ offer.cover_image_url }}" alt="{{ offer.title_fr }}" class="h-full w-full object-cover">
+        {% else %}
+          <div class="flex h-full w-full items-center justify-center bg-gradient-to-br from-sand-100 to-brand-50 text-5xl text-brand-300" aria-hidden="true">✈</div>
+        {% endif %}
+        <span class="absolute start-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-xs font-semibold text-slate-700">
+          {{ offer.get_kind_display }}
+        </span>
+      </div>
+
+      <div class="space-y-4 p-5">
+        <div>
+          <h1 class="text-base font-bold text-slate-900">{{ offer.title_fr }}</h1>
+          <p dir="rtl" class="text-start text-sm text-slate-500">{{ offer.title_ar }}</p>
+        </div>
+
+        <p class="flex flex-wrap items-center gap-x-2 text-sm text-slate-500">
+          <span>{{ offer.agency.name }}</span>
+          {% if offer.agency.is_verified %}<span class="pill pill-brand">✓ Verified</span>{% endif %}
+          <span>· {{ offer.agency.city }}</span>
+        </p>
+
+        <dl class="grid grid-cols-2 gap-2">
+          <div class="rounded-xl border border-slate-200 p-3">
+            <dt class="text-xs text-slate-500">From</dt>
+            <dd class="text-base font-bold text-brand-700 tabular-nums">{{ offer.price_dzd|floatformat:0 }} DZD</dd>
+          </div>
+          <div class="rounded-xl border border-slate-200 p-3">
+            <dt class="text-xs text-slate-500">Departure</dt>
+            <dd class="text-sm font-semibold text-slate-900">{{ offer.departure_date|date:"j M Y" }}</dd>
+          </div>
+          <div class="rounded-xl border border-slate-200 p-3">
+            <dt class="text-xs text-slate-500">Seats</dt>
+            <dd class="text-sm font-semibold {% if offer.seats_left <= 10 %}text-amber-700{% else %}text-slate-900{% endif %}">
+              {{ offer.seats_left }} / {{ offer.seats_total }}
+            </dd>
+          </div>
+          <div class="rounded-xl border border-slate-200 p-3">
+            <dt class="text-xs text-slate-500">Departs from</dt>
+            <dd class="text-sm font-semibold text-slate-900">{{ offer.get_departure_wilaya_code_display|default:"—" }}</dd>
+          </div>
+        </dl>
+
+        <a href="{% url 'offer-detail' offer.id %}" class="text-sm font-semibold text-brand-700 hover:underline">
+          See the full programme and ask for a callback →
+        </a>
+      </div>
+    </aside>
+  </div>
+{% endblock %}

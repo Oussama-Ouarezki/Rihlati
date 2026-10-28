@@ -58,3 +58,14 @@ playwright-report/
 
 # Local scratch from editor tooling — machine-specific, not project config
 .serena/
+
+# ---- Django / Python ----
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.sqlite3
+
+# Generated knowledge-graph output
+graphify-out/

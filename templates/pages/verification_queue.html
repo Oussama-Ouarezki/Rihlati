@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Verification queue{% endblock %}
+
+{% comment %} Staff only, checked server-side against `is_staff` read from the database on
+   every request. This page is not hidden — it is refused. {% endcomment %}
+
+{% block content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Staff</p>
+      <h1 class="page-title">Verification queue</h1>
+      <p class="page-lede">Oldest application first. A queue that is not FIFO means, in practice, that whoever complains loudest goes first.</p>
+    </div>
+  </header>
+
+  <div class="mt-6 space-y-4">
+    {% for agency in queue %}
+      <article class="card card-pad">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">{{ agency.name }}</h2>
+            <p class="text-sm text-slate-500">{{ agency.city }} · applied {{ agency.submitted_for_review_at|date:"j M Y H:i" }}</p>
+          </div>
+          <dl class="grid grid-cols-3 gap-4 text-sm">
+            <div>
+              <dt class="text-xs text-slate-500">Registry</dt>
+              <dd class="text-slate-900">{{ agency.registre_commerce|default:"—" }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">NIF</dt>
+              <dd class="text-slate-900">{{ agency.nif|default:"—" }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs text-slate-500">Licence</dt>
+              <dd class="text-slate-900">{{ agency.tourism_licence|default:"—" }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <form method="post" class="mt-5 grid gap-3 sm:grid-cols-2">
+          {% csrf_token %}
+          <input type="hidden" name="agency_id" value="{{ agency.id }}">
+
+          <div class="sm:col-span-2">
+            <label for="note-{{ agency.id }}" class="field-label">What you checked</label>
+            {% comment %} Required even for an approval: a badge nobody had to justify
+               means nothing, and six months later this is the only trace of why
+               this agency got through. {% endcomment %}
+            <input id="note-{{ agency.id }}" type="text" name="note" required minlength="5"
+                   class="field-input" placeholder="Registry checked with the CNRC; licence up to date.">
+          </div>
+
+          <div>
+            <label for="reason-{{ agency.id }}" class="field-label">Rejection reason</label>
+            <input id="reason-{{ agency.id }}" type="text" name="rejection_reason"
+                   class="field-input" placeholder="Read by the agency, word for word.">
+          </div>
+
+          <div class="flex items-end gap-2">
+            <button type="submit" name="decision" value="approve" class="btn btn-primary flex-1">Verify</button>
+            <button type="submit" name="decision" value="reject" class="btn btn-danger flex-1">Reject</button>
+          </div>
+        </form>
+      </article>
+    {% empty %}
+      <div class="empty-state">
+        <span class="empty-state-icon" aria-hidden="true">✓</span>
+        <h2 class="mt-3 text-base font-semibold text-slate-900">Nothing to review</h2>
+        <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">The queue is empty.</p>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h2 class="section-title mt-10">Recent decisions</h2>
+  <div class="card mt-3 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Agency</th>
+            <th>Decision</th>
+            <th>By</th>
+            <th>When</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for agency in recent %}
+            <tr>
+              <td class="font-medium text-slate-900">{{ agency.name }}</td>
+              <td><span class="pill {% if agency.status == 'verified' %}pill-success{% elif agency.status == 'rejected' %}pill-danger{% else %}pill-neutral{% endif %}">{{ agency.get_status_display }}</span></td>
+              <td class="text-slate-600">{{ agency.decided_by.username|default:"—" }}</td>
+              <td class="whitespace-nowrap text-slate-500">{{ agency.decided_at|date:"j M Y H:i" }}</td>
+              <td class="max-w-64 truncate text-slate-500">{{ agency.decision_note|default:"—"|truncatechars:60 }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="py-10 text-center text-sm text-slate-500">No decisions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endblock %}

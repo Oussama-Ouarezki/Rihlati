@@ -1,5 +1,10 @@
 # Client Quality Labels
 
+> [!success] Built
+> `Lead.Quality` in `apps/leads/models.py`; set through `PATCH
+> /api/agencies/{id}/leads/{id}` in `apps/leads/api.py`; filtered in the inbox by the
+> `quality` query parameter. Free-form tags: `Tag` and `LeadTag`, same file.
+
 Your "label clients from serious to troll to good" feature. It's a field on [[Lead]], plus
 one genuinely hard design question at the end that's yours to answer.
 
@@ -7,30 +12,45 @@ one genuinely hard design question at the end that's yours to answer.
 
 ## The labels
 
-`Lead.quality`, one of seven values:
+`Lead.quality`, one of seven values, defined as a `TextChoices` class on the model —
+`Lead.Quality`. The labels the agency sees are French, because the CRM is French:
 
-| Label | Meaning | Weight |
+| Value | Shown as | Meaning |
 |---|---|---|
-| `spam` | not a real person — bot, junk | −2 |
-| `troll` | real person, wasting the agency's time deliberately | −1 |
-| `unrated` | nobody has judged yet (the default) | 0 |
-| `cold` | real, but just looking | 1 |
-| `warm` | genuinely interested, no budget confirmed | 2 |
-| `serious` | ready to buy, budget confirmed | 3 |
-| `vip` | high value, repeat, or a referral source | 4 |
+| `spam` | Spam | not a real person — bot, junk |
+| `troll` | Troll | real person, wasting the agency's time deliberately |
+| `unrated` | Non évalué | nobody has judged yet (**the default**) |
+| `cold` | Froid | real, but just looking |
+| `warm` | Tiède | genuinely interested, no budget confirmed |
+| `serious` | Sérieux | ready to buy, budget confirmed |
+| `vip` | VIP | high value, repeat, or a referral source |
 
-Defined in `packages/shared/src/enums.ts` as `LEAD_QUALITIES` and `LEAD_QUALITY_WEIGHT`.
+> [!warning] There are no weights in this port
+> The NestJS version carried a `LEAD_QUALITY_WEIGHT` map (`spam` = −2 … `vip` = +4) and
+> sorted the inbox by it. Nothing like that exists here: `Lead.Quality` is a plain set of
+> strings, and the inbox **filters** by quality but does not **sort** by it.
+>
+> Not an oversight worth rushing to fix. A weight is a claim that the gap between `cold`
+> and `warm` is the same size as the gap between `serious` and `vip`, and nobody has
+> checked that. Filtering — "show me the sérieux ones" — answers the same question an
+> agency actually asks, without inventing arithmetic. Sorting is a `models.Case/When` in
+> one queryset the day you want it, and it should be added with a reason, not by default.
 
 ---
 
 ## Why an enum and not free-text tags
 
-Because you want to *compute* with these. The weights let the inbox sort by "worth calling
-first", and later let you price leads — a `serious` Omra lead is worth more than a `cold`
-one, and that's the foundation of charging for introductions at all.
+Because you eventually want to *compute* with these. A fixed set lets the system reason:
+filter the inbox, count conversions per label, and later price leads — a `serious` Omra
+lead is worth more than a `cold` one, and that's the foundation of charging for
+introductions at all.
 
 Free text can't do that. If one agency writes "sérieux", another "serious", a third "SERIEUX
 ++", you have three strings and no signal.
+
+The enum is enforced on the way in: `update_lead` rejects a value outside
+`Lead.Quality.values` with a **422**, rather than letting a typo become a new category. An
+`agency, quality` index on `Lead` makes the filter cheap.
 
 But agencies will always want labels you didn't think of. That's what the separate `Tag`
 table is for: agency-invented, free-form, no computation. "Waiting for passport", "friend of
@@ -45,7 +65,8 @@ Karim", "wants window seat".
 
 Two different axes, and conflating them is the common mistake:
 
-- **`stage`** — where the *deal* is: `new → contacted → quoted → booked → paid → travelled`
+- **`status`** — where the *deal* is: `new → contacted → quoted → negotiating → booked →
+  travelled`, with `lost` as the other ending
 - **`quality`** — how good the *person* is
 
 A `vip` client can be `lost` (they bought elsewhere). A `troll` can reach `quoted` (the
@@ -114,8 +135,10 @@ For actual `spam` — bots, junk submissions — quality labels are the wrong to
 after the fact, by hand.
 
 Cheaper and automatic:
-- rate limit inquiries per IP and per phone number
-- a hidden honeypot field bots fill in and humans don't
+- **rate limit inquiries** — built: `InquiryThrottle` in `apps/common/throttling.py` caps
+  the public inquiry endpoint at 20/hour per source. Per source, never per phone number —
+  see [[Auth Flow]] for why limiting per account is a weapon pointed at your own users.
+- a hidden honeypot field bots fill in and humans don't — **not built**
 - SMS OTP, but *only* if abuse actually appears (every OTP step loses real inquiries — see
   [[User]])
 
@@ -123,16 +146,21 @@ Prevention beats labelling, same lesson as quotas in [[Duplicate and Spam Contro
 
 ---
 
-## What agencies get from this in v1
+## What agencies get from this today
 
-- Set a label on any lead they own
-- Sort or filter the inbox by it
-- `spam` and `troll` are recorded in [[Audit Log]] — because a negative judgement about a
-  named person should be attributable to whoever made it
-- Every change appends to the lead's `LeadActivity` timeline
+- Set a label on any lead they own — `PATCH .../leads/{id}` with `{"quality": "serious"}`
+- **Filter** the inbox by it (`?quality=serious`). Not sort — see the warning above.
+- Every change appends to the lead's `LeadActivity` timeline with the old and new value,
+  and the actor, so a negative judgement about a named person is attributable to whoever
+  made it.
+- The change is also written to the [[Audit Log]] as `lead.updated`, with `before` and
+  `after`. That covers every label, not just `spam` and `troll` — a narrower rule would
+  mean deciding at write time which judgements deserve recording, which is exactly the
+  decision an audit log exists to avoid.
 
-Sorting by quality weight is a `free` plan feature. The pipeline board and analytics are
-`pro` — see [[Plan Limits and Quotas]].
+None of this is plan-gated: [[Plan Limits and Quotas]] currently gates one thing only, the
+number of *published offers*. There is no feature-gating helper in this port yet, so the
+pipeline board and the inbox are open to every plan.
 
 ---
 

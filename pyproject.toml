@@ -1,0 +1,70 @@
+# Tooling config. There is no packaging here — this is an application, not a
+# library — so this file exists purely to configure ruff.
+#
+# The NestJS repo's lint config carries three custom rules that encode bugs
+# which already happened. Ruff has no user-defined rules, so that job lives in
+# `apps/common/tests_house_rules.py` instead. What is left here is the ordinary
+# hygiene layer: the errors that are always errors, in every Python project.
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [
+    "**/migrations/*",
+    ".venv",
+    # Ruff now reaches into fenced code blocks in Markdown, and the vault is
+    # full of them. Those snippets are teaching material: they are aligned for
+    # a human reading a note, they are often deliberate fragments, and half of
+    # them describe code that lives in the NestJS repo rather than this one.
+    # Reformatting them makes the notes worse and the diff noisy, so the vault
+    # is prose as far as the formatter is concerned.
+    "obsidian",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes — undefined names, unused imports, the real bug-finders
+    "W",    # pycodestyle warnings
+    "I",    # import sorting, so a merge conflict is never about import order
+    "UP",   # pyupgrade — don't write 2015 Python in 2026
+    "B",    # flake8-bugbear
+    "DJ",   # flake8-django
+    "S",    # flake8-bandit — the security subset
+    "T20",  # no stray print() left in a request path
+]
+
+ignore = [
+    # Django's own idiom. `blank=True` on a CharField plus `null=True` is the
+    # documented anti-pattern; bugbear's version of this fires on the correct
+    # code too, so it is off and the review catches the real case.
+    "DJ001",
+    # We use `assert` in tests through unittest's methods, and ruff's S101
+    # fires on the bare keyword. Tests are excluded below anyway; this keeps
+    # the exclusion honest rather than blanket-disabling S.
+    "S603",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Settings modules are wildcard-ish by nature and read from the environment;
+# S105/S106 ("possible hardcoded password") fires on the *name* of a variable,
+# and the real check for this file is SecretsTests in tests_house_rules.py,
+# which looks at whether the value is a literal rather than at its name.
+"config/settings.py" = ["S105", "S106"]
+
+# Tests build states the API refuses to produce and use throwaway passwords on
+# purpose. Holding them to the production security rules would mean writing
+# every fixture through the API under test, which tests nothing.
+"**/test*.py" = ["S101", "S105", "S106", "S311"]
+
+# Seed data is operator-facing: printing to the terminal IS its interface. S105
+# fires on the throwaway fixture password, which is published in the README on
+# purpose — it only ever unlocks a local database full of invented agencies.
+"apps/*/management/commands/*.py" = ["T20", "S311", "S105", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+# Routers are named `public_router` / `agency_router` in every app, so almost
+# every import of one is aliased. Without this, ruff splits each alias onto its
+# own line and `config/api.py` becomes twenty import statements for ten names.
+combine-as-imports = true

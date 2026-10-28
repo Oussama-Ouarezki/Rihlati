@@ -1,0 +1,129 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}{{ lead.full_name }} — Inquiries{% endblock %}
+
+{% block agency_content %}
+  <nav class="flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+    <a href="{% url 'agency-leads' agency.id %}" class="hover:text-brand-700">Inquiries</a>
+    <span aria-hidden="true">/</span>
+    <span class="truncate text-slate-700">{{ lead.full_name }}</span>
+  </nav>
+
+  <div class="mt-4 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:items-start">
+    <div class="space-y-6">
+      <section class="card card-pad">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="flex items-start gap-3">
+            <span class="avatar" aria-hidden="true">{{ lead.full_name|slice:":1"|upper }}</span>
+            <div>
+              <h2 class="text-xl font-bold tracking-tight text-slate-900">{{ lead.full_name }}</h2>
+              <p class="text-sm text-slate-500">{{ lead.phone_e164 }}</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            {% if lead.client %}
+              <a href="{% url 'agency-client-detail' agency.id lead.client.id %}" class="pill pill-brand hover:bg-brand-100">
+                Client profile
+              </a>
+            {% endif %}
+            <span class="pill pill-neutral">{{ lead.get_status_display }}</span>
+            <span class="pill pill-neutral">{{ lead.get_quality_display }}</span>
+          </div>
+        </div>
+
+        {% if lead.message %}
+          <blockquote class="mt-4 rounded-xl border-s-4 border-brand-200 bg-sand-50 p-4 text-sm leading-6 text-slate-700">
+            {{ lead.message }}
+          </blockquote>
+        {% endif %}
+
+        <dl class="mt-5 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4 text-sm">
+          <div>
+            <dt class="text-xs font-medium text-slate-500">Offer</dt>
+            <dd class="mt-0.5 font-medium text-slate-900">{{ lead.offer.title_fr }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium text-slate-500">Source</dt>
+            <dd class="mt-0.5 text-slate-900">{{ lead.get_source_display }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium text-slate-500">Received</dt>
+            <dd class="mt-0.5 text-slate-900">{{ lead.created_at|date:"j M Y H:i" }}</dd>
+          </div>
+          <div>
+            <dt class="text-xs font-medium text-slate-500">First reply</dt>
+            <dd class="mt-0.5 text-slate-900">{{ lead.first_responded_at|date:"j M Y H:i"|default:"—" }}</dd>
+          </div>
+        </dl>
+
+        <p class="mt-4 border-t border-slate-100 pt-3 text-xs leading-5 text-slate-500">
+          Consent: {{ lead.consent_given_at|date:"j M Y H:i"|default:"not recorded" }}
+          {% if lead.consent_text_version %}· version {{ lead.consent_text_version }}{% endif %}
+        </p>
+      </section>
+
+      <section class="card card-pad">
+        <h3 class="section-title">Notes</h3>
+        <p class="mt-1 text-sm text-slate-500">Working memory: editable and deletable. The history below never changes.</p>
+        <form method="post" class="mt-4 space-y-2">
+          {% csrf_token %}
+          <label for="lead-note" class="sr-only">New note</label>
+          <textarea id="lead-note" name="note" rows="3" required class="field-input"
+                    placeholder="Called back — wants to travel with five family members."></textarea>
+          <button type="submit" class="btn btn-primary">Add note</button>
+        </form>
+        <ul class="mt-4 space-y-2">
+          {% for note in notes %}
+            <li class="rounded-xl border border-slate-200 bg-sand-50/50 p-3">
+              <p class="text-sm leading-6 text-slate-700">{{ note.body }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ note.author.username|default:"—" }} · {{ note.created_at|date:"j M H:i" }}</p>
+            </li>
+          {% empty %}
+            <li class="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">No notes yet.</li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+
+    <div class="space-y-6">
+      <section class="card card-pad">
+        <h3 class="section-title">Update</h3>
+        <form method="post" action="{% url 'agency-lead-status' agency.id lead.id %}" class="mt-4 space-y-4">
+          {% csrf_token %}
+          <div>
+            <label for="lead-status" class="field-label">Stage</label>
+            <select id="lead-status" name="status" class="field-input">
+              {% for value, label in statuses %}
+                <option value="{{ value }}" {% if lead.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="lead-quality" class="field-label">Quality</label>
+            <select id="lead-quality" name="quality" class="field-input">
+              {% for value, label in qualities %}
+                <option value="{{ value }}" {% if lead.quality == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary w-full">Save</button>
+        </form>
+        <p class="helptext mt-2">Quality is your internal label. The traveller never sees it.</p>
+      </section>
+
+      <section class="card card-pad">
+        <h3 class="section-title">History</h3>
+        <p class="mt-1 text-sm text-slate-500">Written by the system, never edited. This is what remains when two people remember differently.</p>
+        <ol class="mt-4 space-y-3">
+          {% for activity in activities %}
+            <li class="border-s-2 border-slate-200 ps-3">
+              <p class="text-sm text-slate-700">{{ activity.verb }}</p>
+              <p class="text-xs text-slate-500">{{ activity.actor.username|default:"system" }} · {{ activity.created_at|date:"j M H:i" }}</p>
+            </li>
+          {% empty %}
+            <li class="text-sm text-slate-500">Nothing yet.</li>
+          {% endfor %}
+        </ol>
+      </section>
+    </div>
+  </div>
+{% endblock %}

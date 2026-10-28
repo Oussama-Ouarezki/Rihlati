@@ -1,0 +1,122 @@
+{% load static %}
+<!doctype html>
+{% comment %} `dir` on <html> is the single switch that flips the whole layout for
+   Arabic — everything below uses logical utilities, so nothing else changes. {% endcomment %}
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% comment %} A capability URL that gets indexed is a leak: the link stops being a
+     secret the moment a crawler publishes it. Set by the view, not hardcoded
+     in one template, so a second such page cannot forget it. {% endcomment %}
+  {% if noindex %}<meta name="robots" content="noindex, nofollow">{% endif %}
+  <title>{% block title %}Rihlati{% endblock %}</title>
+  <meta name="description" content="Rihlati — trips from verified Algerian travel agencies.">
+  <link rel="stylesheet" href="{% static 'app.css' %}">
+</head>
+<body class="flex min-h-screen flex-col antialiased">
+
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <header class="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+      <a href="{% url 'search' %}" class="flex items-center gap-2.5" aria-label="Rihlati home">
+        <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-sm font-black text-white shadow-sm">R</span>
+        <span class="text-xl font-bold tracking-tight text-slate-900">Rihlati</span>
+      </a>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <span class="hidden rounded-full bg-sand-100 px-2.5 py-1 text-[11px] font-medium text-sand-700 sm:inline">
+          Django preview
+        </span>
+        <a href="{% url 'search' %}"
+           class="hidden text-sm font-medium text-slate-600 hover:text-brand-700 sm:inline">
+          Explore trips
+        </a>
+
+        {% if user.is_authenticated %}
+          <a href="{% url 'dashboard' %}" class="btn btn-primary btn-sm">Agency console</a>
+          <details class="group relative">
+            <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-[11px] font-bold text-brand-700">
+                {{ user.username|slice:":1"|upper }}
+              </span>
+              <span class="hidden max-w-24 truncate sm:inline">{{ user.username }}</span>
+              <span aria-hidden="true" class="text-slate-400">▾</span>
+            </summary>
+            <div class="absolute end-0 mt-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-lift">
+              {% if user.is_staff %}
+                <a href="{% url 'verification-queue' %}" class="block rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  Verification queue
+                </a>
+                <a href="/admin/" class="block rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  Django admin
+                </a>
+              {% endif %}
+              <a href="{% url 'roadmap' %}" class="block rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                Product roadmap
+              </a>
+              <form method="post" action="{% url 'logout' %}" class="mt-1 border-t border-slate-100 pt-1">
+                {% csrf_token %}
+                <button type="submit" class="block w-full rounded-xl px-3 py-2 text-start text-sm font-medium text-rose-600 hover:bg-rose-50">
+                  Sign out
+                </button>
+              </form>
+            </div>
+          </details>
+        {% else %}
+          <a href="{% url 'login' %}" class="btn btn-primary btn-sm">Agency login</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 py-7 sm:py-10">
+    {% if messages %}
+      <div class="mb-5 space-y-2" role="status" aria-live="polite">
+        {% for message in messages %}
+          <p class="flex items-start gap-2 rounded-xl border px-4 py-3 text-sm
+             {% if message.tags == 'error' %}border-rose-200 bg-rose-50 text-rose-700
+             {% else %}border-brand-200 bg-brand-50 text-brand-800{% endif %}">
+            <span aria-hidden="true" class="mt-0.5">{% if message.tags == 'error' %}⚠{% else %}✓{% endif %}</span>
+            <span>{{ message }}</span>
+          </p>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-slate-200/80 bg-white">
+    <div class="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]">
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-xs font-black text-white">R</span>
+          <span class="font-bold tracking-tight text-slate-900">Rihlati</span>
+        </div>
+        <p class="mt-3 max-w-sm text-sm leading-6 text-slate-500">
+          A marketplace for verified Algerian travel agencies — and the client book that keeps their travellers coming back.
+        </p>
+      </div>
+      <div class="text-sm">
+        <p class="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">Explore</p>
+        <ul class="mt-3 space-y-2 text-slate-600">
+          <li><a href="{% url 'search' %}" class="hover:text-brand-700">All trips</a></li>
+          <li><a href="{% url 'login' %}" class="hover:text-brand-700">Agency console</a></li>
+          <li><a href="{% url 'roadmap' %}" class="hover:text-brand-700">Product roadmap</a></li>
+        </ul>
+      </div>
+      <div class="text-sm">
+        <p class="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">About this preview</p>
+        <p class="mt-3 leading-6 text-slate-500">
+          Sample data only — no real names, phone numbers or bookings.
+        </p>
+      </div>
+    </div>
+  </footer>
+
+  {% comment %} Draws the trip programme's road through its pins. Decoration only:
+     with this script off the programme still renders, over a straight band. {% endcomment %}
+  <script src="{% static 'road.js' %}" defer></script>
+</body>
+</html>

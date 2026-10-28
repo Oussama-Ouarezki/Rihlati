@@ -1,0 +1,93 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Assistant — {{ agency.name }}{% endblock %}
+
+{% block agency_content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Automation</p>
+      <h2 class="page-title">Assistant</h2>
+      <p class="page-lede">Your booking rules, added to what each offer already says.</p>
+    </div>
+  </header>
+
+  <div class="mt-5 grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
+    <section class="card card-pad">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 class="section-title">Agency instructions</h3>
+          <p class="mt-1 text-sm text-slate-500">
+            What the assistant adds to each offer's data: booking, deposit, documents, cancellation.
+          </p>
+        </div>
+        {% if assistant and not assistant.is_enabled %}
+          <span class="pill pill-neutral">Disabled</span>
+        {% else %}
+          <span class="pill pill-success">Active</span>
+        {% endif %}
+      </div>
+
+      <form method="post" novalidate class="mt-5 space-y-4">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <label for="{{ form.is_enabled.id_for_label }}"
+               class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-sand-50/50 p-3 transition hover:border-slate-300">
+          {{ form.is_enabled }}
+          <span class="text-sm text-slate-700">
+            <span class="font-medium">{{ form.is_enabled.label }}</span>
+            <span class="mt-0.5 block text-xs leading-5 text-slate-500">
+              When off, the widget and its dedicated page disappear from every agency offer.
+            </span>
+          </span>
+        </label>
+        {{ form.is_enabled.errors }}
+
+        <div>
+          <label for="{{ form.instructions.id_for_label }}" class="field-label">{{ form.instructions.label }}</label>
+          {{ form.instructions }}
+          <span class="helptext">{{ form.instructions.help_text }}</span>
+          {{ form.instructions.errors }}
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save instructions</button>
+      </form>
+    </section>
+
+    <div class="space-y-6">
+      <section class="card card-pad">
+        <h3 class="section-title">Try it</h3>
+        <p class="mt-1 text-sm text-slate-500">Open the page a traveller sees, with your saved instructions.</p>
+
+        {% if offers %}
+          <ul class="mt-3 divide-y divide-slate-100">
+            {% for offer in offers %}
+              <li class="flex items-center justify-between gap-3 py-3">
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-medium text-slate-900">{{ offer.title_fr }}</span>
+                  <span class="block text-xs text-slate-500">{{ offer.departure_date|date:"j M Y" }} · {{ offer.price_dzd|floatformat:0 }} DZD</span>
+                </span>
+                <a href="{% url 'offer-assistant' offer.id %}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Open</a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            No published offers yet. Publish one to test the assistant.
+          </p>
+        {% endif %}
+      </section>
+
+      <section class="card card-pad">
+        <h3 class="section-title">What it will not do</h3>
+        <ul class="mt-2 list-disc space-y-1.5 ps-4 text-sm leading-6 text-slate-600">
+          <li>It does not take bookings or hold seats.</li>
+          <li>It never changes a price — it reads the offer's price.</li>
+          <li>It only talks about this agency, never another.</li>
+        </ul>
+        <p class="mt-3 text-xs leading-5 text-slate-500">
+          To book, the traveller uses the “Ask for a callback” form on the offer page.
+        </p>
+      </section>
+    </div>
+  </div>
+{% endblock %}

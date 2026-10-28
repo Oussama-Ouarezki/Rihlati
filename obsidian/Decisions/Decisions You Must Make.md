@@ -76,7 +76,7 @@ Do this manually, for every single agency, forever. Put a verification badge on 
 what the badge means. Refuse agencies that fail — the refusals are what make the badge worth
 anything.
 
-**Your decision:** what exactly does "Vérifiée" mean on your site, in one sentence a traveler
+**Your decision:** what exactly does "Verified" mean on your site, in one sentence a traveler
 believes? Write that sentence before writing any code.
 
 > [!warning] This section was written before anyone checked whether verifying is *possible*
@@ -88,7 +88,7 @@ believes? Write that sentence before writing any code.
 >
 > That reframes the decision above. It is no longer only "what does the badge mean" but
 > "what can we actually check, and does the badge tell the truth about it?" A weaker label
-> that is true beats « Vérifiée » that is not.
+> that is true beats "Verified" that is not.
 >
 > Deferred 2026-08-04, with the reasoning, the three options and the open questions written up
 > in [[Agency Verification]]. **Read that before answering this section.**
@@ -138,21 +138,34 @@ not a translation task. Retrofitting RTL into a finished UI costs more than buil
 
 **Your decision:** which is the default language on first visit?
 
-> [!success] Fixed 2026-08-04 — validation messages are translated now
-> Field-level messages used to be French prose inside the shared Zod schemas, so an Arabic
-> reader who mistyped a password got a right-to-left page with a French error under the box.
-> They are keys now (`validation.nameTooShort`), translated by whichever client is displaying
-> them. See [[Decision Log]] 026 and [[Validation at the Boundary]].
+> [!danger] Nothing here is translated in this port, and the switch has no handle
+> `USE_I18N = True`, `LANGUAGE_CODE = "fr"` and `LANGUAGES = [("fr", …), ("ar", …)]` are all
+> set in `config/settings.py`, and none of it does anything. There is no `locale/` directory,
+> no `.po` file, and no `gettext` / `gettext_lazy` call anywhere in `apps/`. Every string a
+> user reads — page copy, form labels, validation messages, `messages.error(...)` — is a
+> hardcoded French literal.
 >
-> One piece is still open, and it is a small one: Zod's *own* built-in wording (`.email()`,
-> `.max(120)`) is English in every locale. It shows up rarely, because most fields carry a
-> message we wrote, but it does show up.
+> `django.middleware.locale.LocaleMiddleware` is not in `MIDDLEWARE` and there is no
+> `set_language` route, so `LANGUAGE_CODE` is `"fr"` on every request for everyone. Arabic is
+> **not** one click away; it is not reachable at all.
+>
+> Two pieces of the architecture *are* in place and should not be undone: `base.html` sets
+> `dir="rtl"` off `LANGUAGE_CODE`, and the templates use logical CSS properties throughout, so
+> the layout will flip correctly the day the strings exist. Offers already carry `title_ar`
+> alongside `title_fr`, and the Arabic title renders with its own `dir="rtl"` — that is
+> content translation, which is the agency's job, and it is separate from interface
+> translation, which is ours. See [[Decision Log]] 026.
+>
+> The work is: add `LocaleMiddleware`, wrap every literal in `gettext_lazy`, run
+> `makemessages` for `ar`, and add a check to `scripts/check.sh` that fails on a bare French
+> string in a template. Doing this after the UI is finished is the retrofit the paragraph
+> above warns against.
 
 > [!question] Still yours to decide: which language a first-time visitor sees
-> Today the default is French, with Arabic and English one click away. The argument for Arabic
-> as the default is that Omra buyers skew older and more Arabic-first; the argument for French
-> is that it is what most Algerian commercial sites use, so it looks familiar. Nobody has
-> tested either.
+> The argument for Arabic as the default is that Omra buyers skew older and more Arabic-first;
+> the argument for French is that it is what most Algerian commercial sites use, so it looks
+> familiar. Nobody has tested either. Today it is French by accident rather than by decision —
+> because it is the only language that exists.
 
 ---
 
@@ -160,6 +173,12 @@ not a translation task. Retrofitting RTL into a finished UI costs more than buil
 
 Saying no is the design. v1 has **no** online booking, **no** payments, **no** reviews,
 **no** in-app chat, **no** AI chatbot.
+
+> [!note] One clause of this list is now out of date
+> The assistant exists after all: a read-only, per-offer v1 shipped on 2026-10-28
+> ([[Decision Log]] 031) and became agency-editable the same day (032). It is a preview to
+> measure, not a feature to sell yet — see [[Roadmap]] Phase 3 for when chat v2 is planned.
+> The rest of this section still stands.
 
 Why: booking requires trust you haven't earned; reviews need volume you don't have; chat competes
 with WhatsApp and loses. The AI chatbot is a premium feature you sell in year two — it needs your

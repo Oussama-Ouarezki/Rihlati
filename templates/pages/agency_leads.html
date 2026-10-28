@@ -1,0 +1,129 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Inquiries — {{ agency.name }}{% endblock %}
+
+{% block agency_action %}
+  <a href="{% url 'agency-clients' agency.id %}" class="btn btn-secondary">Clients →</a>
+{% endblock %}
+
+{% block agency_content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Pipeline</p>
+      <h2 class="page-title">Inquiries</h2>
+      <p class="page-lede">Every question from a traveller, in one shared inbox.</p>
+    </div>
+    {% if due_count %}
+      <a href="{% url 'agency-leads' agency.id %}" class="pill pill-warning px-3 py-1.5">
+        {{ due_count }} callback{{ due_count|pluralize }} due
+      </a>
+    {% endif %}
+  </header>
+
+  <div class="mt-5 flex flex-wrap gap-2" aria-label="Filter by status">
+    <a href="{% url 'agency-leads' agency.id %}"
+       class="pill px-3 py-1.5 {% if not status %}bg-brand-600 text-white{% else %}border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900{% endif %}">
+      All
+    </a>
+    {% for value, label, count in chips %}
+      <a href="{% url 'agency-leads' agency.id %}?status={{ value }}"
+         class="pill px-3 py-1.5 {% if status == value %}bg-brand-600 text-white{% else %}border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900{% endif %}">
+        {{ label }} <span class="tabular-nums opacity-70">{{ count }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  <div class="card mt-4 overflow-hidden">
+    <!-- Desktop table -->
+    <div class="hidden md:block">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Received</th>
+            <th>Contact</th>
+            <th>Offer</th>
+            <th>Message</th>
+            <th>Stage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lead in leads %}
+            <tr>
+              <td class="whitespace-nowrap text-xs text-slate-500">{{ lead.created_at|date:"j M H:i" }}</td>
+              <td>
+                <a href="{% url 'agency-lead-detail' agency.id lead.id %}"
+                   class="font-semibold text-slate-900 hover:text-brand-700">{{ lead.full_name }}</a>
+                <span class="mt-0.5 block text-xs text-slate-500">{{ lead.phone_e164 }}</span>
+              </td>
+              <td class="max-w-48 truncate text-slate-600">{{ lead.offer.title_fr }}</td>
+              <td class="max-w-56 truncate text-slate-500">{{ lead.message|default:"—"|truncatechars:60 }}</td>
+              <td>
+                <form method="post" action="{% url 'agency-lead-status' agency.id lead.id %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="filter" value="{{ status }}">
+                  <select name="status" onchange="this.form.submit()" aria-label="Stage for {{ lead.full_name }}" class="field-input w-auto py-1.5 text-xs">
+                    {% for value, label in statuses %}
+                      <option value="{{ value }}" {% if lead.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                  <noscript><button type="submit" class="btn btn-secondary btn-sm mt-1">Update</button></noscript>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="5">
+                <div class="empty-state m-4">
+                  <span class="empty-state-icon" aria-hidden="true">✉</span>
+                  <h3 class="mt-3 text-base font-semibold text-slate-900">No inquiries here</h3>
+                  <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+                    {% if status %}Try another stage, or view all inquiries.{% else %}New questions will appear here as travellers send them.{% endif %}
+                  </p>
+                  {% if status %}<a href="{% url 'agency-leads' agency.id %}" class="btn btn-primary mt-4">View all inquiries</a>{% endif %}
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile cards -->
+    <ul class="record-list md:hidden">
+      {% for lead in leads %}
+        <li class="p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <a href="{% url 'agency-lead-detail' agency.id lead.id %}" class="font-semibold text-slate-900">{{ lead.full_name }}</a>
+              <p class="mt-0.5 text-xs text-slate-500">{{ lead.phone_e164 }} · {{ lead.created_at|date:"j M H:i" }}</p>
+            </div>
+            <span class="pill pill-neutral">{{ lead.get_status_display }}</span>
+          </div>
+          <p class="mt-2 truncate text-sm text-slate-600">{{ lead.offer.title_fr }}</p>
+          {% if lead.message %}
+            <p class="mt-1 line-clamp-2 text-xs text-slate-500">{{ lead.message }}</p>
+          {% endif %}
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <a href="{% url 'agency-lead-detail' agency.id lead.id %}" class="btn btn-secondary btn-sm">Open</a>
+            <form method="post" action="{% url 'agency-lead-status' agency.id lead.id %}" class="flex items-center gap-2">
+              {% csrf_token %}
+              <input type="hidden" name="filter" value="{{ status }}">
+              <select name="status" onchange="this.form.submit()" aria-label="Stage for {{ lead.full_name }}" class="field-input w-auto py-1 text-xs">
+                {% for value, label in statuses %}
+                  <option value="{{ value }}" {% if lead.status == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <noscript><button type="submit" class="btn btn-secondary btn-sm">Update</button></noscript>
+            </form>
+          </div>
+        </li>
+      {% empty %}
+        <li class="empty-state m-4">
+          <span class="empty-state-icon" aria-hidden="true">✉</span>
+          <h3 class="mt-3 text-base font-semibold text-slate-900">No inquiries here</h3>
+          <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">Try another stage, or view all inquiries.</p>
+          <a href="{% url 'agency-leads' agency.id %}" class="btn btn-primary mt-4">View all inquiries</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endblock %}

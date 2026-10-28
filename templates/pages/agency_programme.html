@@ -1,0 +1,143 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Programme — {{ offer.title_fr }}{% endblock %}
+
+{% block agency_action %}
+  <a href="{% url 'agency-manifest' agency.id offer.id %}" class="btn btn-secondary">Traveller list</a>
+{% endblock %}
+
+{% block agency_content %}
+  <nav class="flex flex-wrap items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+    <a href="{% url 'agency-offers' agency.id %}" class="hover:text-brand-700">Offers</a>
+    <span aria-hidden="true">/</span>
+    <span class="truncate text-slate-700">{{ offer.title_fr }}</span>
+  </nav>
+
+  <header class="page-header mt-4">
+    <div>
+      <p class="eyebrow">Itinerary</p>
+      <h2 class="page-title">Programme</h2>
+      <p class="page-lede">Days are relative to departure, not fixed dates. Move the departure and the whole programme follows.</p>
+    </div>
+  </header>
+
+  {% comment %} The preview gets the full width: 38% cards inside the 1.4fr column
+     would be ~230px wide, and a road you cannot read is a road you do not check. {% endcomment %}
+  <section class="card card-pad mt-5">
+    <div class="mt-2">
+      {% include "pages/_programme.html" %}
+    </div>
+  </section>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
+    {# ---------------------------------------------------------------- list #}
+    <section class="card card-pad">
+      <h3 class="section-title">Edit a step</h3>
+      <p class="mt-1 text-sm text-slate-500">Every step on this departure, in order.</p>
+
+      {% if programme %}
+        <ul class="mt-4 divide-y divide-slate-100">
+          {% for day in programme %}
+            {% for step in day.steps %}
+              {% with m=step.milestone %}
+                <li class="flex flex-wrap items-center gap-2 py-2.5">
+                  <span class="text-xs font-medium text-slate-500">D{{ m.day_offset|add:1 }}</span>
+                  <span class="min-w-0 flex-1 text-sm text-slate-700">{{ m.title }}</span>
+
+                  {% if m.tracks_attendance %}
+                    <a href="{% url 'agency-checkpoint' agency.id offer.id m.id %}" class="btn btn-secondary btn-sm">Check-in</a>
+                  {% endif %}
+
+                  <form method="post" action="{% url 'agency-milestone-toggle' agency.id offer.id m.id %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="btn btn-sm {% if m.completed_at %}border border-brand-200 bg-brand-50 text-brand-700{% else %}btn-secondary{% endif %}">
+                      {% if m.completed_at %}✓ Done{% else %}Mark done{% endif %}
+                    </button>
+                  </form>
+
+                  <form method="post" action="{% url 'agency-milestone-delete' agency.id offer.id m.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                  </form>
+                </li>
+              {% endwith %}
+            {% endfor %}
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="mt-3 rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
+          No steps yet. Add the first one on the right.
+        </p>
+      {% endif %}
+    </section>
+
+    {# --------------------------------------------------------------- forms #}
+    <div class="space-y-6">
+      <section class="card card-pad">
+        <h3 class="section-title">Add a step</h3>
+        <form method="post" novalidate class="mt-4 space-y-3">
+          {% csrf_token %}
+          {% for field in form %}
+            <div>
+              <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+              {{ field.errors }}
+            </div>
+          {% endfor %}
+          <button type="submit" class="btn btn-primary w-full">Add step</button>
+        </form>
+      </section>
+
+      {% comment %} Two shortcuts that exist because a programme is mostly repetition. {% endcomment %}
+      <section class="card card-pad">
+        <h3 class="section-title">Duplicate a day</h3>
+        <form method="post" action="{% url 'agency-day-duplicate' agency.id offer.id %}"
+              class="mt-3 flex flex-wrap items-end gap-2">
+          {% csrf_token %}
+          <div class="min-w-32 flex-1">
+            <label for="dup-from" class="field-label">Day to copy</label>
+            <select id="dup-from" name="day_offset" class="field-input">
+              {% for day in programme %}
+                <option value="{{ day.day_offset }}">
+                  Day {{ day.day_offset|add:1 }} ({{ day.steps|length }} step{{ day.steps|length|pluralize }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="min-w-28 flex-1">
+            <label for="dup-to" class="field-label">Copy to day</label>
+            <input id="dup-to" type="number" name="to_day_offset" min="0" value="1" class="field-input">
+          </div>
+          <button type="submit" class="btn btn-secondary">Duplicate</button>
+        </form>
+        <p class="helptext mt-2">
+          Internal numbering: day 0 is departure day. Travellers see “Day 1”.
+          Copied steps start as not done.
+        </p>
+      </section>
+
+      <section class="card card-pad">
+        <h3 class="section-title">Copy from another offer</h3>
+        {% if copy_sources %}
+          <form method="post" action="{% url 'agency-programme-copy' agency.id offer.id %}" class="mt-3 space-y-3">
+            {% csrf_token %}
+            <div>
+              <label for="copy-src" class="field-label">Source offer</label>
+              <select id="copy-src" name="source_offer_id" class="field-input">
+                {% for source in copy_sources %}
+                  <option value="{{ source.id }}">{{ source.title_fr }} — {{ source.departure_date|date:"j M Y" }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <p class="helptext">Copied steps are added to the ones already here; nothing is overwritten. Delete first if you meant to replace.</p>
+            <button type="submit" class="btn btn-secondary w-full">Copy programme</button>
+          </form>
+          <p class="helptext mt-2">Your own offers only: the programme is what agencies compete on.</p>
+        {% else %}
+          <p class="mt-2 text-sm text-slate-500">No other offer to copy from yet.</p>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+{% endblock %}

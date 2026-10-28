@@ -273,22 +273,29 @@ is a small sign the rule is doing something.
 
 ---
 
-## 015 — CHECK constraints are written by hand in SQL
+## 015 — Rules the database refuses to break live in the database
 
 **Date:** 2026-08-01
 
-`20260801090500_check_constraints/migration.sql` adds ~18 constraints Prisma cannot express:
-the 1–5 rating scale, non-negative money, ordered price ranges and dates, seats coherence,
-E.164 phone format, and "a user must have an email or a phone".
+**Django form of the decision.** `models.CheckConstraint` in each model's `Meta`, carried into
+migrations automatically. Three today: `seats_left <= seats_total` and `price_centimes > 0` on
+`Offer`, `1 <= rating <= 5` on `Review`. Plus the `UniqueConstraint`s that encode a rule rather
+than an index — one review per traveler per agency, one report per person per offer.
 
-**Rejected:** relying on Zod validation alone. Zod stops bad data at the door, which is most of
-the value — but it is one door. The seed script, a future CSV import, a migration and a `psql`
-session at 2am all bypass it. A negative price is not an error to report; it is a state the
-database should refuse to hold.
+**Rejected:** relying on Pydantic validation alone. The schema stops bad data at the door,
+which is most of the value — but it is one door. The seed command, a future CSV import, a data
+migration and a `psql` session at 2am all bypass it. A negative price is not an error to
+report; it is a state the database should refuse to hold.
 
-**Cost:** these constraints are invisible in `schema.prisma`, so someone reading only the
-Prisma file will not know they exist. A `prisma migrate dev` that changes an affected column
-can fail confusingly. Mitigated by the comments in the migration, and by this entry.
+**Cost:** far lower than in the NestJS repo, where these had to be hand-written SQL in a
+migration because Prisma could not express them — invisible to anyone reading only the schema
+file. Here the constraint sits in the model next to the column it constrains, which is the
+whole reason this is a smaller entry than it used to be.
+
+> [!warning] There are three, where the NestJS repo had about eighteen
+> Non-negative money on every money column, ordered price ranges, ordered dates, E.164 phone
+> shape and "a user has an email or a phone" are all enforced only in Python here. They are
+> real gaps, not a change of mind — the decision above still says they belong in the database.
 
 ---
 
@@ -296,19 +303,25 @@ can fail confusingly. Mitigated by the comments in the migration, and by this en
 
 **Date:** 2026-08-01
 
-`apps/api/test/setup.ts` derives a `_test` database from `DATABASE_URL` and runs
-`prisma migrate deploy` against it. Every e2e test truncates between cases and runs
-single-threaded.
+Django's test runner builds a `test_…` database from `DATABASE_URL` and runs every migration
+against it. Each `TestCase` runs in a transaction that is rolled back afterwards, so cases do
+not see each other's rows.
 
-**Rejected:** mocking the Prisma client. It loses badly here: a mock returns whatever you told
-it to, so a tenant-isolation test against a mock asserts that your mock was configured the way
-you configured it. The bugs these tests exist to catch — a missing `agencyId` in a WHERE
-clause, a unique index that does not hold, a CHECK constraint rejecting a legal value — are
+**Rejected:** mocking the ORM. It loses badly here: a mock returns whatever you told it to, so
+a tenant-isolation test against a mock asserts that your mock was configured the way you
+configured it. The bugs these tests exist to catch — a missing `agency_id` in a `WHERE` clause,
+a unique constraint that does not hold, a `CheckConstraint` rejecting a legal value — are
 invisible to a mock by construction.
 
-**Cost:** ~9 seconds per run and a database required to run tests at all, locally and in CI.
-`migrate deploy` rather than `db push` on purpose, so the schema under test is the one
-production will get, constraints included.
+**Cost:** a database is required to run tests at all.
+
+> [!warning] Locally this decision is currently half-kept
+> With no `DATABASE_URL` set, `config/settings.py` falls back to SQLite, so the local suite
+> runs on a database that is not the one production uses — it disagrees with Postgres on JSON
+> lookups, case sensitivity and constraint enforcement, which is most of what these tests are
+> for. CI sets `DATABASE_URL` and runs on Postgres, which is what makes the fallback tolerable
+> rather than a lie. Run the suite with a real `DATABASE_URL` before trusting a green local
+> run on anything constraint-shaped.
 
 ---
 
@@ -555,13 +568,27 @@ that the badge should say what was actually checked, is in [[Agency Verification
 
 **Date:** 2026-08-04
 
-A Zod schema in `packages/shared`, and an API handler rejecting an upload or a taken slug, both
-emit a key such as `validation.slugTaken` in `error.fields`. The client translates it. 37 keys,
-listed in `packages/shared/src/validation-messages.ts`, translated in `fr` / `ar` / `en`.
+The rule: a validation failure travels as a **key**, and only the layer that knows which
+language the person chose turns it into a sentence. This closes a violation of "no hardcoded
+user-facing strings": an Arabic reader who mistyped a password got a correctly right-to-left
+page with a French sentence under the box.
 
-This closes a violation of "no hardcoded user-facing strings": an Arabic reader who mistyped a
-password got a correctly right-to-left page with a French sentence under the box. The top-level
-`code` already worked this way — field messages were the one place the rule had leaked.
+> [!danger] This decision is **not** honoured in the Django port
+> Every message in this codebase is a hardcoded French string — `"Un motif de refus est
+> obligatoire."`, `"Places restantes supérieures au total."`, `"Réservé à l'équipe Rihlati."`
+> and roughly forty more. `USE_I18N = True` and `LANGUAGE_CODE = "fr"` are set in
+> `config/settings.py`, and nothing uses them: there is no `locale/` directory, no `.po` file,
+> and no `gettext` / `gettext_lazy` call anywhere in `apps/`.
+>
+> Only the machine-readable half survived. `apps/common/errors.py` returns a stable `code`
+> (`VALIDATION_FAILED`, `FORBIDDEN`, `CONFLICT`, …) which a client can branch on in any
+> language — the `details` string beside it is French and always will be until this is fixed.
+>
+> **What fixing it looks like:** wrap user-facing strings in `gettext_lazy as _`, add
+> `LocaleMiddleware`, ship `locale/ar/` and `locale/en/`, and add a check that fails the build
+> on a bare string literal reaching a `messages.error()` or an `HttpError`. That last part is
+> the one that matters — this rule is broken by forgetting, not by disagreeing, so it needs a
+> machine to enforce it exactly like the other house rules. See [[The Seven Rules]].
 
 **Rejected:**
 
@@ -572,17 +599,18 @@ password got a correctly right-to-left page with a French sentence under the box
 - *Leave it and fix it when the mobile app exists.* It changes the shape of a public API
   contract, so the cost only goes up. Today there is exactly one client, so the change is a
   find-and-replace. That is why it was done now rather than deferred again.
-- *Translate only the shared schemas, not the API's own messages.* Half the problem: the avatar
-  upload error on `/compte` comes from `image.service.ts`, is printed by the same code, and
-  would still have been French.
+- *Translate only the input schemas, not the handlers' own messages.* Half the problem. In this
+  port it would be well under half: most French strings live in handlers and page views, not in
+  schemas.
 
-**Cost:** a schema no longer reads as a sentence — `.min(2, 'validation.nameTooShort')` needs a
-lookup to know what it says. And a key with no translation prints the key itself on the page,
-which is uglier than the wrong language. Both are why `validation-messages.test.ts` exists: it
-scans the source for `'validation.…'` literals and fails if any locale is missing one.
+**Cost:** a schema no longer reads as a sentence — a key needs a lookup to know what it says.
+And a key with no translation prints the key itself on the page, which is uglier than the wrong
+language. Both are why the fix needs a test that fails when a locale is missing an entry, not
+just a convention.
 
-**Not done:** Zod's built-in messages (`.email()`, `.max(120)`) are still English in every
-locale. See the warning in [[Validation at the Boundary]].
+**Also not done:** Pydantic's built-in messages (`Field(min_length=…)`, type errors) come back
+in English regardless of locale, and they are what a client sees on a `422`. See the warning in
+[[Validation at the Boundary]].
 
 ---
 
@@ -634,6 +662,242 @@ Three choices inside it, each trading convenience for evidence:
 so the wording question from 025 is now *more* urgent, not less — the button exists and will be
 used. And manual review is now a standing job with no notification attached to it: the queue is
 a page someone has to remember to open.
+
+---
+
+## 028 — One account menu, in the site header, on every page
+
+**Date:** 2026-08-05
+
+The avatar in the top-right corner of the public header is the single place to sign in, see who
+you are, and sign out — on the marketplace, on an offer page, and inside the agency console
+alike. Signed out, that corner shows « Se connecter » and « Créer un compte » instead. The
+console's own header no longer carries a second avatar: it sits ten pixels below the site
+header, so there were briefly two.
+
+The session is read **server-side** in `SiteAccountNav`, from the httpOnly cookie. The browser
+never receives a "logged in" flag it could flip. Worth being explicit about why that changes
+nothing about security: showing the menu is a UX decision, not a permission. Every API route
+still authorises itself ([[The Seven Rules]] #2). If someone forged the signed-in header in
+their own browser, they would see their own name in a box and every request behind it would
+still 401.
+
+**Rejected:**
+- *A "Espace agence" link in the header for everyone.* That is what was there. It sent
+  travelers — who are most visitors — to a page inviting them to create a travel agency. The
+  console link now only appears for someone who is actually in an agency.
+- *Leaving the account menu only in the console.* Sign-out then existed on exactly the pages
+  agency staff use, and a traveler who had signed up had no way to sign out at all.
+- *Two menus, one per header.* Rejected on sight once it was on screen: "where do I sign out"
+  must have one answer.
+- *Moving the language switcher into the menu on the public site too.* It stays visible in the
+  header, because a visitor who landed on the wrong language must not have to open a menu
+  labelled with a name they can't read to fix it. Inside the console header there is no room,
+  so the console keeps it in the menu.
+
+**Cost:** every page in the public layout now awaits `getSession()`, so every render of the
+marketplace makes one call to `/v1/auth/me`. It is `cache()`d per request and it is the same
+call the console already made, but it is a call on pages that used to need none — the first
+thing to look at if the homepage gets slow.
+
+Two bugs surfaced while building it, both worth a sentence:
+- Base UI's `DropdownMenuLabel` throws unless it is inside a `DropdownMenuGroup`. The console
+  menu had the same bug and had simply never been opened in a test.
+- The login page's title was a styled `div`, so the page had no `<h1>` for a screen reader to
+  land on. The e2e assertion looking for a heading had been failing on `main` because of it.
+  Now it is an `<h1>` and the test is true.
+
+---
+
+## 029 — Programme bulk copies only ever add rows
+
+**Date:** 2026-08-05
+
+Duplicating a day and copying a programme from another offer both **append** to the end of the
+target programme. Neither ever moves, overwrites or deletes an existing step. The target day of
+a duplicate is chosen explicitly by the agency — the console proposes source + 1, the server
+assumes nothing — and both operations stop at 200 steps per offer
+(`MILESTONE_MAX_PER_OFFER`) with `409 MILESTONE_LIMIT_REACHED`.
+
+The reason is undo. An unwanted copy leaves rows the agency can see and delete, one by one, in
+the editor they are already looking at. There is nothing to explain and nothing to restore.
+
+`copy-from-offer` is the first endpoint where a client legitimately sends the **id of tenant
+data** — `sourceOfferId`. It goes through the same owned-offer check as the target, so naming
+another agency's offer id returns 404 and reveals nothing. That case is a test, not a comment:
+`apps/api/test/milestones.e2e.test.ts` asserts the 404, asserts the response body does not
+contain the source offer's title, and asserts zero rows were written ([[The Seven Rules]] #3).
+
+Copies keep `checkpointType` — an agency that decided "présence obligatoire à l'aéroport" meant
+it for next season too — but drop `completedAt` and `completedByUserId`. A copied step has not
+happened. Inheriting a tick would park the "vous êtes ici" marker on every traveler's map at a
+place the group has never been, and the wrong marker is worse than no marker.
+
+**Rejected:**
+- *A "replace the programme" mode.* The obvious ask, and it has no undo: the rows it overwrote
+  are gone, and the agency discovers that after the thing they wanted to keep is already gone.
+  Additive plus manual delete costs a few taps and can always be stopped halfway.
+- *Duplicating a day to "the next day" implicitly.* Reads as convenient until an agency has a
+  gap in its day numbering, at which point the server has silently guessed wrong. The picker
+  makes the choice visible, and defaulting it to source + 1 keeps the common case one tap.
+- *Copying a programme by cloning the offer.* A different feature with different consequences
+  — price, seats, dates, publication state. The agency wanted the itinerary, not the offer.
+- *No ceiling.* A 14-day Omra is ~50 steps; 200 is unreachable by hand and reachable by
+  repeated taps on a copy button. This is a sanity limit on one programme, deliberately **not**
+  a plan gate — it must not become a thing to sell.
+
+**Cost:** copying twice by mistake silently doubles the programme. Nothing warns; the agency
+sees 16 steps where they expected 8 and deletes half. A "this offer already has a programme —
+copy anyway?" confirmation would fix it and is the first thing to add if it happens in practice.
+
+---
+
+## 030 — This repository is Django + Django Ninja, superseding 002
+
+**Date:** 2026-08-09
+
+**Decided:** the same product, the same schema, the same seven rules, the same decisions in
+this log — rebuilt on **Django 5.2 + Django Ninja**, with server-rendered templates instead of
+a separate Next.js app. Decision 002 (NestJS + Prisma) stands as the record of what the other
+repository chose; it no longer describes this one.
+
+The reason is not that NestJS was wrong. It is that most of what NestJS assembles by hand —
+an ORM, migrations, an admin, sessions, a user model, a test runner with database rollback —
+Django ships with, and the parts this project genuinely cares about (typed input, typed
+output, a generated OpenAPI document) are exactly what Ninja adds on top. Fewer moving parts
+holding the same rules.
+
+**What carried over unchanged, and this is the point:** deny-by-default auth at the router
+(`NinjaAPI(auth=…)` in `config/api.py` instead of a global guard), tenant scoping in the data
+layer (`scoped()` instead of a Prisma middleware), one definition of every input schema, a
+404 for both missing and forbidden rows, integer centimes, UUID ids, structured logs with a
+`request_id`, and a test suite that fails when a handler forgets its gate.
+
+**Rejected:**
+
+- *FastAPI.* Better ergonomics than Ninja in isolation, but it brings no ORM, no migrations,
+  no auth, no admin and no template layer — which puts us back to assembling the same pile
+  NestJS was assembling, minus NestJS's structure. Ninja is FastAPI's design applied to a
+  framework that already has the boring half.
+- *Django REST Framework.* The obvious default, and it was the starting point here before
+  being replaced. Its serializers are a second, parallel type system that has to be kept in
+  agreement with the models by hand, and its OpenAPI output is generated by inspection rather
+  than declared. Ninja uses Pydantic, so the schema *is* the type.
+- *Keeping the separate SPA.* Two codebases, a client-side router, and an API contract to
+  version — for a marketplace whose traffic arrives through search. Server-rendered pages
+  index without argument. The trade is real interactivity, paid back with small islands of
+  JavaScript where a page genuinely needs it.
+
+**Cost:** the one-repo, one-language convenience of `packages/shared` is gone — the browser
+cannot import a Pydantic schema. What replaces it is the OpenAPI document at `/api/docs`,
+which a future mobile client generates types from. That is a build step where there used to be
+an import, and it is the honest gap: a shared schema *is* the same code, generated types are
+only a faithful copy. See [[One Rule, Two Entry Points]].
+
+---
+
+## 031 — The first assistant is a local, read-only, per-offer bot
+
+**Date:** 2026-10-28
+
+**Decided:** v1 of [[Agency Chatbot]] is a public `POST /api/chat/offers/{offer_id}` route
+that answers questions about **one** offer using **one** agency's data, in the language the
+traveler writes, powered by **`qwen3:14b` on this machine through Ollama**. It is read-only:
+no tools, no reservation, no price change. The page keeps its existing inquiry form beside it.
+
+Four sub-decisions are the ones worth remembering:
+
+- **A capability token, not a login.** The first response returns 128 random bits from
+  `secrets.token_hex(16)`. It names one conversation, the same pattern as
+  `Reservation.public_code`. Requiring an account to ask "le visa est-il inclus ?" would
+  produce zero conversations.
+- **History in rows, not in the browser.** The client sends only the newest message and the
+  token. The server rebuilds the last six turns from `ChatMessage`. A client that could send
+  its own transcript could inject an assistant turn claiming a lower price.
+- **Context is one offer + its programme + up to three same-agency siblings**, as compact
+  JSON. Related-offer cards are rendered from the same deterministic queryset — the model
+  never chooses a slug, a price or a link.
+- **The read side filters `attributes`.** Until [[Known Gaps]] G1 is fixed, `apps/chat/
+  context.py` passes only allowlisted keys with primitive values. Dropping a real key costs
+  an answer; repeating a typo costs trust in every other answer.
+
+**Rejected:**
+
+- *The Claude API, as the note previously specified.* No key, no invoice and no traveler text
+  leaving the laptop during the preview. The cost is a slower, weaker model — measured here
+  at ≈8s cold and ≈1–3s warm, versus a hosted model that would follow the "say you don't
+  know" rule more reliably. Revisit before real travelers use it, not before.
+- *Tools in v1.* `create_reservation`, price changes, `handoff_to_human` — all deferred.
+  Every one of them turns "the bot was helpful" into an authorization surface, and none is
+  needed to answer the question that motivated the feature.
+- *A vector database or embeddings.* An agency has 5–30 offers. Retrieval is a queryset.
+- *An agency-wide bot.* The context is one offer from one agency. A bot that "knows every
+  agency" leaks tenants through its mouth, and no guard in `apps/common/tenancy.py` sees it.
+- *Storing the transcript only in the browser.* Cheap until someone reloads, and impossible
+  to mine for the unanswered-question queue.
+
+**Cost:** three real ones. The local model is the weakest part of the feature and may not be
+good enough to leave on in production; the 30/hour and 12-turn caps are sized for one laptop,
+not a marketplace; and `purge_chat` is an operator command because there is nowhere to run
+cron until M7. The read-side allowlist is a mitigation, not the G1 fix — the write side still
+accepts `nightsInMaccah`.
+
+---
+
+## 032 — Each agency writes its own assistant policy, in free text
+
+**Date:** 2026-10-28
+
+**Decided:** an agency can now shape what its assistant says about **booking**, without a
+deploy. One optional row per agency — `AgencyAssistant` with `is_enabled` and
+`instructions` (free text, 2 000 characters) — edited by a **manager or owner** at
+`/a/<agency_id>/assistant/`, audited as `assistant.updated` in the same transaction. A
+missing row means "enabled, no extra instructions", so no backfill was needed. The same
+change adds a **dedicated assistant page per offer** at `/offers/<offer_id>/assistant/`,
+which shares the conversation with the offer-page widget through `sessionStorage`.
+
+Four sub-decisions:
+
+- **Free text, not structured fields.** Deposit percentage, cancellation window, required
+  documents and payment method vary enough between agencies that a fixed schema would fit
+  almost nobody and be ignored by the rest. A prose block goes into the prompt as one
+  `CONSIGNES DE L'AGENCE` section and costs one textarea.
+- **Appended after the platform rules, never merged.** The block sits below the seven rules
+  and above the `DONNÉES`, and its own heading states that it cannot replace them. The bot
+  can say "acompte de 30 %" because the agency wrote it; it still cannot invent a price.
+- **Manager-only, and tenant-scoped by the URL.** `require_membership_or_404(..., MANAGER)`
+  authorizes the agency in the URL and the form has no `agency` field to forge — the same
+  shape as `AgencyProfileForm`. The traveler never sees the editor.
+- **`sessionStorage`, not the URL.** The conversation token follows the traveler from the
+  widget to the full page under `rihlati-chat:<offer_id>`. A token in a URL ends up in
+  history, in `Referer`, and in whatever gets pasted to a friend; keying by offer stops two
+  tabs about two trips from swapping conversations.
+
+The full page uses the offer page's own visibility rule (`Offer.publicly_visible()`) and
+returns 404 when the deployment switch or the agency switch is off. `is_enabled=False` also
+hides the widget and makes the API answer 503 — one switch, three surfaces, nothing deleted.
+
+**Rejected:**
+
+- *Structured instruction fields* (deposit %, cancellation days, document checklist). They
+  read well in a form and fit almost no real agency; every exception becomes a request for
+  another field. Free text lets the agency describe its actual practice.
+- *Per-offer instructions.* The offer row already carries the facts that differ between
+  offers; duplicating policy per offer means editing it N times and letting the copies drift.
+- *Site-staff-only editing.* The policy is the agency's commercial practice, not platform
+  behavior. Platform rules stay in `apps/chat/prompts.py`, where a deploy can review them.
+- *A separate preview endpoint.* The full page *is* the preview — it reads the saved
+  instructions and runs the real model. A second endpoint would need its own auth, its own
+  throttle and its own tests to say the same thing.
+- *Putting the token in the full-page URL* so it survives a reload or a share. Reload already
+  works from `sessionStorage`; a URL that survives a share is a leak, not a feature.
+
+**Cost:** the prompt now has an agency-controlled section, so a badly written policy can
+make answers worse — the fix is a better textarea, not a code change, and there is no
+validation beyond length. The editor shows character count only as a hard cap, not as
+guidance. Two surfaces mean two places to keep honest when the widget changes, mitigated by
+sharing `_chat.html` with a `chat_full_page` flag. And the assistant still has no plan gate:
+every verified agency's published offers get it while `CHAT_ENABLED=1`.
 
 ---
 

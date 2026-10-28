@@ -1,203 +1,261 @@
 # User
 
-One person. You asked for accounts for **both travelers and agencies** — this note explains
-how one table serves both, and why that's better than two.
+One person. Rihlati has accounts for **both travelers and agencies** — this note explains how
+one table serves both, and why that's better than two.
+
+Defined in `apps/accounts/models.py`.
+
+---
+
+## What's actually in the table
+
+```python
+class User(AbstractUser):
+    id                 UUIDField(primary_key=True, default=uuid.uuid4)
+    phone              CharField(20, blank=True)   # E.164, never logged in full
+    preferred_language CharField(2, choices=[("fr", "Français"), ("ar", "العربية")])
+```
+
+Plus everything `AbstractUser` brings: `username`, `email`, `password`, `first_name`,
+`last_name`, `is_staff`, `is_superuser`, `is_active`, `date_joined`, `last_login`.
+
+Two things about this class are worth stopping on.
+
+### `AbstractUser`, and why swapping the user model is a one-way door
+
+```python
+AUTH_USER_MODEL = "accounts.User"
+```
+
+Django ships a `User` model that works out of the box, and **substituting your own is
+effectively impossible after the first migration**. Not "hard" — the official documentation
+says to do it at the start of a project or accept a painful manual migration, because
+`AUTH_USER_MODEL` is baked into every migration that references a user, in every app,
+including third-party ones.
+
+So this is a decision you make on day one with incomplete information, and the correct answer
+is always the same: **subclass it immediately, even if you add no fields.** An empty
+`class User(AbstractUser): pass` costs nothing and buys the ability to add a column later.
+Doing it on day 400 costs a weekend and a data migration.
+
+That's a general lesson about frameworks, not a Django trivium: find the decisions that are
+cheap now and expensive later, and pay for them now.
+
+### The UUID `id` is declared by hand
+
+`User` can't inherit `UUIDModel` — it already inherits `AbstractUser` — so the UUID primary
+key is repeated on the class. If it weren't, `DEFAULT_AUTO_FIELD` would silently give users
+sequential integer ids, and `/api/users/1/` would be the platform's first account. See
+[[Data Model Overview]].
 
 ---
 
 ## One table, two kinds of account
 
-There is no `accountType` column. Instead:
+There is no `account_type` column. Instead:
 
 ```
-A user with NO membership   →  a traveler (a client)
-A user WITH a membership    →  agency staff
+A user with NO Membership   →  a traveler (a client)
+A user WITH a Membership    →  agency staff
+```
+
+`apps/pages/views.py` reads exactly this, and does the honest thing with the third case:
+
+```python
+memberships = request.user.memberships.select_related("agency")
+if not memberships:
+    return render(request, "pages/no_agency.html")
 ```
 
 ### Why not two separate tables?
 
-Because the same person is often both. An agency owner in Oran also books a holiday for
-their family. A traveler who inquires about Omra opens their own agency next year.
+Because the same person is often both. An agency owner in Oran also books a holiday for their
+family. A traveler who inquires about Omra opens their own agency next year.
 
-With two tables that person needs two accounts, two passwords, and you can never tell
-they're the same human. With one table plus [[Agency]] memberships, they log in once and
-their role depends on which context they're in.
+With two tables that person needs two accounts and two passwords, and you can never tell
+they're the same human. With one table plus [[Agency]] memberships, they log in once and what
+they can do depends on which context they're in.
 
-It also means every security mechanism — login, password hashing, token rotation, rate
-limiting — is written once and covers both sides. Two auth systems means one of them gets
-less attention, and that's the one that gets breached.
+It also means every security mechanism — login, password hashing, session handling, rate
+limiting — is written once and covers both sides. **Two auth systems means one of them gets
+less attention, and that's the one that gets breached.**
 
-### What each kind can do
+### What each kind can do, here
 
 | | Traveler | Agency staff |
 |---|---|---|
 | Browse and search offers | ✅ | ✅ |
-| Send an inquiry | ✅ (no account needed at all) | — |
-| Save offers to a shortlist | ✅ | — |
-| See their own inquiry history | ✅ | — |
-| Review an agency after travelling | ✅ | — |
-| Publish offers | — | ✅ |
+| Send an inquiry | ✅ — **no account needed at all** | ✅ |
+| Publish and edit offers | — | ✅ |
 | See the lead inbox / CRM | — | ✅ |
-| Manage staff, billing | — | `owner` only |
+| Save offers to a shortlist | ✗ not built | — |
+| See their own inquiry history | ✗ not built | — |
+| Review an agency after travelling | ✗ not built — [[Agency Ratings]] | — |
+| Manage staff, billing | — | ✗ not built; roles aren't enforced |
 
 ---
 
 ## Travelers don't need an account to inquire
 
-Worth being explicit, because it's the most important product decision in this table.
+Worth being explicit, because it's the most important product decision touching this table,
+and it's why `Lead.traveler` is `null=True`.
 
-A traveler can send a lead with just **name + phone + consent**. No signup, no email
-confirmation, no password.
+A traveler sends a lead with just **name + phone + message**. No signup, no email
+confirmation, no password. `InquiryCreateView` is one of exactly two `AllowAny` endpoints in
+the project, and that is deliberate.
 
-Why: signup is a wall placed in front of the one action that makes you money. Every step
-between "I like this Omra package" and "the agency has my number" loses a share of people.
-In a phone-first market where many users are on mobile data and not fluent in web forms,
-that share is large.
+Why: signup is a wall placed directly in front of the one action that makes you money. Every
+step between "I like this Omra package" and "the agency has my number" loses a share of
+people. In a phone-first market where many users are on mobile data and not fluent in web
+forms, that share is large.
 
-So what is an account *for*, then? Three things that are worth returning for:
-- **`SavedOffer`** — a shortlist. Omra is a comparison purchase; people look at ten offers
-  over two weeks.
-- **Inquiry history** — "which agencies did I contact?"
+So what is an account *for*, then? Three things worth returning for, none of them built:
+
+- **A shortlist.** Omra is a comparison purchase; people look at ten offers over two weeks.
+- **Inquiry history** — "which agencies did I contact?" `Lead.traveler` already stores the
+  link and nothing reads it.
 - **Reviewing** — a review needs an identity to be worth anything.
 
-An account is a reward for coming back, not a toll on arriving.
+**An account is a reward for coming back, not a toll on arriving.**
 
 ---
 
-## Identity: phone or email, not both required
+## Identity: username, and the phone-first problem
 
-```
-email         String?  @unique
-phone         String?  @unique   -- E.164, always "+213..."
-passwordHash  String?
-```
+`AbstractUser` makes `username` required and unique, and login goes through it. That is
+Django's default and it is wrong for this market.
 
-Both nullable, because the two sides of the market identify differently:
+- **Travelers are phone-first.** Many Algerian users don't check email. Their phone number is
+  their identity, and it's what the agency will actually call.
+- **Agency staff are email-first.** It's a business account: shared context, password resets,
+  invoices.
 
-- **Travelers are phone-first.** Many Algerian users don't check email. Their phone number
-  is their identity, and it's what the agency will actually call.
-- **Agency staff are email-first.** It's a business account, shared context, password
-  resets, invoices.
+Neither of them thinks in usernames.
 
-The service layer enforces "at least one of email or phone" — the database can't express
-that constraint cleanly, so it's a rule in code with a test.
+> [!warning] Honest state — `phone` is a plain, non-unique, optional field
+> `phone = CharField(max_length=20, blank=True)` has no `unique=True` and no validator, and
+> nothing anywhere sets it. Two accounts can hold the same number. It is not an identity, it's
+> a note.
+>
+> The NestJS repo has nullable-but-unique `email` *and* `phone`, with a service-layer rule
+> that at least one must be present, and login by either.
+>
+> The Django version of that is a custom `UserManager` plus an authentication backend, and
+> `USERNAME_FIELD` pointing at something other than `username`. It's not hard, and — like
+> `AUTH_USER_MODEL` itself — it is much easier before there are accounts than after.
 
-`passwordHash` is nullable because an account can exist without one: a traveler whose lead
-was created as a guest, who later claims the account by SMS code. They have an identity
-before they have a password.
-
-> [!info] Phones are normalized during validation
-> `0551 23 45 67`, `+213 551 234 567` and `00213551234567` all become `+213551234567`
-> before any handler sees them. Without this, the same person creates several accounts and
-> `@unique` protects nothing. Ten tests cover this in `phone.test.ts`.
+When it is built, the phone must be **normalised during validation**, not at the point of
+use. `0551 23 45 67`, `+213 551 234 567` and `00213551234567` are one person and must become
+one string before any handler sees them, or `unique=True` protects nothing and you get several
+accounts for one human. See the honest note in [[Validation at the Boundary]] — the current
+validator rejects rather than normalises.
 
 ---
 
 ## Passwords
 
-Stored as an **Argon2id hash**, never as the password.
+Never stored. Django stores a **PBKDF2 hash** by default — a one-way scramble, deliberately
+slow, so that guessing billions of candidates is expensive.
 
-Argon2id is deliberately slow and memory-hungry. That's the feature: it makes guessing
-billions of candidates expensive. Never use SHA-256 or MD5 for a password — they're fast,
-which is precisely wrong. See [[Authentication vs Authorization]].
+`createsuperuser` and `LoginView` handle this for you and you should never touch it. Do not
+hash a password with SHA-256 or MD5: they're fast, which is exactly the wrong property here.
 
----
-
-## `isPlatformAdmin`
-
-Rihlati's own staff. Verifies agencies, moderates offers, resolves reports.
-
-> [!danger] This field must never appear in any request schema
-> Not on signup, not on profile update, not on an "admins only" endpoint. It must be
-> impossible to send. Set it directly in the database, deliberately, for named people.
->
-> One mass-assignment slip on this field hands over the entire platform — every agency's
-> client list at once. It's the highest-value target in the app, and the defence is that
-> there's simply no code path that writes it. See [[Validation at the Boundary]].
-
-**It is set from a CLI, never from HTTP:** `npm run admin:grant -- someone@rihlati.dz`. The
-chicken-and-egg reasoning — why the first admin cannot be created through any endpoint, and why
-"an endpoint that only works while zero admins exist" is worse than a shell command — is in
-[[Accounts]]. The command writes an audit row with a null actor, because it genuinely does not
-know who was at the keyboard.
-
-The flag is read from the **database on every request**, not from the access token's `adm`
-claim. So revoking it bites immediately rather than whenever the token happens to expire, and
-there is a test that holds a still-valid token across a demotion and asserts the next request
-is refused.
-
-Every action an admin takes is written to the [[Audit Log]]. Not because you distrust your
-staff, but because "who un-verified this agency?" must have an answer.
-
----
-
-## Sessions: `RefreshToken`
-
-```
-tokenHash   String @unique   -- hashed, never the token itself
-familyId    String           -- rotation family
-expiresAt   DateTime
-revokedAt   DateTime?
-```
-
-Tokens are stored **hashed**, so a database leak doesn't hand over live sessions.
-
-Rotation with families is how token theft gets detected: a refresh token used twice can only
-mean two parties hold it, so the whole family is revoked. Full explanation in
+Upgrading to Argon2id before launch is one setting and no migration — Django re-hashes each
+user on their next successful login. Details and the exact setting are in
 [[Authentication vs Authorization]].
 
 ---
 
-## `locale`
+## `is_staff` and `is_superuser`
 
-`ar` / `fr` / `en`, stored per user. Determines the language of the interface *and* of
-notification SMS and emails.
+Rihlati's own team: verifies agencies, moderates offers, resolves reports. These are **not**
+agency roles — an agency owner is not staff, and staff are not members of any agency.
 
-Arabic is right-to-left, which affects layout rather than just text — which is why it's
-handled from the first component instead of retrofitted. See [[The Seven Rules]].
+> [!danger] These fields must never appear in any serializer or form
+> Not on signup, not on profile update, not on an "admins only" endpoint. It must be
+> impossible to *send* them. Set them with `manage.py createsuperuser`, deliberately, for
+> named people.
+>
+> One mass-assignment slip on `is_superuser` hands over the entire platform — every agency's
+> client list at once. It is the highest-value target in the app, and the only real defence is
+> that **no code path writes it from a request**. This is why every serializer here lists its
+> fields by hand and none uses `"__all__"`. See [[Validation at the Boundary]].
+
+There is a chicken-and-egg reason the first admin cannot come from an endpoint: an endpoint
+that "only works while zero admins exist" is a race condition and a permanent liability in the
+codebase. A shell command run by someone with server access is the honest version of the same
+thing. See [[Accounts]].
+
+Django reads these flags from the **database on every request**, which is a real advantage of
+sessions over stateless tokens: revoking `is_superuser` bites on the next request rather than
+whenever a token happens to expire.
+
+> [!warning] Nothing an admin does is recorded
+> Un-verifying an agency in `/admin` leaves a row in Django's own `LogEntry` table if it went
+> through the admin — which is better than nothing and is not a real audit trail, because it
+> only covers the admin site and it records the object, not the reason. See [[Audit Log]].
 
 ---
 
-## `avatarUrl`
+## `preferred_language`
 
-A profile picture, and the only field on `User` that a user cannot set directly.
+```python
+choices = [("fr", "Français"), ("ar", "العربية")]
+```
 
-`PATCH /auth/me` accepts `displayName` and `locale` and nothing else. To change the picture you
-post the **file** to `POST /auth/me/avatar`; the server re-encodes it and writes the URL itself.
-Letting a client put a URL in this column would let anyone point it at a server they control and
-learn the IP address of everyone who loads a page showing that avatar. Full reasoning in
-[[Image Uploads]].
+Stored per user. It should determine the language of the interface *and* of any notification
+SMS or email — the server can't infer a person's language from a request, which carries a
+token and a body, not a person. Storing it is what makes an Arabic SMS possible at all.
 
-It is a `String?` holding a URL rather than the bytes. Images do not belong in Postgres — they
-would bloat every backup — so the bytes live in object storage and this column points at them.
+Arabic is right-to-left, which affects **layout**, not just text: navigation, form alignment,
+icons that point somewhere. That's why it's handled from the first template instead of
+retrofitted — retrofitting RTL is a rewrite. See [[The Seven Rules]].
+
+> [!warning] Honest state — nothing reads this field
+> `LANGUAGE_CODE = "fr"` and every template string is a French literal. There is no
+> `{% trans %}`, no `.po` files, no `LocaleMiddleware`, and no `dir="rtl"`. `Offer` has
+> `title_fr` and `title_ar` columns, so the *data* is bilingual while the *interface* is not.
+>
+> This is the largest single gap between this repo and the NestJS one, and the one that gets
+> most expensive to close later. See [[Templates and Pages]].
 
 ---
 
 ## Fields you might expect and won't find
 
-- **No `name` split into first/last.** One `displayName`. Algerian naming conventions
-  don't map cleanly onto a Western first/last split, and nothing in the product needs them
-  apart.
-- **No `role` column.** Roles live on `Membership`, because they're per-agency.
-- **No `isVerified` for travelers.** `phoneVerifiedAt` / `emailVerifiedAt` are timestamps,
-  not booleans — you'll want to know *when*, and a nullable timestamp carries both facts.
+- **No `role` column.** Roles live on `Membership`, because they're per-agency — the same
+  person can be an owner at one and an agent at another.
+- **`first_name` / `last_name` come from `AbstractUser` and shouldn't be used.** Algerian
+  naming conventions don't map cleanly onto a Western first/last split, and nothing in the
+  product needs them apart. `Lead.full_name` is one field for exactly this reason. They can't
+  be removed from `AbstractUser` without abandoning it, so the rule is a convention, not a
+  constraint.
+- **No `phone_verified_at` / `email_verified_at`.** When these arrive they should be nullable
+  **timestamps, not booleans** — you will want to know *when*, and a nullable timestamp
+  carries both facts in one column. That's a small habit worth keeping everywhere: a boolean
+  answers one question, a nullable timestamp answers two for the same storage.
+- **No avatar.** When it comes, the client posts the **file**, never a URL. Letting a client
+  write a URL into that column lets anyone point it at a server they control and learn the IP
+  address of everyone who loads a page showing that avatar. Same reasoning as
+  `Offer.cover_image_url`, which currently *does* accept a URL — see [[Image Uploads]].
 
 ---
 
-## Open questions for you
+## Open questions
 
+- **Should login be by phone, email, or username?** Today it's username, which no real user
+  will have. This is the single biggest usability gap on the accounts side, and it is much
+  cheaper to change before there are accounts.
 - **Do travelers need SMS OTP verification?** Right now, no — a guest inquiry is name +
-  phone. It stays that way until spam appears. Every SMS costs money and every OTP step
-  loses real inquiries, so this is a decision to make *when* you see abuse, with data,
-  not now.
-- **Should a "troll" flagged by several different agencies become a platform-level
-  signal?** The data supports it (`Lead.quality` rows across agencies). But one agency
-  labelling someone a troll must not blacklist a real customer, so the threshold and the
-  appeal path are a real design problem. See [[Client Quality Labels]].
-- **Account deletion.** A traveler asks to be deleted. Their account goes — but what about
-  the agency's commercial record of an inquiry from March? Worth a lawyer's view.
+  phone. It should stay that way until spam appears. Every SMS costs money and every OTP step
+  loses real inquiries, so decide this *when* you see abuse, with data, not now.
+- **Account deletion.** A traveler asks to be deleted. Their account goes — `Lead.traveler` is
+  `SET_NULL`, so their inquiries survive with the name and number they typed. Is that right?
+  It's what makes the agency's commercial record intact and what a deletion request arguably
+  forbids. Worth a lawyer's view, not a guess.
 
 ---
 
-Related: [[Data Model Overview]] · [[Agency]] · [[Authentication vs Authorization]] ·
-[[Lead]] · [[Client Quality Labels]]
+Related: [[Data Model Overview]] · [[Agency]] · [[Lead]] · [[Multi-Tenancy]] ·
+[[Authentication vs Authorization]] · [[Validation at the Boundary]] · [[Accounts]] ·
+[[Audit Log]] · [[Templates and Pages]]

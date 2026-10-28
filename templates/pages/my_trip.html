@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}My trip — {{ offer.title_fr }}{% endblock %}
+
+{% comment %} Reached by an unguessable link sent by SMS. The link IS the credential, so
+   this page shows only what its holder already knows: their own booking and a
+   programme the agency publishes anyway.
+
+   What is deliberately absent, and must stay absent: the passenger list, what
+   anyone paid, and any CRM note. If one of those ever needs to appear here,
+   this page needs a real login — not a longer code. {% endcomment %}
+
+{% block content %}
+  <div class="mx-auto max-w-4xl space-y-5">
+    <section class="card overflow-hidden">
+      <div class="relative aspect-[21/8] bg-sand-100">
+        {% if offer.cover_image_url %}
+          <img src="{{ offer.cover_image_url }}" alt="{{ offer.title_fr }}" class="h-full w-full object-cover">
+        {% else %}
+          <div class="flex h-full w-full items-center justify-center bg-gradient-to-br from-sand-100 to-brand-50 text-5xl text-brand-300" aria-hidden="true">✈</div>
+        {% endif %}
+        <span class="absolute start-4 top-4 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">Your trip</span>
+      </div>
+
+      <div class="card-pad">
+        <h1 class="page-title">{{ offer.title_fr }}</h1>
+        <p dir="rtl" class="mt-1 text-start text-sm text-slate-500">{{ offer.title_ar }}</p>
+
+        <dl class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="rounded-xl bg-sand-50 p-3">
+            <dt class="text-xs font-medium text-slate-500">Booked for</dt>
+            <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ reservation.full_name }}</dd>
+          </div>
+          <div class="rounded-xl bg-sand-50 p-3">
+            <dt class="text-xs font-medium text-slate-500">People</dt>
+            <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ reservation.party_size }}</dd>
+          </div>
+          <div class="rounded-xl bg-sand-50 p-3">
+            <dt class="text-xs font-medium text-slate-500">Departure</dt>
+            <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ offer.departure_date|date:"j M Y" }}</dd>
+          </div>
+          <div class="rounded-xl bg-sand-50 p-3">
+            <dt class="text-xs font-medium text-slate-500">Agency</dt>
+            <dd class="mt-0.5 text-sm font-semibold text-slate-900">{{ agency.name }}</dd>
+            {% if agency.phone %}<dd class="mt-0.5 text-xs text-slate-500">{{ agency.phone }}</dd>{% endif %}
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    {% if current %}
+      <p class="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+        <span class="font-semibold">Now:</span> {{ current.title }}
+        {% if current.meeting_point %}— {{ current.meeting_point }}{% endif %}
+      </p>
+    {% endif %}
+
+    <section class="card card-pad">
+      <h2 class="section-title mb-5">Programme</h2>
+      {% include "pages/_programme.html" %}
+    </section>
+
+    <p class="text-center text-xs text-slate-500">
+      This link is personal. Share it only with the people on your booking.
+    </p>
+  </div>
+{% endblock %}

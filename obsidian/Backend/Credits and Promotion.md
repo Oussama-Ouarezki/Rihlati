@@ -1,9 +1,15 @@
 # Credits and Promotion
 
 > [!info] Status: **planned, not built.** This note is the design, written before the code.
-> The room was left for it on purpose: `Agency.creditBalanceCentimes`, `Offer.isFeatured`,
-> `Offer.featuredUntil` and the `promotedListings` plan flag all already exist, and the
-> search already sorts featured offers first. None of it is wired to anything yet.
+> The room was left for it on purpose: `Agency.credit_balance_centimes`, `Offer.is_featured`
+> and `Offer.featured_until` are columns that exist and that nothing reads. There is no
+> ledger table, no plan flag, and no admin screen.
+>
+> **And search does not sort featured offers first** — `SORTS["quality"]` in
+> `apps/offers/api.py` orders by `-quality_score, departure_date`, with a comment saying why:
+> a paid slot that outranks a better listing is how a marketplace loses the travelers it
+> needs in order to have anything to sell. Whatever gets built here has to answer that
+> comment, not overwrite it. See "where promotion is allowed to appear" below.
 
 **The idea (yours):** an agency buys credits, then spends them on — a cheaper subscription,
 bidding for placement, its agency appearing first, its listings appearing first. Plus two
@@ -26,7 +32,7 @@ Credits invert it: **one manual confirmation, then many automatic deductions.**
 > The agency transfers 10 000 DZD once. An admin confirms it once. The balance loads, and
 > every promotion afterwards is instant.
 
-That is also why `creditBalanceCentimes` was put on `Agency` in the very first schema.
+That is also why `credit_balance_centimes` was put on `Agency` in the very first schema.
 
 > [!danger] Verify every payment fact yourself
 > Which PSP, what they charge, what a *compte* requires legally, what invoicing and VAT
@@ -38,7 +44,7 @@ That is also why `creditBalanceCentimes` was put on `Agency` in the very first s
 
 ## 2. The single most important technical decision: a ledger, not a balance
 
-`creditBalanceCentimes` is one mutable integer. **Never let that be the source of truth.**
+`credit_balance_centimes` is one mutable integer. **Never let that be the source of truth.**
 
 The moment an agency says *"I bought 10 000 and it says 3 000, where did it go?"* — and they
 will, because it is their money — a single number cannot answer. You need every movement,
@@ -46,17 +52,20 @@ append-only:
 
 ```
 CreditTransaction
-  agencyId, amountCentimes (+ credit / − debit), kind, reference,
-  balanceAfterCentimes, actorUserId, note, createdAt
+  agency, amount_centimes (+ credit / − debit), kind, reference,
+  balance_after_centimes, actor, note, created_at
 ```
 
 - `kind`: `topup` · `promotion` · `subscription` · `refund` · `adjustment` · `expiry`
 - **Append-only.** Corrections are a new compensating row, never an edit. Same principle as
   the [[Audit Log]] — a ledger you can rewrite is a ledger nobody can trust, including you.
-- `creditBalanceCentimes` on `Agency` stays as a **denormalized cache** for fast reads,
+- `credit_balance_centimes` on `Agency` stays as a **denormalized cache** for fast reads,
   recomputed inside the same transaction. A reconciliation job asserts
-  `SUM(amountCentimes) == creditBalanceCentimes` and screams if it ever drifts.
-- **Money is integer centimes.** Never a float. Already the rule everywhere (`money.ts`).
+  `SUM(amount_centimes) == credit_balance_centimes` and screams if it ever drifts.
+- **Money is integer centimes.** Never a float. Already the rule everywhere — every money
+  column in the schema is a `BigIntegerField` named `…_centimes`, and the house-rule test
+  `MoneyTests` in `apps/common/tests_house_rules.py` fails the suite if a `FloatField` or
+  `DecimalField` shows up on one.
 
 ### Idempotency is not optional
 
@@ -71,8 +80,10 @@ index**, so the second attempt is a no-op rather than free money. Rule #6:
 
 ## 3. What credits buy
 
-One currency, four uses. Prices live in **one table in `packages/shared`**, next to
-`PLAN_LIMITS`, read server-side — never sent by the client (rule #6).
+One currency, four uses. Prices live in **one dict in `apps/common/quotas.py`**, next to
+`PUBLISHED_OFFER_LIMITS`, read server-side — never sent by the client (rule #6). Same file as
+the plan limits on purpose: a quota and a price are the same kind of fact, "a number the
+client may not choose", and keeping them together is what makes the rule visible.
 
 | Use | Shape | Notes |
 |---|---|---|
@@ -130,11 +141,26 @@ Non-negotiables, and they should be in `CLAUDE.md` before this ships:
    ([[Duplicate and Spam Control]]).
 4. **Promotion never changes filter results.** If a traveler filters "under 300 000 DZD",
    a promoted 500 000 offer does not appear. Paid placement reorders; it never *inserts*.
-5. **Organic ranking stays honest.** `qualityScore` measures listing completeness, not
+5. **Organic ranking stays honest.** `Offer.quality_score` measures listing completeness, not
    spend. Never blend credits into it.
 
 > The test: a traveler who reads the "Sponsorisé" label should still believe the ranking
 > underneath it is real. The day that stops being true, the marketplace is over.
+
+### Where promotion is allowed to appear
+
+Rules 4 and 5 together decide the implementation, and it is worth stating it as code rather
+than as principle, because the shortcut is very tempting:
+
+- **Not** `order_by("-is_featured", "-quality_score")`. That is the one-line version, and it
+  quietly breaks rule 4 — a promoted offer would jump the queue inside a filtered result set,
+  including filters it does not satisfy in spirit.
+- Instead: the organic queryset is built exactly as it is today, and promoted listings are a
+  **separate, capped query** merged into fixed positions in the template. Two lists, one page.
+  A traveler scrolling past the labelled slots is reading an untouched ranking.
+
+That also keeps the honest thing cheap to verify: a test can assert that removing every
+promotion row leaves the organic ordering byte-for-byte identical.
 
 ---
 

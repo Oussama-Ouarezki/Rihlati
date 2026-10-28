@@ -3,32 +3,45 @@
 Where your paid tier comes from. Also your best spam defence — those turn out to be the
 same mechanism, which is a nice thing to discover early.
 
-Everything here lives in **one file**: `packages/shared/src/plans.ts`. This is a file you
-can edit yourself.
+Everything enforced lives in **one file**: `apps/common/quotas.py`. This is a file you can
+edit yourself.
 
 ---
 
 ## The table
 
-|                       | `free`    | `pro`     | `business` |
-| --------------------- | --------- | --------- | ---------- |
-| Published offers      | **5**     | 30        | unlimited  |
-| Staff accounts        | 2         | 8         | unlimited  |
-| Leads per month       | unlimited | unlimited | unlimited  |
-| CRM pipeline board    | —         | ✅         | ✅          |
-| Assign leads to staff | —         | ✅         | ✅          |
-| Analytics dashboard   | —         | ✅         | ✅          |
-| Export leads to CSV   | —         | ✅         | ✅          |
-| Promoted listings     | —         | ✅         | ✅          |
-| Custom tags           | —         | ✅         | ✅          |
-| [[Tracked Links]]     | 2         | 50        | unlimited  |
-| [[Agency Chatbot]]    | —         | ✅         | ✅          |
+|                       | `free`    | `pro`     | `business` | enforced? |
+| --------------------- | --------- | --------- | ---------- | --------- |
+| Published offers      | **5**     | 30        | 200        | **yes** — `PUBLISHED_OFFER_LIMITS` |
+| Seats across offers   | unlimited | unlimited | unlimited  | no — `SEAT_LIMITS`, all `None` |
+| Leads per month       | unlimited | unlimited | unlimited  | never, on purpose (below) |
+| Staff accounts        | 2         | 8         | unlimited  | **not yet** |
+| CRM pipeline board    | —         | ✅         | ✅          | **not yet** |
+| Assign leads to staff | —         | ✅         | ✅          | **not yet** |
+| Analytics dashboard   | —         | ✅         | ✅          | **not yet** |
+| Export leads to CSV   | —         | ✅         | ✅          | **not yet** |
+| Promoted listings     | —         | ✅         | ✅          | **not yet** |
+| Custom tags           | —         | ✅         | ✅          | **not yet** |
+| [[Tracked Links]]     | 2         | 50        | unlimited  | **not yet** |
+| [[Agency Chatbot]]    | —         | ✅         | ✅          | feature not built |
 
-`null` means unlimited in the code.
+> [!warning] Only the first row is code. The rest is the plan.
+> This is stated bluntly because a table that mixes "enforced" and "intended" without saying
+> which is which is how a free agency ends up exporting leads for a year and then being told
+> to stop. `PUBLISHED_OFFER_LIMITS` and `SEAT_LIMITS` are the only two dictionaries that
+> exist; everything below them is a decision written down early so it does not have to be
+> invented under pressure later.
+>
+> `SEAT_LIMITS` is `None` everywhere on purpose: the *shape* of the limit is in the file so
+> that when a number is finally chosen it lands here with the others, rather than as a magic
+> number inside a handler.
 
-The chatbot row is a flag for a feature that isn't built yet — deliberately, so that when
-it lands, which plan gets it is a one-word product decision, not a schema change. If it
-should be the `business` anchor instead of a `pro` seller, flip it in `plans.ts`.
+`business` is **200**, not unlimited. An unlimited tier means the largest customer can, by
+accident, make every search query slow for everybody. A number you can raise is friendlier
+than an outage.
+
+The chatbot row is a flag for a feature that is not built — deliberately, so that when it
+lands, which plan gets it is a one-word product decision rather than a schema change.
 
 ---
 
@@ -51,8 +64,9 @@ The principle: **sell capacity and convenience, never sell fewer customers.**
 - Capacity → how many offers, how many staff
 - Convenience → pipeline board, analytics, export, promotion
 
-The `maxLeadsPerMonth` field exists so the decision stays yours. But it's `null` everywhere,
-and there's a test asserting that, so nobody changes it by accident.
+There is deliberately **no `LEAD_LIMITS` dictionary** in `quotas.py`. Not one set to `None`
+everywhere — none at all. A dictionary of nulls is an invitation; its absence is a decision
+somebody has to reopen on purpose.
 
 ---
 
@@ -72,29 +86,37 @@ Costs nothing to do now. Impossible to do later.
 
 ## Enforcement: server-side, freshly counted
 
-Publishing an offer checks:
+`assert_can_publish(agency, exclude_pk=None)` is called before **any** transition into
+`published` — creating an already-published offer, or publishing a draft. It:
 
-1. **Count** currently published offers for this agency — a fresh `COUNT` from the database.
-2. **Resolve** the limit: `publishedOfferLimitOverride` if set, otherwise the plan's.
-3. **Compare**: `currentlyPublished < limit`.
+1. **Counts** currently published offers for this agency — a fresh `COUNT` from the database.
+2. **Resolves** the limit: `published_offer_limit_override` if set, otherwise the plan's.
+3. **Compares**: `count >= limit` → `QuotaExceeded`.
 
-Three things worth noticing:
+Four things worth noticing:
 
 **The count is never taken from the client.** "I have 3 offers, let me publish another" is
 not evidence. See [[Validation at the Boundary]].
 
-**Drafts don't count.** Only `published` offers occupy a slot. An agency can prepare
-next season's twenty packages and publish five. Limiting drafts would be limiting work, not
+**Drafts don't count.** Only `published` offers occupy a slot. An agency can prepare next
+season's twenty packages and publish five. Limiting drafts would be limiting work, not
 limiting attention — and attention is the scarce thing.
 
-**Strict `<`, not `<=`.** At 5 published against a limit of 5, you are full. There's an
-explicit test for that off-by-one, because it's the classic place to get this wrong.
+**`exclude_pk` is why editing a title never trips the quota.** Re-saving an already-published
+offer excludes itself from its own count. Without it, an agency at exactly its limit could
+never fix a typo — a bug that only appears at the boundary, which is exactly where nobody
+tests by hand.
+
+**`QuotaExceeded` maps to `409`, not `403`.** The caller *is* allowed to publish offers;
+there is just no room. A 403 tells them to go find a permission they already have, whereas a
+409 says the state is wrong and points at the fix — archive something, or upgrade. Both the
+API and the offer editor page raise the same exception from the same function.
 
 ---
 
 ## The override, and why only admins may set it
 
-`Agency.publishedOfferLimitOverride` raises one agency's cap above its plan.
+`Agency.published_offer_limit_override` raises one agency's cap above its plan.
 
 You will need this immediately. Recruiting your first 40 agencies means saying "post as
 many as you like, it's free while we grow" — and you want that per-agency, not a change to
@@ -104,25 +126,38 @@ the free plan for everyone.
 > If an agency could set its own override, the quota system would be decoration. This field
 > must not appear in any agency-facing request schema.
 
+It is also not in `AgencyProfileIn`, so it cannot arrive in a request body at all — the
+field simply does not exist as far as the boundary is concerned. That is a stronger
+guarantee than a handler remembering to ignore it.
+
 One subtlety with a test on it: an override of `0` must mean **zero**, not "unset, use the
-default". Written as `override || planLimit` — which is the obvious way — `0` is falsy and a
-suspended agency silently gets the full free quota back. The code checks explicitly for
-`null`/`undefined` instead.
+default".
+
+```python
+if agency.published_offer_limit_override is not None:   # not `or`
+    return agency.published_offer_limit_override
+```
+
+Written the obvious way — `override or plan_limit` — `0` is falsy in Python exactly as it is
+in JavaScript, and a suspended agency silently gets its full free quota back. The explicit
+`is not None` is the whole fix, and it is the reason this paragraph exists: the bug is
+invisible in review and only fires on the one agency you most wanted to stop.
 
 ---
 
-## Feature gates
+## Feature gates are not built
 
-```ts
-hasFeature('free', 'crmPipelineBoard')   // false
-cheapestPlanWith('crmPipelineBoard')     // 'pro'
-```
+There is no `has_feature()` in this codebase yet. When it lands it belongs next to the limits
+in `quotas.py`, and it needs two functions rather than one:
 
-`cheapestPlanWith` exists so an upgrade prompt can say *"Available on Pro"* by reading the
-table, rather than hardcoding "Pro" in the UI. Change the table, every prompt follows.
+- `has_feature(plan, name)` — the gate itself
+- `cheapest_plan_with(name)` — so an upgrade prompt can say *"Disponible sur Pro"* by reading
+  the table, instead of hardcoding "Pro" in a template. Change the table, every prompt
+  follows.
 
-The API must enforce every gate too, not just hide the button — a `free` agency calling the
-export endpoint directly gets `403`. See [[Authentication vs Authorization]].
+Whenever it is built: **the API enforces the gate, the template merely hides the button.** A
+`free` agency calling the export endpoint directly must get a refusal, not a CSV. See
+[[Authentication vs Authorization]] and rule #2 of [[The Seven Rules]].
 
 ---
 
@@ -150,15 +185,18 @@ See [[Decisions You Must Make]] section 5.
 
 ## Editing this yourself
 
-`packages/shared/src/plans.ts` is safe for you to change. Edit the numbers, then:
+`apps/common/quotas.py` is safe for you to change. Edit the numbers, then:
 
 ```bash
-npm run test --workspace @rihlati/shared
+./scripts/check.sh
 ```
 
-The tests check the table stays coherent — plans get more permissive as they get more
-expensive, leads stay uncapped, every plan is fully defined. If you break one, it tells you
-which.
+The tests check that the table stays coherent — plans get more permissive as they get more
+expensive, every plan is defined, and the off-by-one at exactly the limit still refuses. If
+you break one, it tells you which.
+
+Nothing else needs touching. `quota_state()` feeds both the API's `GET …/quota` and the bar
+on the offers page, so a new number shows up in both places at once.
 
 ---
 

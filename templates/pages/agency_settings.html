@@ -1,0 +1,105 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Settings — {{ agency.name }}{% endblock %}
+
+{% block agency_content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Agency</p>
+      <h2 class="page-title">Settings</h2>
+      <p class="page-lede">Your public profile, verification status and plan.</p>
+    </div>
+  </header>
+
+  <div class="mt-5 grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+    <section class="card card-pad">
+      <h3 class="section-title">Public profile</h3>
+      <p class="mt-1 text-sm text-slate-500">What a traveller sees before they trust you with their number.</p>
+      <form method="post" novalidate class="mt-4 space-y-3">
+        {% csrf_token %}
+        {% for field in profile_form %}
+          <div>
+            <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Save profile</button>
+      </form>
+    </section>
+
+    <div class="space-y-6">
+      {# ------------------------------------------------------- verification #}
+      <section class="card card-pad">
+        <h3 class="section-title">Verification</h3>
+
+        {% if agency.status == 'verified' %}
+          <p class="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            ✓ Verified on {{ agency.decided_at|date:"j M Y" }}.
+          </p>
+        {% elif agency.status == 'pending' %}
+          <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Submitted on {{ agency.submitted_for_review_at|date:"j M Y" }}. Under review.
+          </p>
+        {% elif agency.status == 'rejected' %}
+          <p class="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            Application rejected. Reason: {{ agency.rejection_reason|default:"not specified" }}
+          </p>
+        {% elif agency.status == 'suspended' %}
+          <p class="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            Account suspended. Contact us.
+          </p>
+        {% else %}
+          <p class="mt-2 text-sm leading-6 text-slate-500">
+            Until you are verified, your offers stay invisible in search. The badge is the only reason a traveller gives their number to an agency they do not know.
+          </p>
+        {% endif %}
+
+        {% if not is_owner %}
+          <p class="mt-3 text-sm text-slate-500">
+            Only the account owner can submit the file: it is a legal declaration about the business.
+          </p>
+        {% elif agency.status == 'draft' or agency.status == 'rejected' %}
+          <form method="post" novalidate class="mt-4 space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="form" value="verification">
+            {% for field in verification_form %}
+              <div>
+                <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+                {{ field.errors }}
+              </div>
+            {% endfor %}
+            <button type="submit" class="btn btn-primary w-full">Submit application</button>
+          </form>
+          <p class="helptext mt-2">Check the exact document list before relying on it: this is a legal question, not a product choice.</p>
+        {% endif %}
+      </section>
+
+      {# -------------------------------------------------------------- quota #}
+      <section class="card card-pad">
+        <h3 class="section-title">Plan</h3>
+        <p class="mt-2 text-sm text-slate-600">
+          <span class="font-semibold text-slate-900">{{ quota.plan|capfirst }}</span> — {{ quota.used }} published offer{{ quota.used|pluralize }}
+          {% if quota.limit %}of {{ quota.limit }}{% else %}(unlimited){% endif %}.
+        </p>
+        {% if quota.limit %}
+          <div class="progress mt-3">
+            <div class="progress-bar" style="width: {% widthratio quota.used quota.limit 100 %}%"></div>
+          </div>
+        {% endif %}
+        <p class="helptext mt-2">Only <em>published</em> offers count. Drafts and archives are unlimited: visibility is the scarce thing, not rows in a table.</p>
+      </section>
+
+      {# ----------------------------------------------------------- assistant #}
+      <section class="card card-pad">
+        <h3 class="section-title">Assistant</h3>
+        <p class="mt-2 text-sm leading-6 text-slate-600">
+          Automatic answers on your offers. Add your booking, deposit and cancellation terms.
+        </p>
+        <a href="{% url 'agency-assistant' agency.id %}" class="btn btn-secondary mt-3">Configure assistant →</a>
+      </section>
+    </div>
+  </div>
+{% endblock %}

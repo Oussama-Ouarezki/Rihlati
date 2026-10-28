@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <span class="avatar" aria-hidden="true">{{ agency.name|slice:":1"|upper }}</span>
+      <div>
+        <h1 class="text-lg font-bold tracking-tight text-slate-900">{{ agency.name }}</h1>
+        <p class="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          {{ agency.city }}
+          {% if agency.is_verified %}
+            <span class="pill pill-brand">✓ Verified</span>
+          {% else %}
+            <span class="pill pill-warning">Pending review</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+    {% block agency_action %}{% endblock %}
+  </div>
+
+  <nav class="mt-5 flex gap-0.5 overflow-x-auto border-b border-slate-200" aria-label="Agency sections">
+    <a href="{% url 'agency-offers' agency.id %}"
+       class="tab-link {% if tab == 'offers' %}tab-link-active{% else %}tab-link-idle{% endif %}"
+       {% if tab == 'offers' %}aria-current="page"{% endif %}>
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M3 7.5 10 3l7 4.5v7L10 19l-7-4.5v-7Z" stroke-linejoin="round"/>
+        <path d="M3 7.5 10 12l7-4.5M10 12v7" stroke-linejoin="round"/>
+      </svg>
+      Offers
+      <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 tabular-nums">{{ agency.offers.count }}</span>
+    </a>
+    <a href="{% url 'agency-leads' agency.id %}"
+       class="tab-link {% if tab == 'leads' %}tab-link-active{% else %}tab-link-idle{% endif %}"
+       {% if tab == 'leads' %}aria-current="page"{% endif %}>
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M3 5.5h14v9H3z" stroke-linejoin="round"/><path d="m3.5 6 6.5 5 6.5-5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Inquiries
+      <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 tabular-nums">{{ agency.leads.count }}</span>
+    </a>
+    <a href="{% url 'agency-clients' agency.id %}"
+       class="tab-link {% if tab == 'clients' %}tab-link-active{% else %}tab-link-idle{% endif %}"
+       {% if tab == 'clients' %}aria-current="page"{% endif %}>
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="10" cy="6.5" r="3"/><path d="M4 17c.6-3 3-4.5 6-4.5s5.4 1.5 6 4.5" stroke-linecap="round"/>
+      </svg>
+      Clients
+      <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-600 tabular-nums">{{ agency.clients.count }}</span>
+    </a>
+    <a href="{% url 'agency-links' agency.id %}"
+       class="tab-link {% if tab == 'links' %}tab-link-active{% else %}tab-link-idle{% endif %}"
+       {% if tab == 'links' %}aria-current="page"{% endif %}>
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M8 12 12 8M6.5 10.5 5 12a2.8 2.8 0 0 0 4 4l1.5-1.5M13.5 9.5 15 8a2.8 2.8 0 0 0-4-4L9.5 5.5" stroke-linecap="round"/>
+      </svg>
+      Campaigns
+    </a>
+    <a href="{% url 'agency-assistant' agency.id %}"
+       class="tab-link {% if tab == 'assistant' %}tab-link-active{% else %}tab-link-idle{% endif %}"
+       {% if tab == 'assistant' %}aria-current="page"{% endif %}>
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <path d="M10 3v2M10 15v2M3 10h2M15 10h2M5 5l1.5 1.5M13.5 13.5 15 15M15 5l-1.5 1.5M6.5 13.5 5 15" stroke-linecap="round"/>
+        <circle cx="10" cy="10" r="3"/>
+      </svg>
+      Assistant
+    </a>
+    <a href="{% url 'agency-settings' agency.id %}"
+       class="tab-link {% if tab == 'settings' %}tab-link-active{% else %}tab-link-idle{% endif %}"
+       {% if tab == 'settings' %}aria-current="page"{% endif %}>
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="10" cy="10" r="2.5"/>
+        <path d="M10 3.2v1.6M10 15.2v1.6M16.8 10h-1.6M4.8 10H3.2M14.8 5.2l-1.1 1.1M6.3 13.7l-1.1 1.1M14.8 14.8l-1.1-1.1M6.3 6.3 5.2 5.2" stroke-linecap="round"/>
+      </svg>
+      Settings
+    </a>
+  </nav>
+
+  <div class="mt-6">{% block agency_content %}{% endblock %}</div>
+{% endblock %}

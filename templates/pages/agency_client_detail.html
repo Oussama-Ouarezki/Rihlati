@@ -1,0 +1,222 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}{{ client.full_name }} — Clients{% endblock %}
+
+{% block agency_content %}
+  <nav class="flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+    <a href="{% url 'agency-clients' agency.id %}" class="hover:text-brand-700">Clients</a>
+    <span aria-hidden="true">/</span>
+    <span class="truncate text-slate-700">{{ client.full_name }}</span>
+  </nav>
+
+  <header class="card card-pad mt-4">
+    <div class="flex flex-wrap items-start justify-between gap-5">
+      <div class="flex items-start gap-4">
+        <span class="avatar h-14 w-14 text-lg" aria-hidden="true">{{ client.full_name|slice:":1"|upper }}</span>
+        <div>
+          <h2 class="text-2xl font-bold tracking-tight text-slate-900">{{ client.full_name }}</h2>
+          <p class="mt-0.5 text-sm text-slate-500">{{ client.phone_e164 }} · client since {{ client.created_at|date:"M Y" }}</p>
+          <div class="mt-2 flex flex-wrap gap-1.5">
+            {% for client_tag in client.client_tags.all %}
+              <span class="pill pill-neutral">{{ client_tag.tag.name }}</span>
+            {% empty %}
+              <span class="text-xs text-slate-500">No labels yet</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <a href="tel:{{ client.phone_e164 }}" class="btn btn-secondary">Call</a>
+        <a href="https://wa.me/{{ client.phone_e164|cut:"+" }}" target="_blank" rel="noopener" class="btn btn-primary">WhatsApp</a>
+      </div>
+    </div>
+
+    <dl class="mt-5 grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+      <div class="rounded-xl bg-sand-50 p-3">
+        <dt class="text-xs font-medium text-slate-500">Trips</dt>
+        <dd class="mt-0.5 text-xl font-bold text-slate-900 tabular-nums">{{ reservations|length }}</dd>
+      </div>
+      <div class="rounded-xl bg-sand-50 p-3">
+        <dt class="text-xs font-medium text-slate-500">Inquiries</dt>
+        <dd class="mt-0.5 text-xl font-bold text-slate-900 tabular-nums">{{ leads|length }}</dd>
+      </div>
+      <div class="rounded-xl bg-sand-50 p-3">
+        <dt class="text-xs font-medium text-slate-500">Last departure</dt>
+        <dd class="mt-1 text-sm font-semibold text-slate-900">
+          {% with first=reservations|first %}{{ first.offer.departure_date|date:"M Y"|default:"—" }}{% endwith %}
+        </dd>
+      </div>
+    </dl>
+  </header>
+
+  <div class="mt-6 grid gap-6 lg:grid-cols-[1.5fr_1fr] lg:items-start">
+    <div class="space-y-6">
+      {# ------------------------------------------------------------ identity #}
+      <section class="card card-pad">
+        <h3 class="section-title">Profile</h3>
+        <p class="mt-1 text-sm text-slate-500">Correct a name or number here. Past inquiries keep the details they were sent with.</p>
+
+        <form method="post" novalidate class="mt-4 space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="profile">
+          <div class="grid gap-3 sm:grid-cols-2">
+            {% for field in profile_form %}
+              <div>
+                <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+                {{ field.errors }}
+              </div>
+            {% endfor %}
+          </div>
+
+          <fieldset>
+            <legend class="field-label">Labels</legend>
+            <div class="flex flex-wrap gap-x-4 gap-y-2">
+              {% for tag in tags %}
+                <label class="flex items-center gap-1.5 text-sm text-slate-600">
+                  <input type="checkbox" name="tags" value="{{ tag.id }}"
+                         {% if tag.id in selected_tags %}checked{% endif %}
+                         class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-600/30">
+                  {{ tag.name }}
+                </label>
+              {% empty %}
+                <p class="text-sm text-slate-500">No labels yet.</p>
+              {% endfor %}
+            </div>
+            {% if can_manage %}
+              <input type="text" name="new_tag" maxlength="40" placeholder="New label…"
+                     aria-label="New label" class="field-input mt-2 w-full py-2 text-sm">
+            {% endif %}
+          </fieldset>
+
+          <button type="submit" class="btn btn-primary">Save profile</button>
+        </form>
+      </section>
+
+      {# ---------------------------------------------------------------- notes #}
+      <section class="card card-pad">
+        <h3 class="section-title">Notes</h3>
+        <p class="mt-1 text-sm text-slate-500">What the agency knows about the person: preferences, family, language. Inquiries keep their own notes.</p>
+        <form method="post" class="mt-4 space-y-2">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="note">
+          <label for="new-note" class="sr-only">New note</label>
+          <textarea id="new-note" name="note" rows="3" required class="field-input"
+                    placeholder="Prefers an evening call. Two young children."></textarea>
+          <button type="submit" class="btn btn-primary">Add note</button>
+        </form>
+        <ul class="mt-4 space-y-2">
+          {% for note in notes %}
+            <li class="rounded-xl border border-slate-200 bg-sand-50/50 p-3">
+              <p class="text-sm leading-6 text-slate-700">{{ note.body }}</p>
+              <p class="mt-1 text-xs text-slate-500">
+                {{ note.author.username|default:"—" }} · {{ note.created_at|date:"j M Y H:i" }}
+              </p>
+            </li>
+          {% empty %}
+            <li class="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">No notes yet.</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      {# ---------------------------------------------------------------- trips #}
+      <section class="card overflow-hidden">
+        <div class="card-header">
+          <div>
+            <h3 class="section-title">Trips</h3>
+            <p class="mt-1 text-sm text-slate-500">Bookings, newest departure first.</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Offer</th>
+                <th>Departure</th>
+                <th>People</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for reservation in reservations %}
+                <tr>
+                  <td>
+                    <a href="{% url 'agency-manifest' agency.id reservation.offer_id %}"
+                       class="font-medium text-slate-900 hover:text-brand-700">{{ reservation.offer.title_fr }}</a>
+                  </td>
+                  <td class="whitespace-nowrap text-slate-600">{{ reservation.offer.departure_date|date:"j M Y" }}</td>
+                  <td class="text-slate-600">{{ reservation.party_size }}</td>
+                  <td><span class="pill pill-neutral">{{ reservation.get_status_display }}</span></td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="py-8 text-center text-sm text-slate-500">No booked trips yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {# -------------------------------------------------------------- demands #}
+      <section class="card overflow-hidden">
+        <div class="card-header">
+          <div>
+            <h3 class="section-title">Inquiries</h3>
+            <p class="mt-1 text-sm text-slate-500">Stage and quality stay on each inquiry: the deal moves, not the person.</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Offer</th>
+                <th>Received</th>
+                <th>Stage</th>
+                <th>Quality</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for lead in leads %}
+                <tr>
+                  <td>
+                    <a href="{% url 'agency-lead-detail' agency.id lead.id %}"
+                       class="font-medium text-slate-900 hover:text-brand-700">{{ lead.offer.title_fr }}</a>
+                  </td>
+                  <td class="whitespace-nowrap text-slate-600">{{ lead.created_at|date:"j M Y" }}</td>
+                  <td><span class="pill pill-neutral">{{ lead.get_status_display }}</span></td>
+                  <td class="text-slate-600">
+                    {% if lead.quality != 'unrated' %}{{ lead.get_quality_display }}{% else %}—{% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="4" class="py-8 text-center text-sm text-slate-500">No inquiries. This client may have been added by hand.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <div class="space-y-6">
+      {# ------------------------------------------------------------- timeline #}
+      <section class="card card-pad">
+        <h3 class="section-title">Timeline</h3>
+        <p class="mt-1 text-sm text-slate-500">Assembled from inquiries and notes. Nothing to maintain by hand.</p>
+        <ol class="mt-4 space-y-4">
+          {% for event in timeline %}
+            <li class="relative border-s-2 ps-4
+              {% if event.kind == 'note' %}border-amber-200{% elif event.kind == 'trip' %}border-brand-200{% else %}border-slate-200{% endif %}">
+              <span class="absolute -start-1.5 top-1.5 h-2.5 w-2.5 rounded-full
+                {% if event.kind == 'note' %}bg-amber-500{% elif event.kind == 'trip' %}bg-brand-600{% else %}bg-slate-400{% endif %}"
+                aria-hidden="true"></span>
+              <p class="text-sm font-medium text-slate-800">{{ event.label }}</p>
+              <p class="text-xs leading-5 text-slate-500">{{ event.detail }}</p>
+              <p class="mt-0.5 text-xs text-slate-400">{{ event.actor }} · {{ event.at|date:"j M Y H:i" }}</p>
+            </li>
+          {% empty %}
+            <li class="text-sm text-slate-500">Nothing yet.</li>
+          {% endfor %}
+        </ol>
+      </section>
+    </div>
+  </div>
+{% endblock %}

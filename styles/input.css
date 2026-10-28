@@ -1,0 +1,372 @@
+@import 'tailwindcss';
+
+/* Scan the Django templates instead of a React tree — the only line in this
+   file that knows what backend it is sitting behind. */
+@source '../templates';
+
+/*
+ * Blue and white, refined with warmth (owner's decision, 2026-10-28).
+ * `brand` remains the only accent colour. Warmth comes from the canvas and a
+ * restrained sand tint, never from a second competing accent.
+ */
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+
+  --color-sand-50: #fbf8f2;
+  --color-sand-100: #f4ecdf;
+  --color-sand-200: #e8dbc7;
+  --color-sand-300: #d9c5a6;
+  --color-sand-700: #8a6a45;
+
+  --color-canvas: #f7f5f0;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.03);
+  --shadow-lift: 0 10px 30px -12px rgb(15 23 42 / 0.18), 0 2px 6px rgb(15 23 42 / 0.04);
+}
+
+/*
+ * RTL: templates use logical utilities (ms-*, me-*, ps-*, pe-*, start-*,
+ * end-*, text-start), so `dir` on <html> flips the whole layout for free.
+ *
+ * The road is the one exception, and only until M2: its pins are placed with a
+ * physical percentage so the drawn curve (also physical) stays on them.
+ */
+
+/* The dashes travel downward, the direction of travel. One keyframe for the
+   SVG curve, one for the CSS fallback band — a background offset and a stroke
+   offset are not the same property. */
+@keyframes road-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes road-dashes {
+  to {
+    background-position-y: 24px;
+  }
+}
+@keyframes road-ping {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-slate-700 antialiased;
+  }
+
+  ::selection {
+    @apply bg-brand-100 text-brand-900;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply text-balance;
+  }
+
+  /* A visible ring on every interactive element, not just inputs. */
+  a:focus-visible,
+  button:focus-visible,
+  summary:focus-visible,
+  [tabindex]:focus-visible {
+    @apply outline-none ring-2 ring-brand-600/40 ring-offset-2 ring-offset-canvas;
+  }
+}
+
+@layer components {
+  /* ---------------------------------------------------------------- shell */
+  .skip-link {
+    @apply sr-only rounded-xl bg-brand-700 px-4 py-2 text-sm font-semibold text-white;
+  }
+  .skip-link:focus {
+    @apply not-sr-only fixed start-4 top-4 z-50;
+  }
+
+  /* ------------------------------------------------------------- typography */
+  .eyebrow {
+    @apply text-xs font-semibold tracking-[0.14em] text-sand-700 uppercase;
+  }
+  .page-header {
+    @apply flex flex-wrap items-end justify-between gap-4;
+  }
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl;
+  }
+  .page-lede {
+    @apply mt-1.5 max-w-2xl text-sm leading-6 text-slate-600;
+  }
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-slate-900;
+  }
+  .muted {
+    @apply text-sm text-slate-500;
+  }
+
+  /* ---------------------------------------------------------------- surfaces */
+  .card {
+    @apply rounded-2xl border border-slate-200/80 bg-white shadow-card;
+  }
+  .card-pad {
+    @apply p-5 sm:p-6;
+  }
+  .card-header {
+    @apply flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6;
+  }
+  .card-interactive {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift;
+  }
+  .hero-band {
+    @apply rounded-3xl border border-sand-200 bg-gradient-to-br from-sand-50 via-sand-100/70 to-brand-50;
+  }
+
+  /* ----------------------------------------------------------------- controls */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap transition focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-brand-600 text-white shadow-sm hover:bg-brand-700;
+  }
+  .btn-secondary {
+    @apply border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50;
+  }
+  .btn-ghost {
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+  }
+  .btn-danger {
+    @apply border border-rose-200 bg-white text-rose-600 hover:bg-rose-50;
+  }
+  .btn-sm {
+    @apply min-h-11 px-3 py-1.5 text-xs sm:min-h-8;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap;
+  }
+  .pill-neutral {
+    @apply bg-slate-100 text-slate-600;
+  }
+  .pill-brand {
+    @apply bg-brand-50 text-brand-700;
+  }
+  .pill-success {
+    @apply bg-emerald-50 text-emerald-700;
+  }
+  .pill-warning {
+    @apply bg-amber-50 text-amber-800;
+  }
+  .pill-danger {
+    @apply bg-rose-50 text-rose-700;
+  }
+
+  .avatar {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700 ring-1 ring-brand-100 ring-inset;
+  }
+  .avatar-sm {
+    @apply h-8 w-8 text-xs;
+  }
+
+  .stat-card {
+    @apply flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift sm:p-5;
+  }
+  .stat-number {
+    @apply rounded-xl bg-brand-50 px-3 py-1.5 text-xl font-bold text-brand-700 tabular-nums;
+  }
+
+  .empty-state {
+    @apply rounded-2xl border border-dashed border-slate-300 bg-white/70 px-6 py-14 text-center;
+  }
+  .empty-state-icon {
+    @apply mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sand-100 text-xl text-sand-700;
+  }
+
+  /* ----------------------------------------------------------------- forms */
+  .field-input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-4 focus:ring-brand-600/10;
+  }
+  .field-input[aria-invalid='true'] {
+    @apply border-rose-300 focus:border-rose-500 focus:ring-rose-500/10;
+  }
+  .field-label {
+    @apply mb-1.5 block text-xs font-semibold text-slate-600;
+  }
+  .errorlist {
+    @apply mt-1 list-none space-y-0.5 p-0 text-xs text-rose-600;
+  }
+  .helptext {
+    @apply mt-1 block text-xs leading-5 text-slate-500;
+  }
+
+  /* --------------------------------------------------------------- records */
+  .record-list {
+    @apply divide-y divide-slate-100;
+  }
+  .record-row {
+    @apply flex flex-wrap items-center gap-3 px-5 py-4 transition hover:bg-slate-50/80;
+  }
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table thead {
+    @apply border-b border-slate-200 text-xs text-slate-500;
+  }
+  .data-table th {
+    @apply px-5 py-3 text-start font-medium;
+  }
+  .data-table td {
+    @apply px-5 py-3;
+  }
+  .data-table tbody tr {
+    @apply border-b border-slate-100 transition last:border-0 hover:bg-slate-50/80;
+  }
+
+  /* ------------------------------------------------------------------- nav */
+  .tab-link {
+    @apply -mb-px inline-flex min-h-11 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition sm:px-4;
+  }
+  .tab-link-active {
+    @apply border-brand-600 text-brand-700;
+  }
+  .tab-link-idle {
+    @apply border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800;
+  }
+
+  /* ------------------------------------------------------------- progress */
+  .progress {
+    @apply h-2 overflow-hidden rounded-full bg-slate-100;
+  }
+  .progress-bar {
+    @apply h-full rounded-full bg-brand-600;
+  }
+
+  /*
+   * The trip programme's road. The itinerary is content; the curve is
+   * decoration, so everything here degrades to a straight band that still
+   * reads as a road when `static/road.js` does not run.
+   */
+  .road {
+    --pin-x: 1.75rem;
+    @apply relative;
+  }
+
+  /* Where the pins stand, and therefore where the road is. On a phone that is
+     a straight line in the start gutter: 390px has no room for a wiggle and a
+     readable card at once. */
+  .road-band {
+    left: var(--pin-x);
+    @apply pointer-events-none absolute inset-y-0 w-9 -translate-x-1/2 rounded-full bg-slate-700;
+  }
+  .road-band::after {
+    content: '';
+    @apply absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2;
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.55) 0 10px,
+      transparent 10px 24px
+    );
+    background-position-y: 0;
+    animation: road-dashes 0.8s linear infinite;
+  }
+  .road[data-road-ready] .road-band {
+    display: none;
+  }
+
+  .road-svg {
+    @apply pointer-events-none absolute inset-0 h-full w-full;
+  }
+  .road-flow {
+    animation: road-flow 0.8s linear infinite;
+  }
+
+  .road-step {
+    @apply relative flex items-center py-1.5;
+  }
+
+  .road-pin {
+    left: var(--pin-x);
+    @apply absolute top-1/2 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] border-white bg-white text-lg leading-none shadow-sm;
+    /* Laid out, not shown: the script measures its box before revealing it. */
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+  }
+  .road[data-road-ready] .road-pin {
+    @apply opacity-100;
+  }
+  .road-pin--current::after {
+    content: '';
+    @apply absolute inset-0 rounded-full ring-2 ring-brand-600;
+    animation: road-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  .road-card {
+    @apply relative w-full rounded-xl border p-3 shadow-sm;
+    margin-inline-start: 4rem;
+  }
+
+  /* A day is a sign on the way, not a separate journey: opaque on purpose, so
+     it masks the road running behind it. */
+  .road-sign {
+    @apply relative z-10 mb-2 flex w-fit items-center gap-2 rounded-full bg-slate-700 px-3 py-1 text-xs font-semibold text-white shadow-sm;
+  }
+  .road-day + .road-day {
+    @apply mt-3;
+  }
+
+  /* Room for the snake: pins alternate either side of a centred road and the
+     cards sit outside them. Below this width both share the gutter instead. */
+  @media (min-width: 48rem) {
+    .road {
+      --pin-x: 50%;
+    }
+    .road-step--right {
+      --pin-x: 58%;
+    }
+    .road-step--left {
+      --pin-x: 42%;
+    }
+    .road-card {
+      width: 38%;
+      margin-inline-start: 0;
+    }
+    .road-step--right .road-card {
+      margin-inline-start: auto;
+    }
+    .road-step--left .road-card {
+      margin-inline-end: auto;
+    }
+    .road-sign {
+      @apply mx-auto;
+      transform: translateX(var(--sign-shift, 0px));
+    }
+  }
+
+  /* A permanently marching line is a vestibular problem. The road stays
+     drawn; it stops moving. */
+  @media (prefers-reduced-motion: reduce) {
+    .road-flow,
+    .road-band::after,
+    .road-pin--current::after {
+      animation: none;
+    }
+    .card-interactive,
+    .record-row {
+      transition: none;
+    }
+    .card-interactive:hover {
+      transform: none;
+    }
+  }
+}

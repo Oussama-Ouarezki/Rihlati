@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}No agency — Rihlati{% endblock %}
+
+{% block content %}
+  <div class="empty-state mx-auto mt-8 max-w-lg">
+    <span class="empty-state-icon" aria-hidden="true">🏢</span>
+    <h1 class="mt-3 text-lg font-semibold text-slate-900">This account is not linked to an agency</h1>
+    <p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+      Access is granted through a membership, not a role on the account.
+      Add one from <a href="/admin/" class="font-medium text-brand-700 hover:underline">Django admin</a>.
+    </p>
+    <a href="{% url 'search' %}" class="btn btn-primary mt-5">Back to all trips</a>
+  </div>
+{% endblock %}

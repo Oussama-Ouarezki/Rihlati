@@ -46,8 +46,15 @@ You want three plans with the middle one the obvious buy. The standard mechanics
 - **Business** is unlimited + prestige extras, priced high **partly so Pro looks cheap**.
   Some agencies will buy it anyway; its main job is being the anchor.
 
-The gates live in one file — `packages/shared/src/plans.ts`, yours to edit. **The DZD
-prices are your call** and don't exist in code yet.
+The gates live in one file — `apps/common/quotas.py`, yours to edit. **The DZD prices are
+your call** and don't exist in code yet.
+
+Neither, today, do most of the gates. `quotas.py` enforces exactly one thing: how many offers
+an agency may have **published** at once (5 / 30 / 200). Every other row in the plan table —
+manifest, tracked links, export, chatbot — is open to every plan, because there is no
+`has_feature(agency, …)` helper in this port yet. Deliberate for now: a feature flag written
+before anyone has paid for anything encodes a guess about what is valuable, and the guess then
+quietly shapes the product. See [[Plan Limits and Quotas]].
 
 ---
 
@@ -74,7 +81,7 @@ collecting for every agency from day one ([[Offer Analytics]]) · the **[[Trip M
 — your differentiator, reservation per family with headcount, 🟡🟢🔴 bus check-in from a
 phone, CRM→manifest bridge · **[[Tracked Links]]** — named links for your Facebook and
 Instagram posts, with the click→client number that is also your sales pitch · the web app
-itself ([[Web App]]): public marketplace + a fully self-service agency console in three
+itself ([[Templates and Pages]]): public marketplace + a fully self-service agency console in three
 languages — offers, leads, manifest, links, stats, FAQ · 178 tests.
 
 ### Next, in your chosen order
@@ -146,4 +153,5 @@ Guard-rails:
 ---
 
 Related: [[Plan Limits and Quotas]] · [[Client Quality Labels]] · [[Lead]] ·
-[[Search and Filters]] · [[API Endpoints]] · [[Decision Log]] · [[The Seven Rules]]
+[[Search and Filters]] · [[API Endpoints]] · [[Decision Log]] · [[The Seven Rules]] ·
+[[Roadmap]] · [[Milestone Plan]]

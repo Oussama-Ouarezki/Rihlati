@@ -1,0 +1,84 @@
+{% load i18n static %}
+{% comment %}
+   The assistant answers from this offer only. The markup is a real <form> with a
+   <textarea> rather than a contenteditable div: Enter/Shift+Enter, mobile
+   keyboards and screen readers all work without JavaScript reinventing them.
+
+   Every class used by the JavaScript lives in the <template> blocks below.
+   Tailwind scans templates, not static/chat.js, so a bubble built from a class
+   string inside the script would be invisible to the compiler and unstyled.
+{% endcomment %}
+<section
+  class="{% if chat_full_page %}card card-pad{% else %}mt-5 border-t border-slate-100 pt-4{% endif %}"
+  data-chat
+  data-chat-offer-id="{{ offer.id }}"
+  data-chat-url="{% url 'api:chat_about_offer' offer_id=offer.id %}"
+  data-chat-error-generic="{% translate "The assistant is temporarily unavailable. Leave your number and the agency will call you back." %}"
+  data-chat-error-rate="{% translate "Too many messages. Try again in an hour, or leave your number." %}"
+  data-chat-error-network="{% translate "Connection failed. Check your network and try again." %}"
+  data-chat-error-expired="{% translate "This conversation has expired. Ask your question again." %}"
+  data-chat-error-done="{% translate "This conversation is over. Leave your number to continue with the agency." %}"
+>
+  <div class="flex items-baseline justify-between gap-2">
+    <h2 class="text-base font-semibold text-slate-900">{% translate "Have a question?" %}</h2>
+    <span class="text-xs text-slate-500">{% translate "Agency assistant" %}</span>
+  </div>
+  <p class="mt-1 text-sm text-slate-500">
+    {% translate "Answers come from this offer only." %}
+  </p>
+
+  <div data-chat-log aria-live="polite" class="mt-3 space-y-2"></div>
+
+  <div class="mt-3 flex flex-wrap gap-2">
+    <button type="button" data-chat-ask="{% translate "What does the price include?" %}"
+            class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+      {% translate "What does the price include?" %}
+    </button>
+    <button type="button" data-chat-ask="{% translate "How many seats are left?" %}"
+            class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+      {% translate "How many seats are left?" %}
+    </button>
+    <button type="button" data-chat-ask="{% translate "Where does the trip depart from?" %}"
+            class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+      {% translate "Where does the trip depart from?" %}
+    </button>
+  </div>
+
+  <form data-chat-form class="mt-3 flex items-end gap-2">
+    <label class="sr-only" for="chat-message">{% translate "Your question" %}</label>
+    <textarea id="chat-message" name="message" rows="2" maxlength="800" required
+              class="field-input flex-1 resize-none"
+              placeholder="{% translate "Write your question…" %}"></textarea>
+    <button type="submit" data-chat-send class="btn btn-primary">
+      {% translate "Send" %}
+    </button>
+  </form>
+
+  <p data-chat-error class="mt-2 hidden text-xs text-rose-600"></p>
+  <p class="mt-2 text-xs text-slate-500">
+    {% translate "Generated automatically — confirm details with the agency." %}
+  </p>
+
+  {% if not chat_full_page %}
+    <p class="mt-3 border-t border-slate-100 pt-3 text-xs">
+      <a href="{% url 'offer-assistant' offer.id %}" class="font-semibold text-brand-700 hover:underline">
+        {% translate "Open the assistant on its own page →" %}
+      </a>
+    </p>
+  {% endif %}
+
+  <template data-chat-bubble-user>
+    <p dir="auto" class="ms-auto max-w-[85%] rounded-xl bg-brand-600 px-3 py-2 text-sm text-white"></p>
+  </template>
+  <template data-chat-bubble-bot>
+    <p dir="auto" class="me-auto max-w-[85%] whitespace-pre-line rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-800"></p>
+  </template>
+  <template data-chat-offer-card>
+    <a class="mt-1 flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50">
+      <span data-card-title class="font-medium text-slate-800"></span>
+      <span data-card-price class="shrink-0 font-semibold text-brand-700"></span>
+    </a>
+  </template>
+
+  <script src="{% static 'chat.js' %}" defer></script>
+</section>

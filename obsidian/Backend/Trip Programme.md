@@ -44,81 +44,95 @@ Same rows. Different views. That is what makes it worth building rather than thr
 One offer is one departure in this model (that is how [[Trip Manifest]] already works), so
 milestones hang off the offer.
 
-```prisma
-enum MilestoneKind {
-  meeting      // rendez-vous — the one that matters at 4am
-  transport    // bus, transfer
-  flight
-  hotel        // check-in / check-out
-  ritual       // omra, tawaf, sa'i — the point of the trip
-  ziyara       // visits
-  meal
-  free_time
-  other
-}
+`apps/offers/models.py`, trimmed to the decisions:
 
-/// Set per milestone by the agency when they build the programme. See §6.
-enum CheckpointType {
-  none        // informational only — no attendance tracked (most milestones)
-  mandatory   // must check in fresh every time — never defaults to no_show
-  optional    // attendance tracked; a no_show can default forward to the
-              // next optional checkpoint — see §6
-}
+```python
+class MilestoneKind(models.TextChoices):
+    MEETING = "meeting", "Rendez-vous"      # the one that matters at 4am
+    TRANSPORT = "transport", "Transport"    # bus, transfer
+    FLIGHT = "flight", "Vol"
+    HOTEL = "hotel", "Hôtel"                # check-in / check-out
+    RITUAL = "ritual", "Rite"               # omra, tawaf, sa'i — the point
+    ZIYARA = "ziyara", "Ziyara"
+    MEAL = "meal", "Repas"
+    FREE_TIME = "free_time", "Temps libre"
+    OTHER = "other", "Autre"
 
-model OfferMilestone {
-  id       String @id @default(uuid(7))
-  agencyId String              // denormalized tenant key (rule #3)
-  offerId  String
 
-  title       String
-  description String?
-  kind        MilestoneKind @default(other)
+# Set per milestone by the agency when they build the programme. See §6.
+class CheckpointType(models.TextChoices):
+    NONE = "none", "Aucun pointage"                 # informational only
+    MANDATORY = "mandatory", "Pointage obligatoire"  # fresh every time
+    OPTIONAL = "optional", "Pointage facultatif"     # can default forward
 
-  /// Day of the trip. 0 = departure day. Combined with Offer.departureDate
-  /// this becomes a real date WITHOUT storing one — see §4.
-  dayOffset Int     @default(0)
-  /// "04:30". Null means "sometime that day", which is honest and common.
-  timeOfDay String?
 
-  locationName String?   // "Aéroport Houari Boumediene"
-  /// The sentence a traveler reads at 4am. Be specific: "Terminal 1,
-  /// porte 3, à côté du café" — not "l'aéroport".
-  meetingPoint String?
-  mapUrl       String?   // a plain maps link; no SDK, no API key
+class OfferMilestone(UUIDModel):
+    # Denormalised tenant key (rule 3): the tenant filter never has to join,
+    # so the safe query is also the lazy query.
+    agency = models.ForeignKey(Agency, on_delete=models.CASCADE, related_name="milestones")
+    offer = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name="milestones")
 
-  sortOrder Int @default(0)
+    title = models.CharField(max_length=MILESTONE_TITLE_MAX)   # 60
+    description = models.TextField(blank=True)
+    kind = models.CharField(max_length=20, choices=MilestoneKind.choices,
+                            default=MilestoneKind.OTHER)
 
-  checkpointType CheckpointType @default(none)
+    # Day of the trip, 0 = departure day. With Offer.departure_date this
+    # renders a real date WITHOUT storing one — see §4.
+    day_offset = models.PositiveSmallIntegerField(default=0)
+    # "04:30". Empty means "sometime that day", which is honest and common.
+    time_of_day = models.CharField(max_length=5, blank=True)
 
-  /// Ticked by the agency as the trip actually happens — drives the public
-  /// "vous êtes ici" marker. Independent of per-family attendance (§6): the
-  /// group can move on even if one family is still being chased down.
-  completedAt       DateTime?
-  completedByUserId String?
+    location_name = models.CharField(max_length=150, blank=True)
+    # The sentence a traveler reads at 4am. "Terminal 1, porte 3, à côté du
+    # café" — not "l'aéroport".
+    meeting_point = models.CharField(max_length=300, blank=True)
+    map_url = models.URLField(max_length=500, blank=True)  # a link, no SDK
 
-  @@index([offerId, dayOffset, sortOrder])
-  @@index([agencyId])
-}
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    checkpoint_type = models.CharField(max_length=20, choices=CheckpointType.choices,
+                                       default=CheckpointType.NONE)
+
+    # Ticked by the agency as the trip actually happens — drives the public
+    # "vous êtes ici" marker. Independent of per-family attendance (§6): the
+    # group can move on even if one family is still being chased down.
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(User, null=True, blank=True,
+                                     on_delete=models.SET_NULL)
+
+    class Meta:
+        ordering = ["day_offset", "sort_order", "created_at"]
+        indexes = [
+            models.Index(fields=["offer", "day_offset", "sort_order"]),
+            models.Index(fields=["agency"]),
+        ]
 ```
+
+> [!note] Two limits that are schema decisions, not style ones
+> `MILESTONE_TITLE_MAX = 60` — a title that needs truncating is a title nobody can read
+> while walking through an airport, so the form shows a live counter and the cost is visible
+> while typing. `MILESTONE_MAX_PER_OFFER = 200` — the ceiling the bulk-copy operations in
+> §7.6 refuse to cross, because "duplicate this day" is one tap and a programme with 4 000
+> steps in it is one tap repeated by an accident.
 
 `Offer.description` **stays** — as a short prose introduction. The milestones become the
 programme section beneath it.
 
 ---
 
-## 4. Why `dayOffset`, not a date
+## 4. Why `day_offset`, not a date
 
 Storing an absolute datetime per milestone looks simpler and is worse:
 
 - An agency builds the programme **before** fixing the departure date, or reuses last
-  season's. `dayOffset` makes the programme a reusable template.
+  season's. `day_offset` makes the programme a reusable template.
 - When the departure moves by three days — which happens — you would otherwise edit twelve
   rows by hand and get one wrong.
-- With `Offer.departureDate` set, `dayOffset + timeOfDay` renders as a real date. One
+- With `Offer.departure_date` set, `day_offset + time_of_day` renders as a real date. One
   source of truth, no drift.
 
 > [!note] Timezone
-> `timeOfDay` is **local to where the traveler is standing** — Algiers for the departure,
+> `time_of_day` is **local to where the traveler is standing** — Algiers for the departure,
 > Saudi time once there. Do not convert. A programme that says "04:30" must say 04:30 to
 > everyone reading it, and quietly shifting it by an hour is how people miss a bus.
 > Store the string; label the day with the destination when it differs.
@@ -130,7 +144,7 @@ Storing an absolute datetime per milestone looks simpler and is worse:
 A traveler has usually **not got an account** (that is deliberate — [[Lead]] works without
 one). So the trip page cannot be behind a login.
 
-**Capability URL:** each [[Trip Manifest|Reservation]] gets a random `publicCode`, and
+**Capability URL:** each [[Trip Manifest|Reservation]] gets a random `public_code`, and
 `/mon-voyage/{code}` shows that traveler their trip. The agency sends the link once, by
 WhatsApp, on confirmation.
 
@@ -161,7 +175,7 @@ still booked" ([[Trip Manifest|Reservation.status]], untouched by any of this): 
 *"did this specific family show up to THIS specific stop"*, asked again at every stop that
 matters.
 
-**`checkpointType` is set per milestone, by the agency, when they build the programme** —
+**`checkpoint_type` is set per milestone, by the agency, when they build the programme** —
 so it is exactly as customizable as the milestone list itself. Most milestones stay `none`
 (no attendance tracked at all — a ziyara description, a meal). The agency marks the stops
 that need a headcount as `mandatory` or `optional`:
@@ -186,28 +200,41 @@ existing manifest.
 > to `checked_in` the moment they show up again, and that only affects that one checkpoint.
 > `mandatory` checkpoints never inherit this — they always start fresh at `expected`.
 
-```prisma
-/// One family's attendance at ONE checkpoint milestone. Created lazily — the
-/// first time a guide opens that checkpoint's list for that family — never
-/// pre-created for every reservation, so adding a checkpoint mid-trip needs
-/// no backfill.
-model MilestoneCheckIn {
-  id            String @id @default(uuid(7))
-  agencyId      String              // denormalized tenant key
-  milestoneId   String
-  reservationId String
+`apps/trips/models.py`:
 
-  status ReservationStatus @default(expected)   // reuses the manifest's enum
+```python
+class MilestoneCheckIn(UUIDModel):
+    """One family's attendance at ONE checkpoint.
 
-  checkedInAt       DateTime?
-  checkedInByUserId String?
+    Rows are created lazily — the first time a guide opens a checkpoint's list —
+    so adding a checkpoint mid-trip needs no backfill.
+    """
 
-  @@unique([milestoneId, reservationId])
-  @@index([agencyId])
-  @@index([reservationId])
-  @@index([milestoneId, status])
-}
+    agency = models.ForeignKey(Agency, on_delete=models.CASCADE)   # tenant key
+    milestone = models.ForeignKey(OfferMilestone, on_delete=models.CASCADE)
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE)
+
+    # Reuses the manifest's own vocabulary — see [[Trip Manifest]].
+    status = models.CharField(max_length=20, choices=AttendanceStatus.choices,
+                              default=AttendanceStatus.EXPECTED)
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(User, null=True, blank=True,
+                                      on_delete=models.SET_NULL)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["milestone", "reservation"],
+                                    name="one_checkin_per_family_per_checkpoint"),
+        ]
+        indexes = [
+            models.Index(fields=["agency"]),
+            models.Index(fields=["milestone", "status"]),
+        ]
 ```
+
+The unique constraint is the whole safety of the lazy creation: two guides opening the same
+checkpoint on two phones at the same moment cannot produce two rows for one family, and the
+one that loses the race reads the row the other just wrote.
 
 See [[Decision Log]] #019 for why `Reservation.status` was deliberately left alone rather
 than redefined to carry this.
@@ -222,7 +249,7 @@ than redefined to carry this.
 > and one answer — what happens next.
 >
 > Same rows, two products. The agency keeps the list editor at
-> `/console/offers/{id}/programme`. Every client-facing surface gets the **programme map**
+> `/a/{agency}/offers/{id}/programme/`. Every client-facing surface gets the **programme map**
 > below. Building one component for both audiences was tried on paper and rejected: the
 > shared thing would have been a list with half its columns hidden, which serves neither.
 
@@ -265,12 +292,12 @@ Why each piece is the way it is:
 
 ### 7.2 The current node — "vous êtes ici"
 
-The first milestone the agency has **not ticked off** (`completedAt IS NULL`). Computed
+The first milestone the agency has **not ticked off** (`completed_at IS NULL`). Computed
 server-side, in `TripsService`.
 
 > [!note] Why not the clock?
 > A programme says 04:30, but the bus leaves when the bus leaves. Deriving "where we are"
-> from `departureDate + dayOffset + timeOfDay` would confidently announce that a delayed
+> from `departure_date + day_offset + time_of_day` would confidently announce that a delayed
 > group had already boarded. The agency ticking a step is a deliberate act by somebody who
 > is standing there; the clock is a guess. See also §4 on why times are never converted.
 
@@ -284,14 +311,21 @@ A buyer on the offer page passes no current node — the trip has not started, s
 
 ### 7.3 Title length is a schema decision, not a style one
 
-`MILESTONE_TITLE_MAX = 60`, enforced in the shared Zod schema and mirrored into the console
-form's `maxLength` from the same constant.
+`MILESTONE_TITLE_MAX = 60` is declared once, in `apps/offers/models.py`, and imported by
+every place that enforces it: the column itself (`title = models.CharField(max_length=...)`),
+the Pydantic schema `MilestoneIn` in `apps/offers/api.py`, and the console form's `maxlength`
+attribute in `apps/pages/forms.py`. Three doors, one number — the reason it lives on the model
+instead of being retyped in each is [[One Rule, Two Entry Points]].
 
 Agencies write long descriptive titles by habit. On a node tile a long title is an
 unreadable smear, and truncating it at render just hides the problem after the fact. A title
 that needs truncating is a title nobody can read while walking through an airport — the rest
-belongs in `description`, which the traveler opens with one tap. The form shows a live
-counter that turns orange near the limit, so the cost is visible while typing.
+belongs in `description`, which the traveler opens with one tap.
+
+> [!note] The live counter is not built
+> The browser's own `maxlength` stops the typing, silently: the field simply refuses the
+> 61st character with no explanation. A counter that turns orange near the limit would make
+> the cost visible while typing. Small, and not done.
 
 ### 7.4 Traveler's live view — `/mon-voyage/{code}`
 
@@ -327,26 +361,41 @@ page on the site where being findable is a bug.
 
 The traveler page is useless if nobody reaches it, so the link lives on the manifest row,
 next to the family it belongs to: a WhatsApp button pre-filled with the message and the URL,
-plus a preview link for the agent. A reservation created before `publicCode` existed shows
+plus a preview link for the agent. A reservation created before `public_code` existed shows
 "créer le lien" instead, which mints one — see the idempotency note in [[API Endpoints]].
 
-### 7.6 Agency editor — `/console/offers/{id}/programme`
+### 7.6 Agency editor — `/a/{agency}/offers/{id}/programme/`
 
 - Add / reorder (**drag a row**, or the up-down buttons — the drag is a shortcut, the
   buttons are the path that works on a touchscreen and by keyboard) / delete
 - Each row: kind (icon), title, day, time, location, meeting point, map link,
   **attendance tracking: off / mandatory / optional**
-- **Duplicate a day** — Omra programmes repeat, and retyping five identical days is how
-  agencies give up on a feature
+Two bulk actions sit **above** the add form, because on an empty programme the fastest route
+to a finished one is copying last season's, and an agency that has started typing step 1 by
+hand will never scroll back up to discover that:
+
+- **Duplicate a day** — pick a source day and a target day. Omra programmes repeat, and
+  retyping five identical days is how agencies give up on a feature. The target is *explicit*,
+  not "the next day": the console proposes source + 1 because that is the order agencies build
+  in, but the server never guesses. Only days that already have steps are offered as a source
+  — a button that can only fail is worse than no button.
 - **Copy the programme from another offer** — the single biggest time-saver, because next
-  season's Ramadan trip is last season's with new dates
+  season's Ramadan trip is last season's with new dates. Because `day_offset` is a *relative*
+  integer (§4), the whole shape transplants with no date arithmetic at all; that is the payoff
+  for that decision.
+
+Both are **additive**. They append to the end of the target and never move or delete an
+existing step, so an unwanted copy is undone by deleting the new rows. Copies keep
+`checkpoint_type` — it is part of the plan being copied — and drop `completed_at`: a copied step
+has not happened yet. Both stop at 200 steps per offer (`MILESTONE_MAX_PER_OFFER`) with a
+translated message. See [[Decision Log]] 029 for the alternatives that lost.
 
 ### 7.7 Agency live view — ticking milestones and checking people off
 
 Lives beside the [[Trip Manifest]] check-in screen, same design rules: one hand, bad light,
 big targets. Two related but separate taps:
 
-- Tick "Départ vers l'aéroport" as **done** (the milestone-level `completedAt`) → every
+- Tick "Départ vers l'aéroport" as **done** (the milestone-level `completed_at`) → every
   traveler's page advances to the next step at once.
 - Open a **checkpoint** milestone → the same thumb-sized, colour-coded family list as the
   manifest, scoped to just that stop. Tapping a family checks them in for *this* checkpoint
@@ -356,32 +405,30 @@ big targets. Two related but separate taps:
 
 ## 8. Build order
 
-1. ~~`OfferMilestone` + `MilestoneCheckIn` models, migration, shared enums~~ — **BUILT**
-   (2026-08-01). `packages/shared/src/milestones/schemas.ts`.
-2. ~~Agency CRUD endpoints for milestones~~ — **BUILT** (2026-08-01).
-   `apps/api/src/modules/milestones/milestones.{controller,service}.ts`. Tenant-isolation
-   test in `apps/api/test/milestones.e2e.test.ts`.
-3. ~~Checkpoint attendance endpoints~~ — **BUILT** (2026-08-01).
-   `checkpoint-attendance.{controller,service}.ts` — lazy row creation, the
-   optional-carries-forward default and the mandatory-never-defaults rule from §6, both
+1. ~~`OfferMilestone` + `MilestoneCheckIn` models and migration~~ — **BUILT**.
+   `apps/offers/models.py`, `apps/trips/models.py`.
+2. ~~Agency CRUD endpoints for milestones~~ — **BUILT**. `apps/offers/api.py`, manager-level.
+   Tenant-isolation tests in `apps/offers/tests.py`.
+3. ~~Checkpoint attendance endpoints~~ — **BUILT**. `apps/trips/api.py` — lazy row creation,
+   the optional-carries-forward default and the mandatory-never-defaults rule from §6, both
    covered by tests including the "push them back" case.
-4. ~~Public read: milestones on the offer detail response~~ — **BUILT** (2026-08-02).
-   `OfferDetail.milestones`, buyer-shaped via `toBuyerMilestone`.
-5. ~~The programme map component~~ — **BUILT** (2026-08-02).
-   `apps/web/src/components/ProgrammeMap.tsx`, used by both client surfaces. §7.1.
-6. The console editor's remaining time-savers: duplicate-day and copy-from-offer.
-   (The editor itself, with the attendance-tracking toggle, is built.)
-7. ~~`Reservation.publicCode` + `/mon-voyage/{code}` traveler page~~ — **BUILT** (2026-08-02).
-   Migration `20260802100000_reservation_public_code`, `TripsService`, and the page at
-   `apps/web/src/app/[locale]/mon-voyage/[code]/page.tsx`. Security tests in
-   `apps/api/test/trips.e2e.test.ts`.
-8. ~~Tick-off in the console + the "vous êtes ici" marker~~ — **BUILT** (2026-08-02).
-   `POST .../milestones/{id}/completion`, member-level (§7.2 and open question 3).
-9. *Later:* notify travelers when a milestone completes (needs task #18 notifications)
+4. ~~Public read: milestones on the offer detail response~~ — **BUILT**.
+   `OfferDetailOut.milestones`, buyer-shaped so the CRM fields cannot leak into it.
+5. ~~The shared programme timeline~~ — **BUILT**. `templates/pages/_programme.html`, included
+   by the public offer page, the traveler page and the agency editor. §7.1.
+6. ~~The editor's time-savers: duplicate-day and copy-from-offer~~ — **BUILT**.
+   `POST …/milestones/duplicate-day`, `POST …/milestones/copy-from`, and the two forms in
+   `templates/pages/agency_programme.html`. §7.6 and [[Decision Log]] 029.
+7. ~~`Reservation.public_code` + `/mon-voyage/{code}` traveler page~~ — **BUILT**.
+   `apps/trips/models.py`, `apps/pages/views.py::my_trip`, `templates/pages/my_trip.html`.
+   Security tests — wrong code 404s, a second family never appears — in `apps/pages/tests.py`.
+8. ~~Tick-off in the editor + the "vous êtes ici" marker~~ — **BUILT**.
+   `POST …/milestones/{id}/complete`, member-level (§7.2 and open question 3).
+9. *Later:* notify travelers when a milestone completes (needs the notifications work)
 
-**Next:** item 6 — duplicate-day and copy-from-offer in the editor. Retyping five identical
-Omra days is how an agency gives up on this feature, and next season's Ramadan trip is last
-season's with new dates.
+**Next:** item 9 — notifying travelers when a milestone completes. It is the one piece that
+turns "vous êtes ici" from something a family has to open the page to discover into something
+that reaches them. It is blocked on the notifications work (task #18), not on this feature.
 
 ---
 
@@ -415,17 +462,17 @@ season's with new dates.
    around at 4am. Pinned by a test (an agent can tick off, but gets 403 renaming a step).
 4. ~~**Should a traveler be able to see the programme before booking, with meeting points
    hidden?**~~ — **decided provisionally on 2026-08-02: yes, hidden.** A buyer sees the whole
-   programme; `meetingPoint` and `mapUrl` come back `null` until they have a booking
+   programme; `meeting_point` and `map_url` come back `null` until they have a booking
    (`toBuyerMilestone` vs `toTravelerMilestone`, and a test pins both). The reasoning: a
    meeting point only matters once you are going, and publishing "parking de l'agence, 4h30,
    devant l'entrée" on an indexable page hands a competitor the agency's routine and hands
    anyone else a place to stand. **This is still your call** — it is two words in one mapper
    to reverse, and the pre-purchase view is genuinely less useful without them.
-5. **Should the editor suggest a default `checkpointType` by `kind`** (e.g. `flight`/
+5. **Should the editor suggest a default `checkpoint_type` by `kind`** (e.g. `flight`/
    `transport` pre-checked as `mandatory`)? Saves a step for the common case; a wrong
    suggestion silently accepted is also how a real mandatory stop ends up `none`.
 
 ---
 
-Related: [[Trip Manifest]] · [[Offer]] · [[Lead]] · [[Interface Plan]] · [[Web App]] ·
+Related: [[Trip Manifest]] · [[Offer]] · [[Lead]] · [[Interface Plan]] · [[Templates and Pages]] ·
 [[API Endpoints]] · [[Decision Log]] · [[The Seven Rules]]

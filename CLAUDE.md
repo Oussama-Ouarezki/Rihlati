@@ -1,191 +1,187 @@
-# Rihlati — Travel Agency Marketplace (Algeria)
+@AGENTS.md
+# Rihlati — Travel Agency Marketplace (Algeria) · Django edition
 
-Two-sided marketplace + CRM. Travelers discover verified travel-agency offers (Omra, Hajj,
-organized trips, visa help). Agencies receive qualified leads and manage them in a built-in CRM.
-Think "Emploitic, but for voyages."
+Two-sided marketplace + CRM. Travelers find verified agency offers (Omra, Hajj, organized trips,
+visas); agencies get qualified leads and work them in a built-in CRM. "Emploitic, but for voyages."
 
-**Status:** greenfield. No monetization in v1 — but every schema decision must not block it later.
+**Status:** greenfield, no monetization in v1 — but no schema decision may block it later.
+**Stack:** Django + **django-ninja** (not DRF) serving the JSON API, plus server-rendered HTML from
+the same models. No separate frontend app. This is the same product as the NestJS/Prisma repo on a
+second stack; when you explain something, say whether it's backend design or stack trivia.
 
 ---
 
 ## THE SEVEN RULES
 
-These are non-negotiable. They exist because AI-built apps fail the same seven ways every time.
-Violating one is a bug, not a style preference. Check them before saying any task is done.
+Non-negotiable. Violating one is a bug, not a style preference.
 
-### 1. No secrets in code, ever
-- Secrets live in `.env` (gitignored) and in the host's secret manager in production.
-- `.gitignore` must cover `.env*` **before the first commit**. Only `.env.example` is committed,
-  with empty values.
-- Nothing prefixed `NEXT_PUBLIC_` / `EXPO_PUBLIC_` may hold a secret. Those ship to the browser.
-- Any key that has ever touched a commit is burned. Rotate it, don't reuse it.
-- Before every push: `git diff --staged | grep -iE "sk-|secret|password|api[_-]?key|BEGIN.*PRIVATE"`
+**1 — No secrets in code.** Secrets live in `.env` (gitignored) and the host's secret manager.
+Only `.env.example` is committed, with empty values. `config/settings.py` reads every secret via
+`os.environ`. Never put a secret in a template context — anything rendered ships to the browser.
+A key that has touched a commit is burned; rotate it.
 
-### 2. The UI is never the security
-Hiding a button is a UX choice, not a permission. **Every endpoint authorizes itself, server-side.**
-- No endpoint is public unless explicitly marked so. Auth is deny-by-default at the router level.
-- Role checks (`traveler` / `agency_agent` / `agency_owner` / `admin`) happen in a guard on the
-  server, never inferred from a request body or header the client controls.
-- Never trust client-sent `userId`, `agencyId`, `role`, or `price`. Derive them from the session.
+**2 — The UI is never the security.** Every endpoint authorizes itself, server-side.
+Deny-by-default is set once on the `NinjaAPI` instance in `config/api.py` (`auth=API_AUTH`), so
+forgetting to write anything gives you a *locked* route. `auth=None` is the only exit and grepping
+it lists the entire public surface. HTML pages get `@login_required` / `LoginRequiredMixin` — two
+entry points into the same models means two places to get authz wrong, so guard and test both.
+Roles (`traveler` / `agency_agent` / `agency_owner` / `admin`) are checked in code, never inferred
+from a body, query param, or header. Never trust a client-sent `user_id`, `agency_id`, `role`, or
+`price` — derive them from `request.user` and the URL segment you already authorized.
 
-### 3. Tenant isolation is enforced in the data layer
-"One user can see another user's data" is the #1 marketplace-killer. Structural defense:
-- Every tenant-scoped table has a non-null `agency_id`.
-- **Every query is scoped by the session's tenant.** No raw `findUnique({ id })` on tenant data —
-  always `findFirst({ where: { id, agencyId: session.agencyId } })`.
-- A missing row and a forbidden row both return `404`. Never leak existence.
-- IDs are UUIDv7 or CUID, never sequential integers.
-- Required test for every tenant-scoped resource: create as Agency A, fetch as Agency B, assert 404.
-  A feature without this test is not done.
+**3 — Tenant isolation lives in the data layer.** "One user sees another's data" is the
+marketplace-killer.
+- Every tenant-scoped model has a non-null `agency` FK.
+- Never `Model.objects.get(pk=...)` on tenant data. Use `scoped()` / `get_scoped_object()` and
+  `require_membership_or_404()` from `apps/common/tenancy.py` rather than re-deriving per view.
+- Missing row and forbidden row both return **404**. Never leak existence.
+- IDs are UUIDs (`UUIDModel` in `apps/accounts/models.py`), never sequential ints.
+- **Required per resource:** create as Agency A, fetch as Agency B, assert 404. No test, not done.
 
-### 4. Errors and logs exist from day one
-- Sentry (or GlitchTip self-hosted) wired into API, web, and mobile **before** the first real user.
-- Structured JSON logs with a `requestId` on every request; propagate it to the client response.
-- Never log tokens, passwords, OTP codes, full phone numbers, or payment identifiers.
-- An unhandled 500 is an incident. A handled error returns a typed, translated error code.
+**4 — Errors and logs from day one.** Sentry/GlitchTip wired before the first real user. Structured
+JSON logs with a `request_id` echoed to the client (`apps/common/errors.py::envelope`). Never log
+tokens, passwords, OTP codes, full phone numbers, or payment ids. A handled error returns a typed,
+translated `code` the client switches on — never the human string. An unhandled 500 is an incident.
+`DEBUG` is an env var precisely because `DEBUG=True` in prod leaks settings, SQL, and environment.
 
-### 5. Backups are only real once restored
-- Managed Postgres with PITR. Nightly logical dump to separate object storage.
-- A restore is rehearsed into a scratch database **before launch**, and quarterly after.
-  The runbook is `obsidian/Runbooks/Restore From Backup.md`, with the last-verified date.
-- Untested backups are hope, not backups.
+**5 — Backups are only real once restored.** Managed Postgres + PITR, nightly dump to separate
+object storage, restore rehearsed into a scratch DB before launch and quarterly after
+(`obsidian/Runbooks/Restore From Backup.md`, with last-verified date). SQLite is local-dev only;
+nothing may depend on SQLite-only behaviour.
 
-### 6. Money never comes from the client
-Applies the moment monetization ships.
-- Prices, plan tiers, and lead costs are read from the **database**, server-side. The client sends
-  an item ID, never an amount.
-- Every payment webhook verifies its signature and is idempotent (dedupe on provider event id).
-- Payment state changes only on a verified webhook, never on a client "success" redirect.
-- Note: Stripe does not operate in Algeria. Rails will be local (CIB/Edahabia via a local PSP,
-  plus manual CCP/BaridiMob transfer confirmation). Verify current provider terms before building.
+**6 — Money never comes from the client.** Prices, tiers, and lead costs are read from the DB
+server-side; the client sends an item ID, never an amount. Payment webhooks verify their signature
+and are idempotent (dedupe on provider event id). State changes on a verified webhook only, never
+on a client "success" redirect. Stripe does not operate in Algeria — rails will be local
+(CIB/Edahabia via a local PSP, plus manual CCP/BaridiMob). Verify provider terms before building.
 
-### 7. Nothing changes silently
-- Typecheck + lint + tests run in CI on every PR. Red CI blocks merge.
-- Playwright covers the five pages that matter: search, offer detail, inquiry submission,
-  agency lead inbox, login. Screenshot/visual assertions on each.
-- Migrations are reviewed by hand. No destructive migration without an explicit written plan.
-- When editing, change what was asked. If a fix requires touching unrelated code, say so first.
+**7 — Nothing changes silently.** Lint + tests in CI on every PR; red CI blocks merge. The five
+pages that matter (search, offer detail, inquiry submit, agency lead inbox, login) have test-client
+tests asserting on rendered content, not just status codes. Read every migration by hand before
+committing it; no destructive migration without a written plan. `makemigrations --check --dry-run`
+runs in CI. When editing, change what was asked — if a fix needs unrelated code, say so first.
+
+### Enforced mechanically
+
+| Rule | By |
+|---|---|
+| 1 | `.gitignore`; `secrets` job in `.github/workflows/ci.yml` scans full history; `tests_house_rules.py::SecretsTests` |
+| 2 | `auth=API_AUTH` on the `NinjaAPI` in `config/api.py`; `AuthorizationTests` pins the exact list of `auth=None` routes |
+| 3 | `apps/common/tenancy.py`; `TenantScopeTests` + `MembershipCheckTests` ban unscoped `.objects.get(`; cross-tenant tests in `apps/offers/tests.py`, `apps/pages/tests.py` |
+| 4 | `register_exception_handlers` in `apps/common/errors.py`; `LoggingTests` bans a raw phone in a log call |
+| 6 | `MoneyTests` bans `FloatField` anywhere |
+| 7 | `./scripts/check.sh` = lint + format + django checks + missing-migration + tests. CI runs that same script. |
+
+`apps/common/tests_house_rules.py` is this repo's answer to custom ESLint rules: an `ast` visitor in
+the test suite, readable in a minute, pointing at the exact file and line. **When a mistake happens
+twice, add a check there instead of a comment.**
 
 ---
 
-## How these rules are enforced mechanically
+## Working agreements
 
-Prefer adding a check here over trusting anyone to remember:
+- **Ask before assuming** on product/business logic. Guessing produces confident, wrong code.
+- **Small, reviewable changes.** One app or one vertical slice per task.
+- **Validate at the boundary.** Every body/query/param goes through a `ninja.Schema` or a Django
+  form first. Input schemas inherit `Strict` from `apps/common/schemas.py` (`extra="forbid"`),
+  because silently-ignored unknown fields are where privilege-escalation bugs hide.
+- **A rule is written once.** Shared validation lives in `apps/common/validators.py` and is imported
+  by both the schema and the HTML form. Written twice = will disagree with itself.
+- **Rate limiting is per source, never per account.** Account lockout hands an attacker a DoS button
+  aimed at your own users. Rates live in `apps/common/throttling.py` (currently login `10/15m`,
+  refresh `30/15m`, inquiry `20/1h`). Every public write route carries a throttle.
+- **No bare `except:`. No `# type: ignore` without a written reason.** A swallowed exception is a
+  500 you never hear about.
+- **Every new endpoint ships with:** auth/role check, input schema, tenant-isolation test, and an
+  entry in `obsidian/Backend/API Endpoints.md`.
+- **Never invent an Algerian legal, tax, or payment fact.** Flag it: "verify this."
 
-| Rule | Enforced by |
+## Before saying a task is done
+
+Answer these four out loud, briefly — they are the review, not decoration:
+
+1. **Is this the most secure way?** Authz server-side, tenant-scoped query, input rejected at the
+   boundary, no secret introduced, nothing sensitive logged.
+2. **Is this the most efficient way?** No N+1 (`select_related`/`prefetch_related`), an index behind
+   every filter and ordering, no query inside a loop, no full-table count on a hot path.
+3. **What regression could this introduce?** Name the blast radius: what else reads this model,
+   this queryset, this template, this migration.
+4. **What must be tested before shipping?** Name the tests, then run `./scripts/check.sh`.
+
+Done = lint passes, tests pass (including tenant isolation), no missing migration, no secret,
+endpoint authorizes server-side, errors reach Sentry, vault note is true, strings translatable.
+**Anything less — say what's missing.** Never report done on a partial result.
+
+## Pre-ship security pass
+
+Run before any launch or public deploy, and after any auth/payment change. Each line is a task for
+the matching sub-agent below:
+
+1. Rate limiting on every endpoint that a stranger can reach; auth routes throttled per source.
+2. Scan the whole codebase (and git history) for hardcoded API keys, tokens, passwords.
+3. All sensitive config in env vars — nothing exposed in a template, a `<script>`, or a commit.
+4. All user input sanitized; oversized and malformed payloads rejected at the boundary.
+5. Full security audit — report remaining vulnerabilities, ranked, with file and line.
+
+## Sub-agents
+
+Use these for scoped, repeatable *tasks* — they keep the audit's file-reading out of the main
+context. Definitions in `.claude/agents/`.
+
+| Agent | Use for |
 |---|---|
-| 1 — secrets | `.gitignore`; the `secrets` job in `.github/workflows/ci.yml` scans full history |
-| 2 — server-side authz | `JwtAuthGuard` registered globally in `AppModule`; `@Public()` is the only exit |
-| 3 — tenant isolation | `AgencyMembershipGuard` fires on any route with `:agencyId`; ESLint bans `findUnique`/`update` on tenant tables; `apps/api/test/tenant-isolation.e2e.test.ts` |
-| 4 — logs | `AppLogger` redacts at the exit; ESLint bans logging a raw phone number |
-| 7 — nothing silent | `npm run check` = build shared + typecheck + lint + test, and CI runs it |
+| `security-audit` | The five pre-ship items above. Read-only, reports findings; does not edit. |
+| `tenant-isolation-test` | Writing/checking the cross-tenant 404 test for a new resource. |
+| `preflight` | Running `./scripts/check.sh` and diagnosing what failed. |
+| `vault-sync` | Making `obsidian/` true again after a code change. |
 
-The three custom ESLint rules in `eslint.config.mjs` each encode a bug that already happened.
-When a mistake gets made twice, add a rule rather than a comment.
+Do the actual feature work in the main thread — that is where Oussama is watching and learning.
+Delegate the mechanical sweeps.
+
+---
 
 ## The documentation vault — `obsidian/`
 
-`obsidian/` is an Obsidian vault and it is **how the owner learns this codebase**. He reads
-it and asks questions against it, so it is a deliverable, not a nice-to-have. Treat it with
-the same standard as code.
+This is how the owner learns the codebase. It is a deliverable, held to the standard of code, and
+updated **in the same change as the code**:
 
-**Keeping it true is part of every task, in the same change as the code:**
-
-| When you change | Update |
+| Changed | Update |
 |---|---|
-| `prisma/schema.prisma` | the matching note in `obsidian/Data Model/` |
-| a business rule (quotas, ranking, statuses) | the matching note in `obsidian/Backend/` |
-| an endpoint's shape or permissions | `obsidian/Backend/API Endpoints.md` |
-| a decision with alternatives | append to `obsidian/Decisions/Decision Log.md` |
-| anything a beginner would find surprising | say so where it lives |
+| `apps/*/models.py` | matching note in `obsidian/Data Model/` |
+| a business rule (quotas, ranking, statuses) | matching note in `obsidian/Backend/` |
+| endpoint shape or permissions | `obsidian/Backend/API Endpoints.md` |
+| a decision with real alternatives | append to `obsidian/Decisions/Decision Log.md` |
 
-Rules for writing in the vault:
-- **Explain why, not what.** The code says what. If a note only restates the code, delete it.
-- Plain language. Define jargon on first use, or link `[[Glossary]]`.
-- Use `[[wikilinks]]` between notes — that is how he navigates. Note names are unique across
-  folders, so link by name alone.
-- Every note about a feature ends with an **open questions** section naming what is still
-  the owner's decision. Do not invent an answer to a business question.
-- When a design was chosen over a real alternative, record the alternative and why it lost.
-  A bug that was found and fixed is worth a sentence — that is how the same mistake stops
-  recurring.
-- Never put secrets, real user data, or real phone numbers in a note.
+Writing rules: explain **why, not what** (a note that restates the code should be deleted); plain
+language, jargon defined on first use or linked to `[[Glossary]]`; `[[wikilinks]]` between notes
+(names are unique across folders, so link by name); every feature note ends with **open questions**
+naming what is still the owner's call — never invent an answer to a business question; record the
+alternative that lost and why; a bug found and fixed is worth a sentence. No secrets, real user
+data, or real phone numbers. Notes marked **Designed, not built here** exist in the NestJS repo but
+not this one — keep the banner honest, don't delete the note.
+**If a note contradicts the code, the code is right and the note is a bug.**
 
-If a note contradicts the code, the code is right and the note is a bug — fix it.
+## Teaching plan
 
-## Working agreements for Claude
+Oussama is learning backend engineering here (aiming at wiring LLMs into real backends later); he
+watches rather than types. Build one vertical slice at a time and narrate each layer. At these
+moments, **stop and go deep** — even if it "was covered conceptually already":
 
-- **Ask before assuming** on product/business logic. Guessing here produces confident, wrong code.
-- **Small, reviewable changes.** One module or one vertical slice per task.
-- **Types are the contract.** Shared Zod schemas define API input/output; both server and clients
-  import them. No hand-written duplicate interfaces.
-- **Validate at the boundary.** Every request body/query/param parses through a schema before
-  touching a handler. Reject unknown fields.
-- **No `any`. No `// @ts-ignore`.** If types fight you, the model is wrong — fix the model.
-- **Every new endpoint ships with:** an authz guard, input validation, a tenant-isolation test,
-  and an entry in the API docs.
-- **Never invent an Algerian legal, tax, or payment fact.** Flag it and say "verify this."
-- Explain the *why* in plain language when a decision is architectural — the owner is learning.
+| Trigger | Teach | Note |
+|---|---|---|
+| First URLconf + view + queryset | URLconf is the door, view is the brain, ORM is the hands. Django folds Nest's controller+service into one view; when a view stops being about HTTP, that logic moves to a model method or manager. | `Concepts/What the API Is.md` |
+| First `.filter(agency_id=...)` | Scope every query by session, never trust a client id, missing and forbidden both 404. The reason the API layer exists. | `Concepts/Multi-Tenancy.md` |
+| First schema/form validation | Input is hostile at the boundary; unknown keys are dropped silently unless you forbid them — the same discipline later stops a malformed LLM tool-call from corrupting data. | `Concepts/Validation at the Boundary.md` |
+| First auth check | Authentication (who you are) vs authorization (what you may do) become two actual lines. Django gives you the first for free, which is why people never notice the second. | `Concepts/Authentication vs Authorization.md` |
+| Schema past ~2 models | Relations, `related_name`, column vs `JSONField`. | `Data Model/Data Model Overview.md` |
 
-## What Oussama is actually learning here
+Everything else — search, quotas, ratings, client labels, payments, i18n/RTL, backups — build
+correctly, give the business reason in one sentence, don't stop to teach unless asked.
 
-He's building Rihlati to learn backend engineering, with an eye toward eventually offering
-AI-automation services to businesses (an "AI agency" model — wiring LLMs into real backends
-so they can act on real data, not just chat). Rihlati's own domain rules are the vehicle, not
-the point.
+## Language & locale (architectural)
 
-Build features piece by piece (see "Small, reviewable changes" above), one vertical slice at
-a time, and narrate each layer as it's written — he's watching and asking questions to learn
-NestJS, not typing it himself yet. Use the build order below as the actual teaching plan: when
-a task hits one of these moments, that is the point to slow down, explain it thoroughly, and
-check he's following before moving on — not to front-load the explanation earlier or skip past
-it because "we covered this conceptually already."
-
-**When you write the first controller + service + Prisma call (any endpoint, even the
-simplest read):** stop and walk through why the split exists — controller is the door,
-service is the brain, Prisma is the hands. This is the transferable "how to design a backend"
-skill, not a NestJS-only detail. Every endpoint after this one should feel like a repeat of
-the same shape, so make sure it lands here, at the first one.
-→ `obsidian/Concepts/What the API Is.md`
-
-**When you write the first tenant-scoped query (any `findFirst({ where: { id, agencyId }})`):**
-stop and go deep. This is the pattern that repeats in every SaaS backend he'll ever build:
-scope every query by session, never trust a client-sent id, missing and forbidden both return
-404. Don't let this one pass as "just another query" — it's the reason the API layer exists
-at all.
-→ `obsidian/Concepts/Multi-Tenancy.md`
-
-**When you add the first `@Body()` DTO / Zod schema validation on an endpoint:** explain why
-input is treated as hostile at the boundary, and flag explicitly that this same discipline is
-what will later keep an LLM tool-call from corrupting data — malformed input from an agent is
-guaranteed, not just possible.
-→ `obsidian/Concepts/Validation at the Boundary.md`
-
-**When you write the first auth guard (login, JWT, session check):** this is where
-authentication (who are you) and authorization (what are you allowed to do) stop being an
-abstract distinction and become two lines of actual code — point at both, don't conflate them.
-→ `obsidian/Concepts/Authentication vs Authorization.md`
-
-**When the schema grows past one or two tables:** enough to explain relations and why a
-column is a column vs. JSON `attributes`, not more. This is "understand schema design in
-general," not "memorize Rihlati's tables."
-→ `obsidian/Data Model/Data Model Overview.md`
-
-**Everything else — search, quotas, ratings, client labels, payments, i18n/RTL, backups:**
-build them correctly per the seven rules, mention the business reasoning in a sentence, but
-don't stop to teach. These are Rihlati-specific or launch-specific, not part of the
-transferable skill set he's after right now — unless he asks.
-
-## Language & locale (architectural, not cosmetic)
-
-- Arabic + French from day one. Arabic is RTL: use logical CSS properties (`margin-inline-start`,
-  not `margin-left`) everywhere. Retrofitting RTL is a rewrite.
-- No hardcoded user-facing strings. Ever. All copy goes through i18n keys.
-- Money is DZD, stored as **integer centimes**. Never floats for money.
-- Phone numbers stored E.164 (`+213...`). Dates stored UTC, displayed Africa/Algiers.
-
-## Definition of done
-
-A task is done when: types pass, lint passes, tests pass (including the tenant-isolation test),
-no secret was introduced, the endpoint authorizes server-side, errors report to Sentry,
-and user-facing strings are translated. Anything less — say what's missing.
+Arabic + French from day one. Arabic is RTL: **logical CSS properties only** (`margin-inline-start`,
+never `margin-left`) — retrofitting RTL is a rewrite. No hardcoded user-facing strings, ever; all
+copy through `{% translate %}` / `gettext`. Money is DZD stored as **integer centimes** in a
+`BigIntegerField` — never `FloatField`, never a Python `float` in or out. Phones E.164 (`+213…`),
+datetimes UTC (`USE_TZ = True`), displayed Africa/Algiers.

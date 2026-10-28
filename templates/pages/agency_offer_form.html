@@ -1,0 +1,41 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}{% if offer %}Edit offer{% else %}New offer{% endif %} — {{ agency.name }}{% endblock %}
+
+{% block agency_content %}
+  <nav class="flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+    <a href="{% url 'agency-offers' agency.id %}" class="hover:text-brand-700">Offers</a>
+    <span aria-hidden="true">/</span>
+    <span class="text-slate-700">{% if offer %}Edit{% else %}New{% endif %}</span>
+  </nav>
+
+  <header class="page-header mt-4">
+    <div>
+      <p class="eyebrow">Catalogue</p>
+      <h2 class="page-title">{% if offer %}Edit offer{% else %}New offer{% endif %}</h2>
+      <p class="page-lede">A clear title, an honest price and a real departure date do most of the work.</p>
+    </div>
+  </header>
+
+  <div class="card card-pad mt-5 max-w-3xl">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% if form.non_field_errors %}{{ form.non_field_errors }}{% endif %}
+
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% for field in form %}
+          <div>
+            <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-5">
+        <button type="submit" class="btn btn-primary">Save offer</button>
+        <a href="{% url 'agency-offers' agency.id %}" class="btn btn-ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

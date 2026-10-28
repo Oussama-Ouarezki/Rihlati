@@ -1,8 +1,9 @@
 # Auth Flow
 
 > [!success] Built
-> Code: `apps/api/src/modules/auth/` and `apps/api/src/common/auth/`.
-> Tests: `apps/api/test/auth.e2e.test.ts` (17 cases).
+> Mechanism: `apps/common/auth.py`. Routes: `apps/accounts/api.py`.
+> Rate limits: `apps/common/throttling.py`.
+> Tests: `apps/accounts/tests.py` (28 cases).
 > Concepts first: [[Authentication vs Authorization]].
 
 ---
@@ -18,97 +19,111 @@ is where auth bugs live. See [[User]].
 
 ---
 
-## Register
+## Two doors, one API
 
-```
-POST /v1/auth/register
-{ displayName, email?, phone?, password, locale? }
-```
+This is the part that differs most from the NestJS build, and it is worth understanding before
+anything below makes sense.
 
-1. Rate limited: **5 per hour per IP**.
-2. Validated by `registerSchema` in `packages/shared`. At least one of `email` or `phone`.
-3. The phone is normalized to E.164 **inside validation**, so the handler can only ever see
-   `+213…`. The email is lowercased the same way.
-4. Password hashed with **Argon2id** (~19 MiB, ~50 ms). Deliberately slow — see below.
-5. `isPlatformAdmin`, `emailVerifiedAt` and every other server-owned field are absent from the
-   schema, so Zod strips them. Posting `isPlatformAdmin: true` does nothing. There is a test.
-6. Tokens issued.
+| Caller | Proves identity with | Set up in |
+|---|---|---|
+| a person on a Django-rendered page | the **session cookie** Django already issues | `django.contrib.auth`, `LoginView` |
+| a program — mobile app, script, a future LLM tool-call | a **bearer access token** | `BearerAuth` in `apps/common/auth.py` |
 
-> [!note] Why the minimum password length is 10 and there is no symbol rule
-> "Must contain an uppercase, a number and a symbol" produces `Password1!` — memorable to a
-> cracking dictionary, annoying to a human. Length is the only rule that reliably buys
-> entropy. Checking against a list of breached passwords would beat both, and is a later job.
+`API_AUTH = [BearerAuth(), SessionAuth()]` is handed to `NinjaAPI` once, so **either** satisfies
+**any** route. That is why a console page can call the same endpoint the mobile app calls, with
+no token anywhere in JavaScript — the page already has a session.
 
-**Registration does tell you an email is taken.** That is a deliberate trade — the alternative
-needs working email delivery, which does not exist yet, and leaves a user staring at a form
-that silently did nothing. Rate limiting is what makes bulk enumeration impractical here.
-Login, where the stakes are higher, does *not* leak (below).
+> [!note] Why the browser never holds a token here, and why that was hard work in NestJS
+> The old stack served pages from a separate Next.js server, so the session had to be carried
+> from the browser to that server to the API: httpOnly cookies, a token-refresh dance in
+> `middleware.ts`, and a whole decision record explaining it (Decision 019).
+>
+> Django renders the pages *and* serves the API from the same process, so the session cookie
+> is simply already there. The entire mechanism collapses into `request.user`. This is the
+> single biggest simplification the port bought — and the cost is on the other side of the
+> ledger: the pages are server-rendered, so anything that needs to feel instant needs real
+> work rather than coming free from React. See [[One Rule, Two Entry Points]].
 
-**The web page is `/inscription`.** Until 2026-08-04 this endpoint existed but nothing called
-it, so an agency could only be created by hand in SQL. It now runs through the same server
-action pattern as login: the password is posted to a server action, the Next server calls the
-API, and the tokens land in httpOnly cookies the browser cannot read (see Decision 019 below).
+CSRF belongs to the cookie door only. A browser attaches the session cookie to *any* request to
+our domain, including one triggered by a form on someone else's site; a bearer token is never
+sent that way. So `SessionAuth` carries the CSRF check and `BearerAuth` needs no equivalent —
+**CSRF is a cookie problem, not an authentication problem in general.**
 
-After signing up with no agency, the console shows a dead-end screen with a link to
-`/nouvelle-agence`. That page is deliberately **outside** `/console`, because the console layout
-short-circuits to that same dead-end screen for anyone with no membership — putting the
-create-agency form inside it would make it unreachable by exactly the people who need it.
-
----
-
-## Profile edits
-
-```
-PATCH /v1/auth/me
-{ displayName?, locale? }
-```
-
-The interesting part is the list of fields it **refuses**:
-
-- `avatarUrl` — a picture is uploaded as bytes to `POST /auth/me/avatar`. See [[Image Uploads]].
-- `email` / `phone` — these are what you log in with. Changing one is account recovery: it needs
-  the current password and a verification round trip, and neither exists yet. The account page
-  shows them read-only with a note to contact support.
-- `isPlatformAdmin`, `emailVerifiedAt`, … — server-owned, always.
-
-None of them are in `updateProfileSchema`, so Zod strips them rather than the handler having to
-remember to ignore them. Two tests post `avatarUrl` and `isPlatformAdmin` and assert nothing
-happened. This is [[Validation at the Boundary]] doing its job: the safe thing is the default,
-not something a future handler has to opt into.
+> [!tip] One override in `SessionAuth`, and the reason for it
+> Ninja runs the CSRF check unconditionally, so an anonymous POST to a protected route answers
+> `403 CSRF check Failed` — a confusing thing to tell a mobile client whose token merely
+> expired. With no session cookie there is nothing to forge, so the check is skipped and the
+> honest answer is **401**. There is a test named for exactly this.
 
 ---
 
 ## Login
 
 ```
-POST /v1/auth/login
-{ identifier, password }        // identifier = email OR phone, one field
+POST /api/auth/login
+{ "username": "...", "password": "..." }
 ```
 
-One field, not a "log in with email / with phone" toggle — the server works out which it is by
-trying to normalize it as a phone first. Users should not have to make that choice.
+Three things are the same whether the account exists or not and whether the password is wrong:
+**the status (401), the message ("Identifiants invalides."), and roughly the time taken.**
 
-Three things are the same whether the account exists or not, whether it has a password or not,
-and whether the password is wrong: **the status, the error code, and the time taken.**
-
-The timing is the part people forget. Checking a real password costs ~50 ms and returning
-"no such user" costs ~2 ms, and that gap alone lets anyone test which phone numbers have
-accounts on Rihlati. So when there is no account, the code hashes against a decoy anyway
-(`fakeVerifyPassword`) and pays the same cost.
+The timing is the part people forget. Verifying a real password costs tens of milliseconds and
+returning "no such user" costs almost nothing, and that gap alone lets anyone test which
+accounts exist here. Django's own `ModelBackend` closes it: when the user is not found it runs
+the password hasher against a throwaway value anyway, purely to pay the same cost. That
+behaviour is inherited, not written here — but it is load-bearing, so do not replace the
+backend without reproducing it.
 
 In a country where the phone number *is* the identity, a verified list of "these numbers are
 registered travel customers" has real resale value. That is what this defends.
 
-> [!warning] Rate limiting is per IP, NOT per account
-> The vault used to say "per identifier and per IP". That was wrong, and the code is right.
->
-> Locking an account after N failed attempts hands everyone a weapon: type wrong passwords at
-> a competitor's owner account and lock them out of their own CRM during Ramadan booking
-> season. Limiting the **source** slows down guessing without creating that weapon.
-> **10 attempts per 15 minutes per IP.**
+A deactivated user is refused with the same message, for the same reason.
 
-A disabled account is rejected **after** the password check, so "this account is suspended"
-is never returned to someone who merely guessed the address.
+> [!warning] Login is by `username`, not by email or phone
+> The NestJS build accepted one `identifier` field and worked out whether it was an email or a
+> phone. This port uses Django's stock `User.username`, because there is no self-registration
+> yet (below) and inventing an identifier scheme before there are users to identify would be
+> designing in the dark. **When registration is built, this changes** — the intended shape is
+> still one field, normalized to E.164 if it parses as an Algerian number.
+
+---
+
+## Rate limits: per source, never per account
+
+```
+login     10 / 15 min
+refresh   30 / 15 min
+inquiry   20 / hour
+```
+
+Those are the only three routes a stranger may call, so they are the only three with limits.
+Everything else is behind authentication, where the account itself is the limit.
+
+> [!danger] Account lockout is a weapon, not a defence
+> "Lock the account after five failed attempts" sounds safer and hands every user a button:
+> type wrong passwords at a competitor's owner account and lock them out of their own CRM
+> during Ramadan booking season. The server cannot tell that attack from a genuine forgotten
+> password. Limiting the **source** slows guessing without creating the weapon.
+
+The limit counts *attempts*, not failures — a stolen-password list wants to succeed, and every
+request that gets a real answer is progress for the attacker. There is a test for that
+distinction, because "only count failures" is the intuitive and wrong choice.
+
+> [!warning] `NINJA_NUM_PROXIES = 0` is doing real work
+> Left unset, Django Ninja keys the throttle bucket on `X-Forwarded-For` whenever that header
+> is present — and that header is chosen by the caller. A different value on every request
+> means a different bucket on every request, and the limit silently stops existing while still
+> looking configured. Setting it to `0` means "ignore that header, trust `REMOTE_ADDR`", which
+> is correct while nothing sits in front of us.
+>
+> **This must change at deploy time.** Behind nginx or Cloudflare, `REMOTE_ADDR` is the
+> proxy, so every request in the country lands in one bucket and a single attacker locks
+> everyone out. Set it to the real number of proxies. `test_a_forged_x_forwarded_for_header_
+> does_not_buy_a_fresh_bucket` guards today's half of this; nothing can guard the deploy half
+> except remembering.
+
+Counters live in Django's cache, which defaults to per-process local memory. Two workers means
+two counts and an effective limit twice as high. Production wants Redis — see [[The Seven Rules]].
 
 ---
 
@@ -116,242 +131,177 @@ is never returned to someone who merely guessed the address.
 
 | | Access token | Refresh token |
 |---|---|---|
-| What it is | signed JWT | 256 random bits |
-| Lives | ~15 minutes | 30 days |
-| Sent | every request | only to `/auth/refresh` |
+| What it is | signed payload (`django.core.signing`) | 256 random bits |
+| Lives | 15 minutes | 30 days |
+| Sent | every request | only to `/api/auth/refresh` |
 | Stored server-side | no | yes, **hashed** |
 | Can be cancelled | no | yes, instantly |
 
-The access token is checked with maths alone — no database lookup — which is what makes it
-fast. The price of that speed is that it cannot be revoked, which is exactly why it expires
-quickly. The refresh token is the opposite trade.
+The access token is checked with arithmetic alone — no database lookup for the *signature* —
+which is what makes it fast. The price of that speed is that it cannot be recalled, which is
+exactly why it expires quickly. The refresh token is the opposite trade.
+
+### Why not a JWT library
+
+`signing.dumps()` gives an HMAC-signed, timestamped payload verified against `SECRET_KEY` —
+which is precisely what a JWT's HS256 mode gives, minus a dependency, minus the
+algorithm-confusion family of bugs (`"alg": "none"` and friends), and minus the temptation to
+put things in a token that ought to be read from the database.
+
+The day a third party needs to *verify* our tokens without holding our secret is the day to
+switch to real asymmetric JWTs. Nothing in Rihlati needs that.
+
+`salt="rihlati.access"` is namespacing, and it matters: without it, any other signed value the
+app produces — a future unsubscribe link, a password-reset code — would be accepted as a login
+token, because they all share one `SECRET_KEY`. There is a test.
 
 ### What is inside the access token
 
-**Three claims: `sub` (user id), `fam` (session family), `adm` (admin flag).** That is all.
+**One field: the user id.** That is the whole payload.
 
-A JWT is *signed, not encrypted* — anyone holding it can read every claim. And every claim is
-a snapshot that goes stale the moment the database changes.
+Not roles. Not memberships. Not `is_staff`.
 
-> [!warning] The token does NOT contain memberships or roles
-> The vault used to say it did. That was wrong, and the code is right.
+> [!important] Why the token is deliberately almost empty
+> Fire an employee at 09:00, and with a role baked into a 15-minute token they can still read
+> your client list until 09:15. Everything that answers "what may you do" is read from the
+> database on every request, so revoking access bites **now**. The test
+> `test_deactivating_a_user_kills_a_token_that_has_not_expired` is that guarantee, written
+> down.
 >
-> Fire an employee at 09:00, and with roles baked into a 15-minute token they can still read
-> your client list until 09:15. The membership is instead read from the database on every
-> tenant-scoped request — one indexed lookup, `memberships(userId, agencyId)`.
->
-> The `adm` claim exists but is **not trusted**: `JwtAuthGuard` re-reads `isPlatformAdmin`
-> from the database too. Revocation that takes effect now is worth one query.
+> A signed payload is also *readable* by anyone holding it — signing is not encryption. One
+> more reason to put nothing in it.
 
-Refresh tokens are stored as plain **SHA-256**, not Argon2. A password is low-entropy and
-guessable, so its hash must be slow; a 256-bit random token is not guessable at any speed, so
-slowness would only make every refresh cost 50 ms for nothing. What is needed here is just
-that a stolen database dump contains no usable tokens.
+Refresh tokens are stored as plain **SHA-256**, not a password hash. A password is low-entropy
+and guessable, so its hash must be deliberately slow; 256 random bits are not guessable at any
+speed, so slowness would only make every refresh burn CPU for nothing. The reason to hash at
+all is the same either way: **a stolen database dump must contain no usable credentials.**
 
 ---
 
 ## Refresh, with theft detection
 
 ```
-POST /v1/auth/refresh
-{ refreshToken }
+POST /api/auth/refresh
+{ "refresh_token": "..." }
 ```
 
-Every refresh **consumes** the old token and issues a new one. Refresh tokens are single-use.
-All tokens descending from one login share a `familyId`.
+Every refresh **consumes** the old token and issues a new one. Refresh tokens are single-use,
+and every token descending from one login shares a `family`.
 
 Now suppose a refresh token is stolen:
 
-- **The thief uses it first.** The real user's next refresh presents a token already revoked.
-- **The user uses it first.** The thief presents a token already revoked.
+- **The thief uses it first.** The real client's next refresh presents an already-spent token.
+- **The client uses it first.** The thief presents an already-spent token.
 
-Either way **a revoked token gets presented** — and that never happens in normal use, because
-a client that has rotated threw the old one away. So it is treated as proof of theft: the
-entire family is revoked, both parties are logged out, and the one who knows the password
-comes back. The thief does not.
+Either way **a spent token gets presented** — and that never happens in normal use, because a
+client that has rotated threw the old one away. So it is treated as proof that two parties hold
+the credential, and since nothing in the request says which one is calling, the entire family
+is revoked. Both are logged out; the one who knows the password comes back, and the thief does
+not.
 
-The theft is caught by the victim simply carrying on using the app, with nobody noticing
-anything was wrong. Without rotation, a stolen refresh token is 30 days of silent access.
+The theft is caught by the victim simply carrying on using the app, with no monitoring, no
+heuristics, and nobody noticing anything was wrong. Without rotation, a stolen refresh token is
+thirty days of silent access.
 
-The detection is written to the [[Audit Log]] as `user.token_reuse_detected`.
+`test_a_replayed_refresh_token_burns_the_whole_family` is the single test in this file most
+worth reading.
 
----
-
-## Acting as an agency
-
-```
-GET /v1/agencies/{agencyId}/leads
-```
-
-The agency is named **in the URL path**. That sounds like trusting client input, and it is
-worth being precise about why it is not:
-
-> The client **says** which agency it wants to act as.
-> The server **proves** the claim, and derives the role from its own data.
-
-`AgencyMembershipGuard` takes `:agencyId`, looks for a membership row for the logged-in user,
-and 404s if there is none. `TenantContext` — including `role` — is built from **that row**, not
-from the URL. So `:agencyId` is a lookup key that must match something the caller owns, and
-guessing ids reveals nothing.
-
-> [!tip] The mechanism worth understanding
-> The guard is global, and it activates on one condition: **the route has an `:agencyId`
-> parameter.** The thing that makes a route tenant-scoped is the same thing that switches the
-> guard on. There is no decorator to forget.
-
-See [[Multi-Tenancy]] and [[API Endpoints]].
+> [!warning] The reuse event is not written to the [[Audit Log]] yet
+> The NestJS build logged `user.token_reuse_detected`. This one does not — the revocation
+> happens, but nothing records that it happened, so the one signal that would tell you an
+> account was actually attacked is currently invisible. Small fix; listed below.
 
 ---
 
 ## Logout
 
 ```
-POST /v1/auth/logout
-{ refreshToken?, allDevices? }
+POST /api/auth/logout
 ```
 
-With no `refreshToken`, this session's whole family is revoked — otherwise "log out" would
-leave the session alive until it expired. `allDevices: true` revokes every family the user has.
+Takes no body, and revokes **every** refresh token the user has, not just the one presented.
+
+"Log out" on a device you are worried about has to mean it. A partial logout that leaves a
+stolen token alive is worse than none, because the user now believes they are safe. The cost is
+that logging out on a laptop also logs out the phone; that is the right default, and a
+per-device logout can be added later by revoking one `family` instead of all of them.
+
+The page-side logout (`/logout/`) is Django's own `LogoutView`, which flushes the session. The
+two are independent: a browser session and an API token family are separate credentials.
 
 ---
 
-## How the WEB APP holds the session (Decision 019)
+## Acting as an agency
 
-The browser never sees a token. Not in localStorage, not in JavaScript memory — nowhere
-a script on the page could read.
+```
+GET /api/agencies/{agency_id}/leads
+```
 
-- **Login is a server action**: the password goes browser → Next server → API, and the
-  returned tokens land in **httpOnly cookies** the browser stores but cannot read.
-- **Console reads are server components, writes are server actions** — both attach the
-  `Authorization: Bearer` header on the server. The API itself never sees a cookie, which
-  is exactly what keeps the API's CSRF surface at zero.
-- **Refresh happens in `middleware.ts`** — the one stage of a request where Next can still
-  set cookies before pages render. The middleware also has to mutate the *request's*
-  cookies, not just the response's: cookies set only on the response reach the browser but
-  not the server components of the same request, and with rotation, "the new refresh token
-  got lost" reads as theft to the API (family revoked, on purpose).
+The agency is named **in the URL path**. That sounds like trusting client input, and it is worth
+being precise about why it is not:
 
-**Rejected:** tokens in localStorage (any XSS exfiltrates a 30-day session);
-access-token-in-JS-memory (the standard compromise, workable — but "no tokens in JS at
-all" is strictly simpler to reason about, and this app can afford it because every
-mutation already runs through a server action).
+> The client **says** which agency it wants to act as.
+> The server **proves** the claim, and derives the role from its own data.
 
-**Cost:** an XSS on the site can still *ride* the session while the tab is open (make
-requests as the user); it just can't *steal* it. And the web server is now stateful about
-auth in middleware — a page cannot be exported statically. Both accepted.
+`require_membership(request.user, agency_id, minimum_role)` looks for a `Membership` row for the
+session's user, and raises otherwise. The role comes from **that row**, never from the URL or
+the body. So `agency_id` is a lookup key that must match something the caller already owns, and
+guessing ids reveals nothing.
+
+> [!warning] The one thing the port lost
+> In NestJS this was a **global guard** that switched itself on whenever a route had an
+> `:agencyId` parameter — the thing that made a route tenant-scoped was the same thing that
+> armed the check, so there was no decorator to forget.
+>
+> Here it is a plain function call at the top of each handler, which means **it can be
+> forgotten**. What replaces the guarantee is a test: `apps/common/tests_house_rules.py`
+> asserts that every route with an `agency_id` parameter calls it. A convention plus a test
+> that fails when the convention is broken — weaker than a mechanism, stronger than trust.
+
+See [[Multi-Tenancy]] and [[API Endpoints]].
 
 ---
 
-## Sign in with Google
+## Not built in this port
 
-> [!success] Built — code only. **Not switched on until you add credentials.**
-> `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`. Both or neither: the config
-> refuses to boot half-configured, because a client id without a secret fails later with a
-> confusing error from Google instead of a clear one from us.
+Say so plainly rather than describing a flow that does not exist:
 
-### The flow, and why it is split across both apps
-
-```
-web   /auth/google/start      makes state + PKCE, redirects to Google
-Google                        the user consents
-web   /auth/google/callback   checks state, POSTs the code to the API
-API   POST /v1/auth/oauth/google   exchanges it, decides whose account this is
-web                           sets the same session cookies as a password login
-```
-
-The web app owns cookies (Decision 019); the API stays stateless and cookie-free. **The
-browser never holds a Google token** — only the web server does.
-
-Two secrets make the round trip safe, both in httpOnly cookies for ten minutes:
-
-- **`state`** — without it, an attacker can hand a victim a crafted callback URL and log
-  them into the *attacker's* Google account. Everything the victim then types happens
-  inside a stranger's session. This is login CSRF, and it is easy to forget because the
-  flow "works" without it.
-- **PKCE `code_verifier`** — an intercepted authorization code is useless without it, and
-  the verifier never leaves our server.
-
-### Account linking — where OAuth vulnerabilities actually live
-
-Three cases, and **the order is the security**:
-
-1. **Known provider subject** → log that user in.
-2. **No link, but the email matches an existing account** → link only if the provider says
-   it **verified** that address.
-3. **Otherwise** → create a new account.
-
-> [!danger] Case 2 is the takeover path
-> Linking on an *unverified* email means anyone who can persuade a provider to assert
-> `victim@gmail.com` inherits the victim's Rihlati account — no password required. It is
-> the most common OAuth flaw, and the `emailVerified` check is the whole defence. There is
-> a test named for it.
-
-Everything keys on the provider's stable **`sub`**, never the email: people change email
-addresses, and an address can be reassigned to someone else. A test signs in, changes the
-email, signs in again, and asserts it is still the same user.
-
-The refusal message talks about *the provider*, never about whether a Rihlati account
-exists — otherwise Google sign-in becomes an account-enumeration oracle.
-
-### A design gap the database caught
-
-Case 3 originally created an account with a null email when the provider would not verify
-one. The `users_has_identifier` CHECK constraint rejected it — correctly. Such a user would
-have had **no email and no phone**: uncontactable, unrecoverable, a ghost.
-
-So new accounts now require a verified email, which collapses both branches into one rule:
-
-> **An unverified email is never enough to establish an identity.**
-
-The alternative — relaxing the constraint — would have weakened a real invariant for
-everyone to serve a rare case (a Workspace account whose domain admin has not verified it).
-Those users get a clear message pointing at password signup.
-
-### Why the ID token's signature is not verified
-
-Deliberate, and spec-backed rather than a shortcut. OIDC Core §3.1.3.7: a token received by
-**direct TLS communication with the provider's token endpoint** may rely on TLS server
-validation instead of the signature. We asked Google directly over HTTPS a millisecond
-earlier; nobody else was in the conversation. Issuer, audience and expiry *are* checked —
-the audience check is what stops a token Google issued for a different application.
-
-> [!warning] If you ever accept an ID token from the BROWSER
-> Google One Tap, or a mobile SDK, hands you a token from an untrusted party. Signature
-> verification against Google's JWKS becomes **mandatory** there. Do not copy
-> `readIdToken()` into that path.
-
-### Apple, later
-
-`OAuthAccount` is a table with a `provider` enum, not a `googleId` column on `User` — so
-adding Apple is a row, not a migration. You will need it: **the App Store requires Sign in
-with Apple** if an iOS app offers Google. `signInWithIdentity()` is already
-provider-agnostic; only a new client class is needed.
-
----
-
-## Deliberately not in v1
-
-- **SMS OTP.** Every message costs money and every extra step loses real inquiries. Add it
-  when abuse actually appears, with data. See [[User]].
-- **Password reset.** Needed before real users, not before the first endpoint. It needs
-  working email/SMS delivery first.
-- ~~**Social login.**~~ Built — see above.
-- **2FA for `isPlatformAdmin`.** Those accounts can read every agency's data. This is the
-  first one to add.
+- **Registration.** There is no `POST /api/auth/register` and no `/inscription` page. Accounts
+  are created in the Django admin or `manage.py createsuperuser`, which is honest for a
+  preview and is the first blocker for a real user. Whatever gets built must keep the
+  server-owned fields (`is_staff`, `is_superuser`, `preferred_language`) out of the input
+  schema, exactly as `AgencyProfileIn` keeps `status` and `plan` out of the profile update.
+- **Profile edits.** No `PATCH /api/me`. An agency can edit its *agency* profile; a person
+  cannot yet edit their own.
+- **Sign in with Google.** The NestJS build had it, including the account-linking rules that
+  are where OAuth vulnerabilities actually live. None of it is here. If it comes back, the
+  rule that carried the weight was: **an unverified email is never enough to establish an
+  identity** — linking on an unverified address means anyone who can persuade a provider to
+  assert `victim@gmail.com` inherits that account, no password required.
+- **Password reset**, **SMS OTP**, and **2FA for staff accounts**. Staff can read every
+  agency's data, so that last one is the first to add.
+- **Password strength rules.** `AUTH_PASSWORD_VALIDATORS` is not configured, so Django's
+  defaults are off. Worth knowing: "must contain an uppercase, a number and a symbol" produces
+  `Password1!` — memorable to a cracking dictionary, annoying to a human. Length is the only
+  rule that reliably buys entropy, and checking against a list of breached passwords beats
+  both.
 
 ---
 
 ## Open questions — yours to decide
 
-- **Session length.** 30 days is convenient and long. Agency staff handle other people's
+- **What do people log in with?** Username is a placeholder. Email, phone, or either, is a
+  product decision, and in Algeria the phone number is the stronger answer — which makes
+  delivery (SMS cost per message) part of the same decision.
+- **Session length.** Thirty days is convenient and long. Agency staff handle other people's
   personal data on possibly shared computers — do you want a shorter refresh window for
-  accounts with a membership than for travelers?
-- **Should registering with an existing email be allowed to say so?** It is the friendly
-  option and the one implemented. The private alternative needs email delivery.
-- **Do you want to force logout everywhere when a password changes?** Standard, and not built
-  yet because there is no password-change endpoint.
+  accounts holding a membership than for travelers?
+- **Should logout be per-device?** Today it is all-devices. Per-device is one line (revoke the
+  presented token's family) and is what most people expect from a "log out" button.
+- **Force logout everywhere when a password changes?** Standard, and not built, because there
+  is no password-change endpoint yet.
 
 ---
 
 Related: [[Authentication vs Authorization]] · [[User]] · [[Multi-Tenancy]] ·
-[[API Endpoints]] · [[Audit Log]] · [[The Seven Rules]]
+[[API Endpoints]] · [[Audit Log]] · [[One Rule, Two Entry Points]] · [[The Seven Rules]]

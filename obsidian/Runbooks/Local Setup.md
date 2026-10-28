@@ -1,137 +1,200 @@
 # Local Setup
 
-Getting Rihlati running on your machine. You have Node 22 and Docker already, so this is
-short.
+Getting the Django build of Rihlati running on your machine. It is deliberately short:
+two Python packages, one SQLite file, no Docker required.
 
 ---
 
 ## One-time setup
 
 ```bash
-cd ~/Desktop/Rihlati
+cd ~/Desktop/rihlati-django-preview
 
-# 1. install everything (all workspaces at once)
-npm install
+# 1. a virtualenv, so this project's packages don't mix with your system Python
+python3 -m venv .venv
 
-# 2. start the local database
-npm run db:up
+# 2. runtime deps (Django, django-ninja) + dev deps (ruff)
+.venv/bin/pip install -r requirements-dev.txt
 
-# 3. build the shared package (api and web import from it)
-npm run build --workspace @rihlati/shared
+# 3. create the database file and its tables
+.venv/bin/python manage.py migrate
+
+# 4. fill it with fake agencies, offers, leads, a programme and a manifest
+.venv/bin/python manage.py seed_preview
 ```
 
-Your `.env` already exists with generated secrets. **Don't commit it, don't edit it, don't
-share it.** See [[The Seven Rules]] rule 1.
+> [!info] Why a `.venv/bin/...` prefix everywhere
+> It saves you from remembering whether the virtualenv is activated. `source
+> .venv/bin/activate.fish` works too and then plain `python manage.py …` is enough — but
+> every command in this vault is written with the explicit path so it works either way.
+
+> [!info] You do **not** need a `.env` to run this locally
+> Seeing `.env.example` sitting there, the obvious guess is that step zero is copying it.
+> It isn't. Every setting in `config/settings.py` reads through `os.environ.get(...)` with a
+> development default, so with no `.env` at all you get `DEBUG=1`, SQLite, `INFO` logs and no
+> Sentry — which is exactly what you want on a laptop.
+>
+> That is a deliberate trade and it cuts both ways. `DJANGO_DEBUG` defaults to **on**, so an
+> unconfigured deployment is a leaky one; the same is true of `DJANGO_SECRET_KEY`, whose
+> fallback is the literal string `dev-only-not-a-real-secret`. Both are safe here and both are
+> a production bug the moment this runs anywhere public — which is why "`DJANGO_DEBUG`
+> refusing to default to on when a real hostname is configured" is written into **M7** in
+> [[Milestone Plan]] rather than left to whoever does the deploy remembering.
+>
+> Copy `.env.example` to `.env` when you want to point at Postgres or turn Sentry on. Not
+> before.
 
 ---
 
 ## Every day
 
 ```bash
-npm run db:up        # start Postgres (skip if already running)
-npm run dev:api      # the API, restarts on save
-npm run dev:web      # the website, restarts on save — separate terminal
+.venv/bin/python manage.py runserver
 ```
 
-The API listens on **`localhost:4000`**. Check it is alive:
+That's it. One process serves the HTML pages **and** the JSON API. There is no separate
+"API server" and "web server" to start — that difference is the single biggest day-to-day
+change from the NestJS repo.
+
+The app listens on **`localhost:8000`**. Check it is alive:
 
 ```bash
-curl localhost:4000/health
-# {"status":"ok"}
+curl -s localhost:8000/api/offers | head -c 200
 ```
 
-The website listens on **`localhost:3000`** and needs the API running to show anything —
-it fetches offers, leads, everything, from `localhost:4000` on every page.
+An unauthenticated `GET /api/offers` returning offers is the correct answer — it is one of
+the ten deliberately public endpoints ([[API Endpoints]]).
+
+### After pulling new code, run these two before `runserver`
+
+```bash
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py seed_preview
+```
+
+Git updates your code. It does not touch `preview.sqlite3`, which is a *separate artifact*
+that only these two commands move. Skipping them does not produce a message telling you to
+run them; it produces one of two confusing symptoms:
+
+- **Skipped `migrate`** → the home page returns 500 with `no such column:
+  offers_offer.<something>`, naming a field you have never heard of.
+- **Skipped `seed_preview`** → no error at all, and an **empty marketplace**. Rows created
+  before a column existed hold that column's default, so agencies seeded before verification
+  was built read as `draft` rather than `VERIFIED`, and `Offer.publicly_visible()` correctly
+  hides every one of their offers.
+
+The second is the one that wastes an afternoon, because nothing is broken — the code is doing
+exactly what it is supposed to, to data that is out of date. [[Architecture]] has the table of
+which combinations of code, schema and data are valid.
 
 ---
 
-## Run the website
+## Where to click
 
-```bash
-npm run db:up
-npm run dev:api      # terminal 1
-npm run dev:web      # terminal 2
-```
-
-Then open **http://localhost:3000**. That's the public marketplace — the same thing a
-traveler sees. French is the default and lives at the bare URL; Arabic is
-`localhost:3000/ar`, English `localhost:3000/en` ([[Decision Log]] #018).
-
-**The agency console** is the part you're usually testing: **http://localhost:3000/console**.
-It redirects to a login page if you're not signed in. Use one of the seeded accounts below —
-`baraka@rihlati.test` / `rihlati-dev-password` is the one with real offers and leads already
-in it, which is usually more useful than starting from an empty agency.
-
-> [!tip] Port 3000 already taken
-> Something else on your machine may already be using it. `next dev` will just pick the next
-> free port (3001, 3002…) and print which one — read its terminal output rather than
-> assuming 3000. If you want to force a specific port: `cd apps/web && npx next dev -p 3100`.
-
-### Log in as a seeded account
-
-`npm run db:seed` creates fake agencies and leads. Every account uses the password
-`rihlati-dev-password`:
-
-| Account | Who |
+| Path | What |
 |---|---|
-| `admin@rihlati.test` | Rihlati staff — the only one who can publish an offer |
-| `baraka@rihlati.test` | owner of Voyages El Baraka (free plan, has leads) |
-| `nour@rihlati.test` | owner of Nour Travel (pro plan) |
-| `agent@rihlati.test` | an `agent` at El Baraka — sees only assigned leads |
-| `voyageur@rihlati.test` | a traveler |
+| `/` | Public search: kind, wilaya, budget, dates |
+| `/offers/<id>/` | Offer detail + the inquiry form (no account needed) |
+| `/login/` | Agency login |
+| `/dashboard/` | Redirects you to your own agency |
+| `/a/<agency_id>/offers/` | Your offers, with lead counts; create & edit |
+| `/a/<agency_id>/leads/` | The CRM inbox: filter by status, change status inline |
+| `/admin/` | Django admin — the agency verification queue |
+| `/api/docs` | **The interactive API browser**, generated from the schemas |
+
+> [!tip] `/api/docs` is the single most useful URL in the project
+> It is not hand-written documentation — it is generated from the same Pydantic schemas the
+> handlers validate against, so it cannot drift from the code. Every endpoint, every field,
+> every response shape, and a "Try it out" button. When [[API Endpoints]] and `/api/docs`
+> disagree, `/api/docs` is right and the note is a bug.
+
+### See tenant isolation with your own eyes
+
+This takes ninety seconds and teaches more than the note does:
+
+1. Log in as `karim` (Wahran Tours, Oran).
+2. Go to `/` and open an offer belonging to **Dar Essalam**. Copy its id out of the URL.
+3. Paste that id into *your own* agency's edit URL: `/a/<your-agency-id>/offers/<their-offer-id>/`.
+4. **404.** Not "forbidden" — as far as that page is concerned, the row does not exist.
+
+That is [[Multi-Tenancy]], and step 4 is the whole point: the row was never in the queryset,
+so there was nothing to reject.
+
+### The seeded accounts
+
+`seed_preview` creates three agencies. Every account uses the password `preview-password`
+(a local fixture, not a credential — it is in the seed file in plain sight for that reason):
+
+| Login | Agency | Notes |
+|---|---|---|
+| `amina` | Dar Essalam Voyages (Alger) | owner; has the Omra programme, the manifest, a review |
+| `karim` | Wahran Tours (Oran) | owner; has a draft Hajj offer and a tracked link |
+| — | Sahara Évasion (Ghardaïa) | **pending**, on purpose, so `/admin/` has a queue to work |
+
+The third agency has no login by design. An empty verification queue makes
+[[Agency Verification]] look like a feature that doesn't exist.
+
+### Talk to the API from a terminal
 
 ```bash
-# get a token
-curl -s -X POST localhost:4000/v1/auth/login \
+# log in — this is a public endpoint, no token needed to get a token
+curl -s -X POST localhost:8000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"identifier":"baraka@rihlati.test","password":"rihlati-dev-password"}'
+  -d '{"username":"karim","password":"preview-password"}'
 
-# the public search needs no token at all
-curl -s 'localhost:4000/v1/offers?limit=2'
+# then use the access token
+curl -s localhost:8000/api/me -H "Authorization: Bearer <access_token>"
 ```
 
-The response to `login` contains `user.memberships[0].agencyId` — that is the id you put in
-`/v1/agencies/{agencyId}/leads`. See [[API Endpoints]].
+The response to `login` contains the memberships, and the `agency` id in there is what you
+put in `/api/agencies/{agency_id}/leads`. See [[Auth Flow]] for why there are two tokens and
+what the refresh one is for.
 
 ---
 
 ## Test it
 
-Two different things people mean by "test", and Rihlati has both:
+Two different things people mean by "test", and this repo has both.
 
 ### By hand, in a browser
 
-The fastest way to check a change actually works — not just that it compiles.
+The fastest way to check a change actually works — not just that it imports.
 
-1. `npm run dev:api` and `npm run dev:web` running, Postgres up, database seeded
-   (`npm run db:seed` if you haven't).
-2. **As a traveler:** `localhost:3000` — search, open an offer, submit an inquiry with
-   consent. No login needed; this is the marketplace.
-3. **As an agency:** `localhost:3000/console`, log in with `baraka@rihlati.test` /
-   `rihlati-dev-password`. The inquiry you just submitted should appear in **Clients**
-   within a page refresh — that loop (public inquiry → agency inbox) is the single most
-   important thing in the product to keep working.
-4. **As a different agency**, to sanity-check tenant isolation yourself: log in as
-   `nour@rihlati.test` and confirm you do NOT see El Baraka's leads or offers anywhere.
+1. `runserver` running, database seeded.
+2. **As a traveler:** `localhost:8000` — search, open an offer, submit an inquiry and tick
+   the consent box. No login needed; this is the marketplace.
+3. **As an agency:** `/login/` as `amina`. The inquiry you just submitted should appear in
+   the CRM inbox on the next page load. That loop — public inquiry → agency inbox — is the
+   single most important thing in the product to keep working.
+4. **As a different agency:** log in as `karim` and confirm you do *not* see Dar Essalam's
+   leads or offers anywhere.
 
 ### Automated
 
 ```bash
-npm run check       # build + typecheck + lint + every unit/integration test
-npm run test:e2e    # Playwright: the five pages that matter (rule #7)
+./scripts/check.sh
 ```
 
-`test:e2e` builds a **production** build first (`test:e2e:build`) and boots its own API +
-website on ports 4200/3200, separate from your dev servers — so it's safe to run while
-`dev:api`/`dev:web` are still up. It checks both real behaviour (does the form actually
-submit) and takes a screenshot of each page, compared pixel-for-pixel against the saved one
-in `e2e/five-pages.spec.ts-snapshots/`.
+One command, and **CI runs exactly this script** rather than a parallel list of steps. Two
+lists of checks drift, and the one that drifts is always the local one — at which point "it
+passed on my machine" stops meaning anything.
 
-> [!warning] Changed something visual on purpose?
-> The screenshot comparison will fail — correctly, that's its job. Look at the diff Playwright
-> prints, confirm the new look is the one you meant, then run `npm run test:e2e:update` to
-> save the new screenshots. Never update them without actually looking first; that's how a
-> real regression slips through disguised as "oh, the test's just outdated."
+It runs five things, in this order:
+
+| Step | Catches |
+|---|---|
+| `ruff check .` | lint: unused imports, shadowed names, long lines |
+| `ruff format --check .` | formatting, so diffs are about behaviour |
+| `manage.py check` | a misconfigured setting, a broken URLconf, a model that won't make a table |
+| `manage.py makemigrations --check --dry-run` | **a model change with no migration** |
+| `manage.py test` | the suite — including the tenant-isolation tests |
+
+That fourth step deserves a sentence. A model change with no migration works perfectly on
+your laptop, because your database already has the column. It fails on a fresh deploy, which
+is the worst possible place to find out. See [[Migrations]].
+
+For the browser-level tests — the five pages that matter, clicked through like a user — see
+[[End-to-End Testing]].
 
 ---
 
@@ -139,44 +202,42 @@ in `e2e/five-pages.spec.ts-snapshots/`.
 
 | Command | Does |
 |---|---|
-| `npm run db:up` | start Postgres in Docker |
-| `npm run db:down` | stop it, **keeps your data** |
-| `npm run db:migrate` | apply schema changes, regenerate the Prisma client |
-| `npm run db:studio` | open a browser UI to browse and edit rows |
-| `npm run db:seed` | fill an empty database with fake agencies and offers |
-| `npm run dev:api` | run the API in watch mode |
-| `npm run dev:web` | run the website in watch mode |
-| `npm run test` | run every test in every workspace (needs Postgres running) |
-| `npm run test:e2e` | Playwright: the five pages that matter, behaviour + screenshots |
-| `npm run test:e2e:update` | regenerate the screenshots after an intentional visual change |
-| `npm run typecheck` | check types without building |
-| `npm run lint` | ESLint across the whole repo |
-| `npm run lint:fix` | fix what ESLint can fix on its own |
-| `npm run check` | build shared + typecheck + lint + test. **Run before you commit.** |
+| `manage.py runserver` | the whole app on `localhost:8000`, reloading on save |
+| `manage.py migrate` | apply schema changes to your database |
+| `manage.py makemigrations` | write a migration file for a model change |
+| `manage.py seed_preview` | wipe and refill with fake data |
+| `manage.py createsuperuser` | an account that can reach `/admin/` |
+| `manage.py shell` | a Python REPL with the models importable |
+| `manage.py dbshell` | a SQL prompt on the current database |
+| `sqlitebrowser preview.sqlite3` | a GUI on every table, column and foreign key |
+| `manage.py graph_models ... -o db-schema/schema-clean.png` | an ER diagram image — see below |
+| `manage.py test` | every test |
+| `manage.py test apps.offers` | one app's tests, when you're iterating |
+| `ruff check . --fix` | fix what the linter can fix on its own |
+| `ruff format .` | reformat |
+| `./scripts/check.sh` | all of the above. **Run before you commit.** |
+| `npm run css` | rebuild `static/app.css` after editing a template's classes |
 
-> [!danger] `docker compose down -v` deletes your local database
-> The `-v` removes the volume where the data lives. Without it, your data survives a
-> restart. Nothing on your machine is backed up — it's a scratch database, which is
-> exactly why the real one needs [[Restore From Backup]].
+> [!info] Why there is still a `package.json`
+> Only for Tailwind. The CSS is compiled from `styles/input.css`, whose `@theme` block is
+> copied verbatim from the Next.js app so both builds render the same brand. No JavaScript
+> ships to the browser from it.
 
 ---
 
 ## After I change the database schema
 
-Whenever `apps/api/prisma/schema.prisma` changes:
+Whenever a file in `apps/*/models.py` changes:
 
 ```bash
-npm run db:migrate
+.venv/bin/python manage.py makemigrations   # writes the file
+.venv/bin/python manage.py migrate          # applies it
 ```
 
-It will ask you to name the change — something like `add_offer_quotas` is fine. This writes
-a migration file, applies it, and regenerates the TypeScript types.
-
-If your editor shows red squiggles on Prisma types after a schema change, that's usually
-just the regenerated client not being picked up yet. Restart the TypeScript server in your
-editor.
-
-See [[Migrations]].
+`makemigrations` names the file itself from what changed. **Read the generated file before
+you commit it** — that is rule #7, and it is not ceremony: a rename that Django cannot tell
+from a drop-and-add becomes `RemoveField` + `AddField`, which is a silent data loss on a real
+database. See [[Migrations]].
 
 ---
 
@@ -185,88 +246,170 @@ See [[Migrations]].
 ### Look at your data
 
 ```bash
-npm run db:studio
+.venv/bin/python manage.py dbshell
 ```
 
-Opens on `localhost:5555`. A spreadsheet view of every table — genuinely the fastest way to
-build a feel for the schema. Read [[Data Model Overview]] with Studio open beside it.
+`.tables` lists tables, `.schema offers_offer` describes one, `.quit` quits. (Those are
+SQLite commands; on Postgres it's `\dt`, `\d offers_offer`, `\q`.)
 
-### Connect with psql
+The friendlier option is `/admin/` in a browser — a spreadsheet view of every table.
+Genuinely the fastest way to build a feel for the schema. Read [[Data Model Overview]] with
+`/admin/` open beside it.
 
-You don't have `psql` installed locally, but the container has it:
+> [!info] `/admin/` only shows what's been registered
+> Django's admin is opt-in per model — `@admin.register(...)` in an app's `admin.py`. Right
+> now only `Agency` and `AuditLog` (in `apps/accounts/admin.py`) are registered, on purpose:
+> the `Agency` admin routes through the same status-transition + `AuditLog` write as the API,
+> rather than a raw `list_editable` that could badge an agency with no record of who decided.
+> A model with no `admin.py` entry is invisible in `/admin/` even though it's in the database
+> — `dbshell` or DB Browser (below) show every table regardless of registration.
+
+### A GUI on the actual `.sqlite3` file
+
+**DB Browser for SQLite** (`sqlitebrowser`) opens the raw file — every table, every column,
+every foreign key — with no Django app required to see it, and it can edit rows directly
+(careful: it writes straight to the file, no validation, no audit trail).
 
 ```bash
-docker exec -it rihlati_db psql -U rihlati -d rihlati
+sqlitebrowser preview.sqlite3
 ```
 
-`\dt` lists tables, `\d offers` describes one, `\q` quits.
+It was already installed on this machine (`/usr/bin/sqlitebrowser`); on a fresh machine
+that's `sudo apt install sqlitebrowser`. Point it at whichever `.sqlite3` file `DATABASES`
+resolves to — see [[Data Model Overview]] for why that fallback exists and when it switches
+to Postgres.
+
+### A picture of the schema (ER diagram)
+
+One-time setup — a dev-only dependency, never installed in production:
+
+```bash
+.venv/bin/pip install django-extensions pydot   # pydot needs the system `graphviz` package
+sudo apt install graphviz                        # if `dot` isn't already on your machine
+```
+
+Then in `config/settings.py`, `django_extensions` is added to `INSTALLED_APPS` **gated behind
+`DEBUG`**, so it's structurally impossible for it to load in production:
+
+```python
+"apps.pages",
+*(["django_extensions"] if DEBUG else []),
+]
+```
+
+Generate the diagram:
+
+```bash
+.venv/bin/python manage.py graph_models accounts offers leads trips reviews \
+  --exclude-models=UUIDModel,AbstractBaseSession,LogEntry,Group,Permission,ContentType,AbstractBaseUser,PermissionsMixin \
+  -o db-schema/schema-clean.png
+```
+
+Output lives in `db-schema/` at the repo root. `--exclude-models` strips Django's own
+internal/abstract classes so the picture is just Rihlati's models; drop the flag (or use
+`-a` for every installed app) if you want Django's `auth`/`sessions`/`admin` tables in the
+picture too, at the cost of a much busier image.
+
+> [!info] Why this is worth reading before poking at code
+> `agency` foreign keys on every tenant table are [[Multi-Tenancy]] as a literal arrow on the
+> diagram. Every model inheriting `UUIDModel` at the bottom is "IDs are UUIDs, never
+> sequential integers" enforced structurally rather than by convention. A diagram makes both
+> facts obvious in a way scrolling through `models.py` files one at a time doesn't.
+
+### The Python shell, with the models loaded
+
+```bash
+.venv/bin/python manage.py shell
+```
+
+```python
+from apps.offers.models import Offer
+Offer.publicly_visible().count()
+```
+
+That one queryset is worth poking at by hand — it is the *only* set of offers a traveler is
+ever allowed to see, and understanding why it filters on three things at once is most of
+[[Search and Filters]].
 
 ### Start completely fresh
 
 ```bash
-npm run db:down
-docker volume rm rihlati_pgdata
-npm run db:up
-npm run db:migrate
-npm run db:seed
+rm preview.sqlite3
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py seed_preview
 ```
+
+Safe: `preview.sqlite3` is a scratch database with nothing but fake data in it. Nothing on
+your machine is backed up — which is exactly why the real one needs
+[[Restore From Backup]].
 
 ---
 
 ## When something breaks
 
-**`Environment variable not found: DATABASE_URL`**
-You're running a command from the wrong folder, or `.env` is missing. Run from the repo
-root. If `.env` is genuinely gone, tell me and I'll regenerate it.
+**`ModuleNotFoundError: No module named 'ninja'`**
+You're running system Python instead of the virtualenv. Use `.venv/bin/python`, or activate
+the venv first.
 
-**`Can't reach database server at localhost:5433`**
-Postgres isn't running. `npm run db:up`, then `docker compose ps` to confirm it's healthy.
+**`no such table: offers_offer`**
+The database file exists but is empty. `manage.py migrate`.
 
-**Port 5433 already in use**
-Something else is on it. `docker compose ps` — you may already have it running.
-(5433 rather than the usual 5432 is deliberate, so it never fights a Postgres you installed
-directly.)
+**`Your models have changes that are not yet reflected in a migration`**
+Exactly what `check.sh` is for. `manage.py makemigrations`, read the file, commit it with
+the model change in the same commit.
 
-**Types from `@rihlati/shared` not found**
-It needs building: `npm run build --workspace @rihlati/shared`. `npm run dev:api` does this
-automatically.
+**`UNIQUE constraint failed: offers_offer.slug` when migrating**
+Stale rows from an older seed conflicting with a new constraint. Delete `preview.sqlite3`
+and re-run migrate + seed. This is a *development* answer only; on a real database the
+equivalent is a data migration with a written plan (rule #7).
 
-**Tests fail after I edited `plans.ts`**
-Expected — the tests check the plan table stays coherent. Read the failure message; it names
-the rule you broke. See [[Plan Limits and Quotas]].
+**A test fails with `403` where you expected `200`**
+Almost always a role, not a bug. Creating or updating an offer needs `Membership.MANAGER` or
+above; the default in the test factories is `AGENT`. Fixing it by lowering the required role
+makes the test pass for the wrong reason.
 
-**Tests fail with `database "rihlati_test" does not exist`**
-The API tests use a **separate** database, derived by appending `_test` to your
-`DATABASE_URL`, so a test run can never truncate your development data. It is created
-automatically on the first run — this error usually means Postgres was not running yet.
-`npm run db:up`, then retry.
+**A test fails with `404` where you expected `403`**
+Also almost always correct. Read [[Multi-Tenancy]]: a *foreign row id* is 404 (it was never
+in the queryset), a *foreign agency id in the path* is 403 (agency ids are not secret). The
+tests assert those two separately on purpose — `assertIn(status, (403, 404))` would pass
+while the bug is present.
 
-**`Configuration invalide (.env)`**
-The API validates its whole configuration at boot and refuses to start if anything is missing
-or looks like a placeholder. The message lists the failing **keys** (never the values — that
-output can end up in a CI log). Fix them in `.env` and restart.
+**`TypeError: NinjaAPI.__init__() got an unexpected keyword argument 'csrf'`**
+You followed a Django Ninja 0.x tutorial. In 1.x, CSRF belongs to the cookie auth class, not
+to the API. See [[Auth Flow]].
 
-**Prisma commands work from `apps/api` but not elsewhere**
-`.env` lives at the repo root and the Prisma CLI only looks in its own folder;
-`apps/api/prisma.config.ts` loads it explicitly. Run Prisma commands through the npm scripts
-(`npm run db:migrate`) rather than calling `npx prisma` from a random directory.
+**`RuntimeError: Model class ... doesn't declare an explicit app_label`**
+You ran a script directly instead of through `manage.py`. Django has to be set up first.
 
 ---
 
 ## Before you commit
 
 ```bash
-npm run check
+./scripts/check.sh
 ```
 
 And the secrets check from [[The Seven Rules]]:
 
 ```bash
-git diff --staged | grep -iE "sk-|secret|password|api[_-]?key"
+git diff --staged | grep -iE "sk-|secret|password|api[_-]?key|BEGIN.*PRIVATE"
 ```
 
-If that prints anything with a real value in it, stop.
+If that prints anything with a real value in it, stop. (`preview-password` in the seed file
+will match — that one is fine, and knowing *why* it's fine is the point of the exercise: it
+grants access to fake agencies in a scratch SQLite file and appears nowhere else.)
 
 ---
 
-Related: [[Start Here]] · [[Migrations]] · [[Data Model Overview]] · [[The Seven Rules]]
+## Open questions
+
+- Postgres locally, or keep SQLite for development? CI already runs Postgres, so the risk
+  today is a bug that only appears in CI. Running it locally costs a Docker container and
+  removes that whole class of surprise.
+- Should `seed_preview` grow a `--minimal` flag? It currently creates a full demo, which is
+  right for looking at the app and slightly heavy when you just want two rows to test against.
+
+---
+
+Related: [[Start Here]] · [[Migrations]] · [[Data Model Overview]] · [[The Seven Rules]] ·
+[[End-to-End Testing]] · [[API Endpoints]]

@@ -1,0 +1,80 @@
+{% extends "pages/agency_base.html" %}
+
+{% comment %} The one screen that answers "which of my posts actually brings clients?".
+
+   Clicks are printed small and grey, clients big and blue. That is not
+   decoration: an agency optimising for clicks optimises for the wrong thing,
+   and the type size is the cheapest way to say so. {% endcomment %}
+
+{% block title %}Campaigns · {{ agency.name }}{% endblock %}
+
+{% block agency_content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Attribution</p>
+      <h2 class="page-title">Campaigns</h2>
+      <p class="page-lede">Know which post, story or message actually brought a client — not just a click.</p>
+    </div>
+  </header>
+
+  <div class="mt-5 grid gap-6 lg:grid-cols-[1fr_20rem]">
+    <section>
+      {% if links %}
+        <ul class="space-y-3">
+          {% for link in links %}
+            <li class="card card-interactive p-4 sm:p-5">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="font-semibold text-slate-900">{{ link.label }}</p>
+                  <p class="mt-0.5 text-sm text-slate-500">
+                    {% if link.offer %}{{ link.offer.title_fr }}{% else %}All offers{% endif %}
+                  </p>
+                  <code class="mt-2 inline-block max-w-full truncate rounded-lg bg-sand-50 px-2.5 py-1.5 text-xs text-slate-700">
+                    {{ request.scheme }}://{{ request.get_host }}{% url 'tracked-link' link.code %}
+                  </code>
+                </div>
+                <div class="flex items-end gap-6 text-end">
+                  <div>
+                    <p class="text-sm font-medium text-slate-500 tabular-nums">{{ link.click_count }}</p>
+                    <p class="text-xs text-slate-500">clicks</p>
+                  </div>
+                  <div>
+                    <p class="text-2xl font-bold text-brand-700 tabular-nums">{{ link.lead_count }}</p>
+                    <p class="text-xs font-semibold text-slate-600">clients</p>
+                  </div>
+                </div>
+              </div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state">
+          <span class="empty-state-icon" aria-hidden="true">🔗</span>
+          <h3 class="mt-3 text-base font-semibold text-slate-900">No campaigns yet</h3>
+          <p class="mx-auto mt-1 max-w-sm text-sm text-slate-500">
+            Create a link, paste it under your Facebook post, and see how many clients it really brought.
+          </p>
+        </div>
+      {% endif %}
+    </section>
+
+    {% if can_create %}
+      <aside class="card card-pad h-fit">
+        <h2 class="section-title">New campaign</h2>
+        <p class="mt-1 text-sm text-slate-500">One link per post, so the numbers stay honest.</p>
+        <form method="post" novalidate class="mt-4 space-y-3">
+          {% csrf_token %}
+          {% for field in form %}
+            <div>
+              <label for="{{ field.id_for_label }}" class="field-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+              {{ field.errors }}
+            </div>
+          {% endfor %}
+          <button type="submit" class="btn btn-primary w-full">Create link</button>
+        </form>
+      </aside>
+    {% endif %}
+  </div>
+{% endblock %}

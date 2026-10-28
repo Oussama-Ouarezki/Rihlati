@@ -1,0 +1,91 @@
+{% load programme %}
+{% comment %} The programme, read-only. Shared by the public offer page, the traveler's
+   own trip page and the agency editor, so the three never drift apart — a
+   buyer comparing programmes and a family reading theirs at 4am are looking at
+   the same rows, and if they rendered differently one of them would be wrong.
+
+   The road is drawn, not authored: `static/road.js` measures the pins and
+   injects one curve through them. Every step below is real content and reads
+   fine without the script — a pin's emoji is repeated in the kind pill beside
+   it, so nothing is only visible in the drawing.
+
+   Times are printed exactly as stored. `time_of_day` is a string, never a
+   TimeField: 04:30 must read as 04:30 to a family in Alger and to the guide
+   standing in Jeddah. Converting it is the bug, not the feature. {% endcomment %}
+<div class="road" data-road>
+  {% if programme %}
+    {% comment %} The straight band is the no-JavaScript fallback and the shape the
+       script replaces. It is not hidden from the start: an unscripted page still
+       has to look like a road, not like a list that lost its spine. {% endcomment %}
+    <div class="road-band" aria-hidden="true"></div>
+  {% endif %}
+
+  <ol>
+    {% for day in programme %}
+      <li class="road-day">
+        {% comment %} A day is a sign on the way, not a separate journey: the road runs
+           behind this pill from the first day to the last. The pill is opaque for
+           exactly that reason — it masks the road so the label stays readable. {% endcomment %}
+        <p class="road-sign">
+          <span>Day {{ day.day_offset|add:1 }}</span>
+          <span class="font-normal text-slate-300">{{ day.date|date:"D d/m" }}</span>
+        </p>
+
+        <ul>
+          {% for step in day.steps %}
+            {% with m=step.milestone %}
+              {% comment %} Pins restart on the right at the start of each day, so a day
+                 always reads top-left to bottom-right in the same rhythm. {% endcomment %}
+              <li class="road-step {% if forloop.counter0|divisibleby:2 %}road-step--right{% else %}road-step--left{% endif %}">
+                <span class="road-pin {% if step.is_current %}road-pin--current{% endif %}"
+                      data-road-pin aria-hidden="true">{{ m.kind|kind_emoji }}</span>
+
+                <article class="road-card
+                    {% if step.is_current %}border-brand-300 bg-brand-50{% else %}border-slate-200 bg-white{% endif %}">
+                  {% comment %} The marker is derived from the ticked-off steps, not from the
+                     clock: the bus leaves when the bus leaves. {% endcomment %}
+                  <div class="flex flex-wrap items-baseline gap-x-2">
+                    {% if m.time_of_day %}
+                      <span class="font-mono text-sm font-semibold text-slate-800">{{ m.time_of_day }}</span>
+                    {% endif %}
+                    <span class="text-sm font-medium text-slate-800">{{ m.title }}</span>
+                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                      <span class="road-kind-emoji">{{ m.kind|kind_emoji }}</span>
+                      {{ m.get_kind_display }}
+                    </span>
+                    {% if step.is_current %}
+                      <span class="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-semibold text-white">You are here</span>
+                    {% endif %}
+                    {% if m.completed_at %}
+                      <span class="text-xs text-brand-700">✓ done</span>
+                    {% endif %}
+                  </div>
+
+                  {% if m.location_name %}
+                    <p class="mt-1 text-xs text-slate-500">{{ m.location_name }}</p>
+                  {% endif %}
+                  {% if m.meeting_point %}
+                    {% comment %} The single most-repeated question in this business. It gets
+                       its own line and its own weight, not a footnote. {% endcomment %}
+                    <p class="mt-1 text-sm text-slate-700">📍 {{ m.meeting_point }}</p>
+                  {% endif %}
+                  {% if m.description %}
+                    <p class="mt-1 text-sm text-slate-500">{{ m.description }}</p>
+                  {% endif %}
+                  {% if m.map_url %}
+                    <a href="{{ m.map_url }}" rel="noopener noreferrer nofollow" target="_blank"
+                       class="mt-1 inline-block text-xs font-medium text-brand-700 hover:underline">Open map</a>
+                  {% endif %}
+                </article>
+              </li>
+            {% endwith %}
+          {% endfor %}
+        </ul>
+      </li>
+    {% empty %}
+      <li class="rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-500">
+        The programme has not been published yet.
+      </li>
+    {% endfor %}
+  </ol>
+</div>

@@ -1,398 +1,450 @@
 # API Endpoints
 
 > [!success] Built
-> Code: `apps/api/src/modules/`. Base path `/v1`. `/health` sits outside the prefix.
-> Every endpoint below exists and is covered by tests.
+> Code: `apps/*/api.py`, mounted in `config/api.py`. Base path **`/api`**.
+> Interactive docs at **`/api/docs`**, generated from the same schemas that validate the
+> requests — so this note and the code cannot disagree for long about *shapes*. What this
+> note adds is the part OpenAPI cannot express: **why** each permission is where it is.
 
 Read [[What the API Is]] first if "endpoint" is still a fuzzy word.
+
+> [!info] Django vs NestJS
+> The NestJS repo versions its API at `/v1` and documents it by hand. Here the version lives
+> in `NinjaAPI(version="1.0.0")` and the document is generated. That is the whole argument for
+> [[One Rule, Two Entry Points|Django Ninja over DRF]]: the schema is the contract, not a
+> second description of it.
 
 ---
 
 ## How to read the permission column
 
-| Marking | Meaning |
-|---|---|
-| **public** | no account needed. Rate limited, and never reads tenant data. |
-| **logged in** | any valid access token. This is the **default** — see below. |
-| **member** | must belong to the agency in the URL, any role |
-| **manager** / **owner** | that role or higher at that agency |
-| **verified** | the agency must be verified by Rihlati |
-| **admin** | Rihlati staff (`isPlatformAdmin`) |
+| Marking | Meaning | In code |
+|---|---|---|
+| **public** | no account needed | `auth=None` on the route |
+| **logged in** | any valid access token or session | the default — nothing written |
+| **member** | belongs to the agency in the URL, any role | `require_membership(user, agency_id)` |
+| **manager** / **owner** | that role or higher at that agency | `require_membership(..., Membership.MANAGER)` |
+| **staff** | Rihlati staff | `require_staff(request)` |
 
-> [!tip] Deny by default
-> `JwtAuthGuard` is global. An endpoint with no decorator requires a logged-in user. You
-> cannot forget to protect a route; you can only explicitly open one with `@Public()`.
+> [!tip] Deny by default, and how to check it in one command
+> `auth=API_AUTH` is set once, on the `NinjaAPI` object in `config/api.py`. A route that says
+> nothing is a **locked** route. The only exit is writing `auth=None`, which means the entire
+> public surface of this application is one grep:
 >
-> And any route whose path contains `:agencyId` is automatically tenant-guarded, because the
-> guard keys off that parameter alone. See [[Multi-Tenancy]].
+> ```bash
+> grep -rn "auth=None" apps/*/api.py
+> ```
+>
+> Eleven lines today. If that list grows and nobody can say why, that is the bug.
+> Compare: in the NestJS repo the same job is done by a global `JwtAuthGuard` and `@Public()`.
+> Same inversion, different spelling. See [[Authentication vs Authorization]].
+
+Membership is checked in a plain function call at the top of the handler, not in a decorator.
+Why that is a deliberate loss as well as a gain is written up in
+[[The Seven Hops of a Request]] §"where the guard went".
 
 ---
 
-## Health
+## Auth — `/api/auth`
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/health` | public |
-
-Returns `{ status: "ok" }` and nothing else. No version, no hostname, no migration state — a
-health endpoint is public by necessity and every extra field is free reconnaissance.
-
----
-
-## Media
-
-| Method | Path | Permission |
-|---|---|---|
-| GET | `/media/{key}` | public |
-
-Note the missing `/v1`. Both `/health` and `/media` are in the `exclude` list of
-`setGlobalPrefix` in `main.ts`, because an image URL gets stored in the database and pasted
-into pages — it should not carry an API version that we may want to bump.
-
-This route exists **only in development**, where images are written to local disk. In
-production `STORAGE_DRIVER=s3` and the controller returns 404 for everything, because the
-object store serves its own URLs. See [[Image Uploads]].
-
----
-
-## Auth — `/v1/auth`
-
-| Method | Path | Permission | Rate limit |
-|---|---|---|---|
-| POST | `/auth/register` | public | 5 / hour / IP |
-| POST | `/auth/login` | public | 10 / 15 min / IP |
-| POST | `/auth/refresh` | public | 60 / hour / IP |
-| POST | `/auth/oauth/google` | public | 20 / hour / IP |
-| POST | `/auth/logout` | logged in | default |
-| GET | `/auth/me` | logged in | default |
-| GET | `/auth/me/providers` | logged in | default |
-| PATCH | `/auth/me` | logged in | default |
-| POST | `/auth/me/avatar` | logged in | 20 / hour |
-| DELETE | `/auth/me/avatar` | logged in | default |
+| POST | `/auth/login` | **public** |
+| POST | `/auth/refresh` | **public** |
+| POST | `/auth/logout` | logged in |
+| GET | `/me` | logged in |
 
 `/auth/refresh` is public because an *expired* access token is exactly when you call it — the
-refresh token in the body is the credential. Full detail in [[Auth Flow]].
+refresh token in the body is the credential. Full mechanics in [[Auth Flow]].
 
-`GET /auth/me` returns the user **and their memberships**, which is how a client knows which
-agencies to offer in a switcher.
+**Login answers the same way for a wrong password and an unknown username.** Distinguishing
+them is a free account-enumeration oracle: an attacker learns which of 10 000 guessed
+usernames exist without ever logging in.
 
-`PATCH /auth/me` accepts **only** `displayName` and `locale`. It cannot set `avatarUrl` — a
-picture is uploaded as bytes and the server names the file, see [[Image Uploads]]. It cannot
-change `email` or `phone` either: those are what you log in with, so changing one is an
-account-recovery flow (needs the current password and a verification round trip), not a
-profile edit. Neither flow exists yet.
+**Logout revokes every refresh token the user holds, not just the one presented.** A partial
+logout that leaves a stolen token alive is worse than no logout at all, because the person
+clicking it now believes they are safe.
 
-`POST /auth/me/avatar` is `multipart/form-data` with a single `file` part, and returns the
-updated user. See [[Image Uploads]] for what the server does to that file before storing it.
+`GET /me` returns the user **and their memberships**, which is how a client knows which
+agencies to offer in a switcher. The roles come from the database on every call — they are
+deliberately *not* in the token, so removing someone bites immediately instead of at the next
+token expiry.
 
 ---
 
-## Offers, public — `/v1/offers`
+## Public catalogue — `/api/offers`
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/offers` | public |
-| GET | `/offers/by-slug/{slug}` | public — counts a view ([[Offer Analytics]]) |
-| POST | `/offers/{offerId}/events` | public, 120 / hour / IP — the metrics beacon |
-| POST | `/offers/{offerId}/reports` | public, 10 / hour / IP |
-| POST | `/tracked-links/resolve` | public, 120 / hour / IP — counts a click |
+| GET | `/offers` | **public** |
+| GET | `/offers/{offer_id}` | **public** — counts a view |
+| POST | `/offers/{offer_id}/report` | **public** |
+| GET | `/agencies/{agency_id}/reviews` | **public** |
+| POST | `/reviews` | **public** |
+| GET | `/consent-text` | **public** |
 
-`/tracked-links/resolve` is a POST because it changes state: a counting endpoint behind a
-GET gets fetched by every link previewer and proxy in the chain. The public short URL
-`/l/{code}` lives on the **web** app and calls this. See [[Tracked Links]].
+`GET /offers` is the marketplace search and the busiest endpoint in the app. Filters live in
+`OfferFilters` in `apps/offers/api.py`: `q`, `kind`, `wilaya`, `price_min`, `price_max`,
+`date_from`, `date_to`, `sort`, `limit`, `offset`. See [[Search and Filters]].
 
-`GET /offers` is the marketplace search and the busiest endpoint in the app. Filters:
-`q`, `kind`, `minPriceCentimes`, `maxPriceCentimes`, `destinationCountry`, `destinationCity`,
-`departureWilayaCode`, `departureFrom`, `departureTo`, `minDurationDays`, `maxDurationDays`,
-`agencySlug`, `verifiedAgenciesOnly` (default **true**), `includeFlaggedDuplicates`
-(default false), `sort`, `cursor`, `limit`. See [[Search and Filters]].
+> [!important] `limit` is capped in the schema, not in the handler
+> `limit: int = Field(20, ge=1, le=50)`. An unbounded `limit` is a one-request denial of
+> service, and the cap belongs somewhere it cannot be forgotten by the next person who writes
+> a list endpoint. The same `OfferFilters` class is what the HTML search page parses its query
+> string with, so a bad `sort=` fails identically in both places.
 
-By slug, not by id: the public URL is `/offres/omra-ramadan-2027…`, which is what SEO and a
-link pasted into a WhatsApp group need. Ids stay internal.
+`sort=quality` orders by `quality_score`, **not** featured-first. A paid slot that outranks a
+better listing is how a marketplace loses the travelers the agencies are paying to reach.
 
 Reporting is public so a traveler can flag a scam without signing up — the people most likely
 to spot one have not committed to an account yet. **A report never hides an offer, at any
 count.** See [[Duplicate and Spam Control]].
 
----
+`GET /consent-text` exists so the checkbox label a client renders and the
+`consent_text_version` the server stores cannot drift apart. See [[Lead]].
 
-## Agencies, public — `/v1/agencies`
-
-| Method | Path | Permission |
-|---|---|---|
-| GET | `/agencies` | public |
-| GET | `/agencies/by-slug/{slug}` | public |
-| GET | `/agencies/by-slug/{slug}/faq` | public |
-
-Only `verified` agencies appear. An unverified agency does not exist publicly — including
-its FAQ.
-
-The FAQ list shows only **enabled** entries and is bounded by the 50-per-agency cap, which
-is why it carries no cursor. These entries are also the future knowledge base of the
-[[Agency Chatbot]].
+**Reviews require a lead that reached a terminal state.** `ReviewIn` has no `agency_id` — it
+comes from the lead. A client that names the agency it is rating can rate one it never dealt
+with, which on a marketplace where agencies in the same wilaya know each other by name is a
+weapon. See [[Agency Ratings]].
 
 ---
 
-## Inquiries — `/v1/inquiries`
+## Inquiries — `/api/inquiries`
 
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/inquiries` | **public**, 5 / hour / IP |
+| POST | `/inquiries` | **public** |
 
 The marketplace's one conversion event, and the reason it is public: requiring an account here
-would kill it.
+would kill it. Note the asymmetry — **write-open, read-locked**. Anyone may create a lead;
+only the agency that received it may ever read one.
 
-Three things about this endpoint are load-bearing:
+Four things about this endpoint are load-bearing:
 
-1. **`agencyId` is derived from the offer, never sent.** Otherwise anyone could post leads into
-   any agency's inbox — including a competitor's, filled with garbage.
-2. **Contact details are snapshotted onto the lead**, not referenced through an account. The
-   inquiry must survive the traveler deleting their account, and must work when they never had
-   one.
-3. **`consent` must be literally `true`** (`z.literal(true)`, not `z.boolean()`), and the
-   consent trail is written in the same insert. "We asked them in March" cannot be
+1. **`agency_id` is derived from the offer, never sent.** Otherwise anyone could post leads
+   into any agency's inbox — including a competitor's, filled with garbage.
+2. **The offer is looked up through `Offer.publicly_visible()`, not `Offer.objects`.** An
+   inquiry against a draft, an archived offer, or an unverified agency's listing must 404, or
+   the "verified agencies only" promise is decorative.
+3. **`consent` must be literally `True`**, and the consent trail is written in the same insert:
+   timestamp, text version, hashed IP, user agent. "We asked them in March" cannot be
    reconstructed in June.
-
-The same person asking the same agency about the same offer within 6 hours gets the existing
-lead back rather than creating a second one — reported as success, because the traveler did
-what was asked and telling them "duplicate" only makes them submit again another way.
-
-Returns only `{ id, createdAt, agencyName }`. The lead is never echoed back.
+4. **The response is `{"detail": …}` and nothing else.** Echoing the created row back would let
+   anyone POST a plausible payload and read an id they could then try elsewhere.
 
 ---
 
-## An agency's own offers — `/v1/agencies/{agencyId}/offers`
+## An agency's own offers — `/api/agencies/{agency_id}/offers`
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/agencies/{agencyId}/offers` | member |
-| GET | `/agencies/{agencyId}/offers/{offerId}` | member |
-| POST | `/agencies/{agencyId}/offers` | manager |
-| PATCH | `/agencies/{agencyId}/offers/{offerId}` | manager |
-| PATCH | `/agencies/{agencyId}/offers/{offerId}/status` | manager + **verified** |
-| DELETE | `/agencies/{agencyId}/offers/{offerId}` | manager |
+| GET | `/agencies/{agency_id}/offers` | member |
+| POST | `/agencies/{agency_id}/offers` | manager |
+| PUT | `/agencies/{agency_id}/offers/{offer_id}` | manager |
+| POST | `/agencies/{agency_id}/offers/{offer_id}/publish` | manager + **verified** |
+| POST | `/agencies/{agency_id}/offers/{offer_id}/archive` | manager |
+| GET | `/agencies/{agency_id}/offers/{offer_id}/metrics` | member |
+| GET | `/agencies/{agency_id}/quota` | member |
 
-`agent` cannot create offers — an agent works leads.
+An `agent` cannot create offers — an agent works leads.
 
 Drafting is allowed **before** verification: an agency should be able to prepare its catalogue
-while Rihlati checks its licence. `verified` is required only on the status route, where the
-offer starts moving towards being seen by a traveler.
+while Rihlati checks its licence. Verification is required only on `publish`, where the offer
+starts moving towards being seen by a traveler.
 
-### The status route is where the money lives
+> [!important] What `OfferIn` leaves out is the security
+> The schema has no `agency`, `slug`, `status`, `is_featured`, `quality_score`, `fingerprint`,
+> `duplicate_status` or `report_count`. **A field absent from the schema is a field a client
+> cannot set** — and because `Strict` sets `extra="forbid"`, sending one is a 422 rather than a
+> silent no-op. An agency that could PUT `is_featured: true` would promote itself for free.
+> See [[Validation at the Boundary]].
 
-Status changes follow `OFFER_STATUS_TRANSITIONS` in `packages/shared`. `draft → published` is
-not in that table, so **the review step cannot be skipped by anyone**, including admins.
-
-Only Rihlati staff may set `published` or `rejected`. An agency asks (`pending_review`); a
-human decides. Without this, "verified agency" is self-service and the badge is worthless.
-
-Publishing is also where the **plan quota** is enforced — counted inside the transaction, from
-the database, against the limit in `packages/shared/src/plans.ts`. See
-[[Plan Limits and Quotas]]. Returns `409 OFFER_LIMIT_REACHED` with `{ plan, limit, current }`
-so the UI can say "5 of 5 used, upgrade".
-
-`DELETE` is a **soft delete**. Leads point at offers, and a traveler's inquiry must keep making
-sense after the agency removes the listing.
+Publishing is where the **plan quota** is enforced, counted from the database inside the
+transaction. It returns **409**, not 403: the caller is allowed to publish offers, there is
+just no room. 403 would tell them to go find a permission they already have. See
+[[Plan Limits and Quotas]].
 
 ---
 
-## The CRM — `/v1/agencies/{agencyId}/leads`
+## Programme — the milestone routes
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/agencies/{agencyId}/leads` | member |
-| GET | `/agencies/{agencyId}/leads/{leadId}` | member |
-| POST | `/agencies/{agencyId}/leads` | member |
-| PATCH | `/agencies/{agencyId}/leads/{leadId}` | member |
-| POST | `/agencies/{agencyId}/leads/{leadId}/notes` | member |
+| GET | `/agencies/{agency_id}/offers/{offer_id}/milestones` | member |
+| POST | `/agencies/{agency_id}/offers/{offer_id}/milestones` | manager |
+| PUT | `/agencies/{agency_id}/milestones/{milestone_id}` | manager |
+| DELETE | `/agencies/{agency_id}/milestones/{milestone_id}` | manager |
+| POST | `/agencies/{agency_id}/offers/{offer_id}/milestones/reorder` | manager |
+| POST | `/agencies/{agency_id}/offers/{offer_id}/milestones/duplicate-day` | manager |
+| POST | `/agencies/{agency_id}/offers/{offer_id}/milestones/copy-from` | manager |
+| POST | `/agencies/{agency_id}/milestones/{milestone_id}/complete` | member |
+| POST | `/agencies/{agency_id}/milestones/{milestone_id}/uncomplete` | member |
 
-Inbox filters: `q`, `stage`, `quality`, `source`, `offerId`, `assignedToUserId`, `dueOnly`,
-`sort`, `cursor`, `limit`.
+Editing the programme needs `manager` — the same bar as editing the offer it belongs to.
 
-> [!important] An `agent` sees only the leads assigned to them
-> Enforced in the **WHERE clause**, not the UI, and on **both** the list and the detail
-> endpoint. Filtering the list but not the detail is the classic version of this bug: the
-> agent reads an id from a screenshot and fetches it directly.
->
-> An agent passing `?assignedToUserId=<colleague>` cannot widen their view — their filter is
-> overwritten. There is a test for each of these.
+`complete` / `uncomplete` are the odd ones out: **writes that are member-level**. Ticking a
+step off is bus-side work done by the accompagnateur, usually the most junior person on the
+trip, so gating it on `manager` would mean passing a phone around at 4am. And `uncomplete`
+exists because the tap that matters right after a wrong tap is the undo.
 
-`PATCH` changes stage, quality label, assignment and values. **Contact details are not
-editable** — they are the traveler's own submission, and an agency rewriting them would destroy
-the meaning of the consent record.
+`reorder` re-fetches every milestone id **inside the tenant scope** before writing. A client
+sending another agency's milestone id must move nothing, not everything.
 
-Assigning leads to staff is gated on the plan (`leadAssignment`) and returns
-`402 FEATURE_NOT_IN_PLAN`. The assignee must be a member of the same agency — otherwise an
-agency could assign a lead to an outsider's user id, and that person's inbox would start
-returning rows from a tenant they do not belong to.
+`copy-from` is the one place in this API where a **client sends the id of tenant data**
+(`source_offer_id`). It is scoped exactly like the target: you may copy from *your* offers
+only. Otherwise this endpoint reads any agency's programme, which is the thing agencies
+compete on. Copies deliberately drop `completed_at` — **a copy is a plan, not something that
+already happened**, and inheriting a tick would park the "vous êtes ici" marker somewhere the
+group has never been.
 
-Changing a lead's quality to `spam` or `troll` writes a dedicated [[Audit Log]] entry — it is a
-judgement about a real person that can later cost them access. See [[Client Quality Labels]].
+Both bulk copies refuse past `MILESTONE_MAX_PER_OFFER` (200) with a 409. That is a limit on
+one programme's sanity, not a plan gate.
 
-The first move off `new` stamps `firstRespondedAt`, once, and nothing can set it back.
-Response time is the metric agencies are sold on, so it is measured rather than self-reported.
+Full design in [[Trip Programme]].
 
 ---
 
-## Agency management — `/v1/agencies`
+## The manifest and the checkpoints
 
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/agencies` | logged in, 3 / hour / IP |
-| GET | `/agencies/{agencyId}` | member |
-| PATCH | `/agencies/{agencyId}` | manager |
-| POST | `/agencies/{agencyId}/submit-for-review` | owner |
-| POST | `/agencies/{agencyId}/logo` | manager, 20 / hour |
-| DELETE | `/agencies/{agencyId}/logo` | manager |
-| GET | `/agencies/{agencyId}/faq` | member (sees disabled entries too) |
-| POST | `/agencies/{agencyId}/faq` | manager |
-| PATCH | `/agencies/{agencyId}/faq/{faqId}` | manager |
-| DELETE | `/agencies/{agencyId}/faq/{faqId}` | manager |
-| GET | `/agencies/{agencyId}/analytics/offers` | member + **plan gate** (`analytics`) |
-| GET | `/agencies/{agencyId}/departures` | member |
-| GET | `/agencies/{agencyId}/offers/{offerId}/manifest` | member |
-| POST | `/agencies/{agencyId}/reservations` | member |
-| PATCH | `/agencies/{agencyId}/reservations/{id}` | member |
-| POST | `/agencies/{agencyId}/reservations/{id}/trip-link` | member |
-| GET | `/agencies/{agencyId}/offers/{offerId}/milestones` | member |
-| POST | `/agencies/{agencyId}/offers/{offerId}/milestones` | manager |
-| POST | `/agencies/{agencyId}/offers/{offerId}/milestones/reorder` | manager |
-| PATCH | `/agencies/{agencyId}/offers/{offerId}/milestones/{milestoneId}` | manager |
-| POST | `/agencies/{agencyId}/offers/{offerId}/milestones/{milestoneId}/completion` | member |
-| DELETE | `/agencies/{agencyId}/offers/{offerId}/milestones/{milestoneId}` | manager |
-| GET | `/agencies/{agencyId}/milestones/{milestoneId}/check-ins` | member |
-| PATCH | `/agencies/{agencyId}/milestones/{milestoneId}/check-ins/{reservationId}` | member |
-| GET | `/agencies/{agencyId}/tracked-links` | member |
-| POST | `/agencies/{agencyId}/tracked-links` | manager + **plan gate** (count) |
-| PATCH | `/agencies/{agencyId}/tracked-links/{linkId}` | manager |
-| DELETE | `/agencies/{agencyId}/tracked-links/{linkId}` | manager |
+| GET | `/agencies/{agency_id}/offers/{offer_id}/reservations` | member |
+| POST | `/agencies/{agency_id}/reservations` | member |
+| PATCH | `/agencies/{agency_id}/reservations/{reservation_id}` | member |
+| GET | `/agencies/{agency_id}/offers/{offer_id}/checkpoints` | member |
+| GET | `/agencies/{agency_id}/milestones/{milestone_id}/checkpoint` | member |
+| POST | `/agencies/{agency_id}/milestones/{milestone_id}/checkpoint/{reservation_id}` | member |
 
-The manifest routes are member-level on purpose — bus check-in is agent work. Details and
-the reasoning in [[Trip Manifest]].
+Member-level throughout, on purpose: bus check-in is agent work. Reasoning in
+[[Trip Manifest]].
 
-The milestone **editing** routes need `manager` — same bar as editing the offer they belong
-to. Reading the programme and **checking a family in at a checkpoint** are both member-level:
-an agent needs to see the plan, and check-in at a checkpoint is exactly the same kind of
-bus-side work as the manifest. `GET .../check-ins` on a milestone with `checkpointType: none`
-returns `422 VALIDATION_FAILED` — it isn't a checkpoint, there's nothing to list. Full design,
-including the mandatory/optional default rule, in [[Trip Programme]].
+Creating a reservation decrements `seats_left`; cancelling one gives the seats back, and
+un-cancelling takes them again. Seats move in the same transaction as the reservation, because
+a manifest that disagrees with the seat count is a family without a seat.
 
-`POST .../milestones/{id}/completion` is the odd one out: a **write that is member-level**.
-Ticking a step off is bus-side work done by the accompagnateur — usually the most junior
-person on the trip — so gating it on `manager` would mean passing a phone around at 4am. It
-takes `{ isDone: boolean }` rather than being a one-way "done", because the tap that matters
-right after a wrong tap is the undo. One tick advances the "vous êtes ici" marker on every
-traveler's map at once.
-
-`POST .../reservations/{id}/trip-link` mints this family's `/mon-voyage/{code}` link if they
-haven't got one, and is **idempotent** — an existing code is returned, never rotated. Rotating
-would silently break a link already sitting in the family's WhatsApp thread, and that failure
-lands at 4am on the person who needs it most.
-
-The analytics endpoint returns the daily views/clicks/inquiries series — zero-filled, so a
-chart can plot it as-is. Collection itself is never gated; see [[Offer Analytics]] for why.
+`GET .../checkpoint` **creates the check-in rows lazily**, one per non-cancelled reservation,
+the first time the screen is opened. That is what lets a checkpoint invented mid-trip need no
+backfill, and a booking made this morning simply appear.
 
 ---
 
-## The back office — `/v1/admin`
+## The CRM — `/api/agencies/{agency_id}/leads`
 
 | Method | Path | Permission |
 |---|---|---|
-| GET | `/admin/agencies?status=&q=&cursor=&limit=` | **admin** |
-| POST | `/admin/agencies/{id}/verify` | **admin** |
-| POST | `/admin/agencies/{id}/reject` | **admin** |
+| GET | `/agencies/{agency_id}/leads` | member |
+| GET | `/agencies/{agency_id}/leads/{lead_id}` | member |
+| PATCH | `/agencies/{agency_id}/leads/{lead_id}` | member |
+| GET | `/agencies/{agency_id}/pipeline` | member |
+| GET | `/agencies/{agency_id}/leads/{lead_id}/notes` | member |
+| POST | `/agencies/{agency_id}/leads/{lead_id}/notes` | member |
+| GET | `/agencies/{agency_id}/leads/{lead_id}/activity` | member |
+| GET | `/agencies/{agency_id}/tags` | member |
+| POST | `/agencies/{agency_id}/tags` | manager |
+| POST | `/agencies/{agency_id}/leads/{lead_id}/tags/{tag_id}` | member |
+| DELETE | `/agencies/{agency_id}/leads/{lead_id}/tags/{tag_id}` | member |
+
+`PATCH` changes stage, quality label, assignment and estimated value. **Contact details are
+not editable** — they are the traveler's own submission, and an agency rewriting them would
+destroy the meaning of the consent record attached to it.
+
+The assignee must be a member of the same agency. Otherwise an agency could assign a lead to
+an outsider's user id, and that person's inbox would start returning rows from a tenant they
+do not belong to.
+
+The first move off `new` stamps `first_responded_at`, once, and nothing sets it back. Response
+time is the metric agencies are sold on, so it is measured rather than self-reported.
+
+Notes and activity are **two tables on purpose**: notes are editable working memory, activity
+is append-only and written by the system. If staff could edit the timeline it would be
+worthless as evidence in a dispute; if the system wrote into notes, real notes would drown in
+noise. See [[Client Quality Labels]] and [[Audit Log]].
+
+`GET /pipeline` is a single grouped aggregate, not one count per stage. Seven round trips to
+render one header is the kind of thing that is invisible on a laptop and obvious on a phone in
+Ghardaïa.
+
+---
+
+## The client directory — `/api/agencies/{agency_id}/clients`
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/agencies/{agency_id}/clients` | member |
+| POST | `/agencies/{agency_id}/clients` | member |
+| GET | `/agencies/{agency_id}/clients/{client_id}` | member |
+| PATCH | `/agencies/{agency_id}/clients/{client_id}` | member |
+| GET | `/agencies/{agency_id}/clients/{client_id}/notes` | member |
+| POST | `/agencies/{agency_id}/clients/{client_id}/notes` | member |
+| POST | `/agencies/{agency_id}/clients/{client_id}/tags/{tag_id}` | member |
+| DELETE | `/agencies/{agency_id}/clients/{client_id}/tags/{tag_id}` | member |
+
+A client is one person per agency, identified by `phone_e164`. `GET` accepts the same `q`,
+`filter`, `limit` and `offset` as the HTML directory, and the two share `ClientQuerySet` so
+"à venir" and "répété" cannot mean two different things at two doors. See [[Client]].
+
+`POST` exists for the walk-in who never filled the public form; it accepts a first note in the
+same request. A phone number already used in the agency is a `409`, not a `500` from the unique
+constraint. `PATCH` changes name and phone only — status, quality and callbacks stay on the
+lead, because they describe a deal rather than a person.
+
+The detail response carries the person's leads, reservations, notes and tags, so a client app
+gets one screen's worth of data in one request. Deleting a client unlinks its leads and
+reservations (`SET_NULL`); it never deletes the history.
+
+---
+
+## Agency management and tracked links
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/agencies/{agency_id}` | member |
+| PUT | `/agencies/{agency_id}` | owner |
+| POST | `/agencies/{agency_id}/submit-for-review` | owner |
+| GET | `/agencies/{agency_id}/audit` | owner |
+| GET | `/agencies/{agency_id}/tracked-links` | member |
+| POST | `/agencies/{agency_id}/tracked-links` | manager |
+| PUT | `/agencies/{agency_id}/reviews/{review_id}/reply` | manager |
+
+`AgencyProfileIn` has no `status`, no `plan`, no `credit_balance_centimes`. **An agency that
+could PATCH its own `status` would verify itself**, and the badge is the only reason a traveler
+hands their phone number to a stranger.
+
+Submitting for review is `owner`, not `manager`: it is a legal declaration about the company,
+and an agent hired last week should not be able to make it. The HTML page enforces the same
+split — see `agency_settings` in `apps/pages/views.py`.
+
+Replying to a review is `manager` and **there is no delete**. A calm public answer to a bad
+review is the single most useful thing an agency can do here, and the most trusted signal a
+reader gets. See [[Agency Ratings]].
+
+Tracked links let an agency answer "which Facebook post actually worked?" — see
+[[Tracked Links]].
+
+---
+
+## The traveler's own trip — `/api/my-trip/{code}`
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/my-trip/{code}` | **public** |
+
+The one endpoint in the API that is **not scoped by a session's tenant** — because there is no
+session. The caller is a family with an SMS link and no account, which is deliberate: a [[Lead]]
+becomes a reservation without anyone signing up.
+
+What replaces the tenant scope is the code itself. `Reservation.public_code` is 128 random bits
+from `secrets.token_hex(16)` and globally unique, so it names exactly one reservation across
+every agency — there is no id to swap for a neighbour's. **The code is the authorization.**
+
+That is only acceptable while the page shows nothing its holder does not already know: their
+own booking, and a programme the agency publishes anyway. It must **never** show the passenger
+list, what anyone paid, or a CRM note. `MyTripOut` is a hand-built allow-list with that
+sentence written above it, and `apps/pages/tests.py` asserts a second family's name and phone
+number are absent from the rendered page. If one of those fields ever needs to appear, this
+endpoint needs a real login — not a longer code.
+
+A wrong code, a cancelled booking and a closed agency all return the same `404`.
+
+> [!warning] Not yet built: a rate limit
+> "Unguessable" without a request limit means "unguessable at whatever rate the attacker's
+> bandwidth allows". 128 bits makes that a very long wait, but the limit is still the control
+> and it is missing here. Listed in the open questions below.
+
+---
+
+## The per-offer assistant — `/api/chat/offers/{offer_id}`
+
+| Method | Path | Permission |
+|---|---|---|
+| POST | `/chat/offers/{offer_id}` | **public** |
+
+The traveler asks a question about one listing and gets an answer grounded in that listing's
+row, its programme, and its agency's profile. Public because travelers have no account;
+**throttled at 30 messages per hour per IP** and capped at 12 turns per conversation.
+
+The body has exactly two fields:
+
+```json
+{"message": "le visa est-il inclus ?", "token": "…"}
+```
+
+`token` is absent on the first turn. The response carries it back, and it is the only
+credential for the rest of the conversation:
+
+```json
+{"token": "…", "reply": "Oui, le visa est inclus.", "related_offers": [
+  {"id": "…", "url": "/offers/…/", "title": "…", "price_centimes": 4200000,
+   "departure_date": "2026-12-27", "seats_left": 12}
+]}
+```
+
+Four properties matter more than the shape:
+
+1. **The offer is the scope, and it is resolved like every public read.**
+   `Offer.publicly_visible()` — a draft, an archived listing, or an unverified agency's offer
+   is a 404 here too. The assistant is not a side door onto a hidden listing.
+2. **The token names one conversation, not one user.** 128 random bits from
+   `secrets.token_hex(16)`, the same capability-URL pattern as `Reservation.public_code`. A
+   token from another offer, a guessed token and an expired token all return the same 404.
+3. **History is server-side.** The browser never sends its transcript; the server rebuilds
+   the last six turns from `ChatMessage` rows. A client can therefore influence only the
+   newest question, never a forged assistant turn.
+4. **Related offers are chosen by the server.** The same same-agency rows that fed the model
+   become the cards, with URLs built by `reverse()`. The model never selects a slug or a
+   price. No sibling offers means an empty list.
+
+The model is local (Ollama) in v1, behind `apps/chat/llm.py`; if it is down the route returns
+**503 `UNAVAILABLE`** and writes nothing, so a retry starts from a clean turn. See
+[[Agency Chatbot]] and [[Decision Log]] 031.
+
+---
+
+## The back office — `/api/admin`
+
+| Method | Path | Permission |
+|---|---|---|
+| GET | `/admin/verification-queue` | **staff** |
+| POST | `/admin/agencies/{agency_id}/decision` | **staff** |
+| POST | `/admin/agencies/{agency_id}/suspend` | **staff** |
+| GET | `/admin/reconcile-ratings` | **staff** |
 
 This is the **first deliberately cross-tenant surface in the app**, and it deserves the
 paragraph.
 
-Every other endpoint in this document answers *"what may this agency see?"*, and the answer is
-enforced by `agencyId` sitting in a `where` clause ([[Multi-Tenancy]]). These three answer
-*"what may Rihlati see?"*, and the answer is everything: the queue returns the RC, the NIF, the
-licence number and the owner's phone for agencies the caller has no relationship with. That is
-the job — you cannot review a stranger's documents without reading them.
+Every other endpoint in this document answers *"what may this agency see?"*, enforced by
+`agency_id` in a `WHERE` clause ([[Multi-Tenancy]]). These answer *"what may Rihlati see?"*,
+and the answer is everything: the queue returns the registre de commerce, the NIF and the
+licence number of agencies the caller has no relationship with. That is the job — you cannot
+review a stranger's documents without reading them.
 
-Which means the whole protection is `@PlatformAdminOnly()` on the controller class, checked in
-`JwtAuthGuard`. One boolean. A bug there exposes every agency at once, where a bug in a
-tenant-scoped service exposes one. That is why the tests for this module spend most of their
-lines on who is *shut out* rather than on the happy path.
+Which means the whole protection is `require_staff(request)`, one boolean read **from the
+database on every request**, never from a token claim. A bug there exposes every agency at
+once, where a bug in a tenant-scoped query exposes one.
 
-> [!note] Look at the path parameter: it is `{id}`, not `{agencyId}`
-> Not a naming whim. `AgencyMembershipGuard` switches itself on for any route containing
-> `:agencyId`, and for a platform admin it hands back a tenant context with `role: 'owner'` —
-> i.e. it frames the request as *staff acting **as** the agency*. That is right for support
-> work and wrong for judging them: a reviewer acts on Rihlati's behalf, not the agency's.
-> So this is the one route family where the guard staying silent is intentional.
+**Three rules the endpoints enforce:**
 
-**Three rules the endpoints enforce that are worth knowing:**
+1. **Only a legal transition is accepted.** `Agency.STATUS_TRANSITIONS` is the table; an agency
+   someone else already decided gets a 409. See [[Agency Verification]].
+2. **A decision requires a written note, minimum five characters — including an approval.**
+   A badge nobody had to justify is a badge that means nothing, and six months later that note
+   is the only record of why this agency passed.
+3. **The queue is ordered by `submitted_for_review_at`, oldest first.** A queue that is not
+   FIFO quietly means whoever complains loudest gets reviewed first.
 
-1. **Only `pending_review` can be decided.** A draft that never applied, and an agency someone
-   else already handled, both get `409 INVALID_STATUS_TRANSITION`. The status is repeated
-   inside the `UPDATE`'s `where` clause, so two admins clicking at once cannot overwrite each
-   other's decision — the second one loses and is told so.
-2. **Verification requires a written note** (`checkedNote`, 10 chars minimum). It is private,
-   it goes only to the audit log, and it exists because [[Agency Verification]] is built around
-   one fear: that the badge claims more than was actually done. This makes the answer to
-   *"what exactly did you verify?"* get written down by the person who decided, at the moment
-   they decided.
-3. **An admin cannot decide on an agency they belong to.** `403 FORBIDDEN` with
-   `details.reason = "self_review"`. Not because staff are expected to cheat — because a badge
-   granted by its own owner is worthless as evidence, and evidence is the only thing the badge
-   is for.
+The decision writes an [[Audit Log]] row **in the same transaction** as the status change, with
+`decided_by` set. That is exactly the record you want when a verified agency later turns out to
+be fraudulent, and exactly the one that cannot be reconstructed afterwards.
 
-Rejection carries **two** texts, and keeping them apart is the point: `reason` is shown
-verbatim to the agency owner in the red banner on `/console/agence`, and `internalNote` never
-leaves the audit log. Before the second field existed, a private suspicion had nowhere to go
-except the sentence the applicant reads.
+`GET /admin/reconcile-ratings` is the other half of the denormalised counter on `Agency`:
+`rating_sum` and `rating_count` are fast to read and **will** eventually disagree with the
+reviews table. A cached number with no reconciliation job is a number that lies, so the job
+exists from the start rather than after someone notices. See [[Agency Ratings]].
 
-Both decisions write an audit row **in the same transaction** as the status change, and
-`verify` sets `verifiedByUserId`. That column had been sitting in the schema unused since the
-first migration, because verification was a hand-written `UPDATE` — which is exactly the
-record you want when a verified agency later turns out to be fraudulent, and exactly the one
-that could not be reconstructed afterwards.
-
-**Becoming an admin is not an endpoint.** See [[Accounts]] — it is a CLI command, and the
-chicken-and-egg reason is written down there.
-
----
-
-## The traveler's trip page — `/v1/trips`
-
-| Method | Path | Permission |
-|---|---|---|
-| GET | `/trips/{code}` | **public**, 30 / hour / IP |
-
-The one endpoint in the API that is **not scoped by a session's tenant** — because there is no
-session. The caller is a family with a WhatsApp link and no account, which is deliberate:
-a [[Lead]] becomes a [[Trip Manifest|Reservation]] without anyone signing up.
-
-What replaces the tenant scope is the code itself. `Reservation.publicCode` is 128 random bits
-and globally unique, so it names exactly one reservation across every agency — there is no id
-to swap for a neighbour's. **The code is the authorization.** That holds only while two things
-stay true, and both are enforced in code:
-
-1. **The rate limit is the security control**, not decoration. "Unguessable" without a limit
-   means "unguessable at whatever rate the attacker's bandwidth allows."
-2. **The response is a hand-built allow-list** — never a spread of the row. The test
-   `apps/api/test/trips.e2e.test.ts` asserts the exact key set, so a column added to
-   `reservations` next month fails the build rather than shipping to a forwarded link.
-
-A wrong code, a cancelled booking, a deleted offer and a closed agency all return the same
-`404`. Distinguishing them would make the endpoint an oracle that confirms which codes exist.
-
-Full design and the list of what this page must never contain: [[Trip Programme]] §5.
-
-`POST /agencies` makes the caller the `owner`, in one transaction with the agency — an agency
-with no owner would be unreachable by everyone including its creator.
-
-**One agency per person, for now.** Not a technical limit: without it, one signup creates fifty
-agencies and fifty times the free offer quota, which defeats the quota entirely.
-
-`GET /agencies/{agencyId}` returns live quota usage:
-`limits: { publishedOffers: { used, limit }, seats: { used, limit } }`.
-
-Editing the RC/NIF/licence of a **verified** agency sends it back to `pending_review`.
-Otherwise the flow is: get verified with a real RC, then quietly swap in a different one and
-keep the badge.
+Django's own `/admin/` is a second door onto verification, and it goes through the same state
+machine and writes the same audit row — see `apps/accounts/admin.py`. The admin is never a way
+around a rule.
 
 ---
 
@@ -400,56 +452,57 @@ keep the badge.
 
 ```json
 {
-  "error": {
-    "code": "OFFER_LIMIT_REACHED",
-    "message": "…",
-    "fields": { "slug": ["validation.slugTaken"] },
-    "details": { "plan": "free", "limit": 5, "current": 5 },
-    "requestId": "0198a0b1-…"
-  }
+  "code": "VALIDATION_FAILED",
+  "details": {"phone_e164": ["Numéro algérien attendu, au format +213…"]},
+  "requestId": "a1b2c3d4e5f60718"
 }
 ```
 
-The **code** is what clients switch on — the message is for developers, and the app is Arabic
-and French, so the API has no business choosing which one a user reads. Full list in
-`packages/shared/src/errors.ts`.
+The **code** is what clients switch on — the sentence is for developers, and the app is Arabic
+and French, so the API has no business choosing which one a user reads. The mapping lives in
+`STATUS_TO_CODE` in `apps/common/errors.py`.
 
-`fields` follows the same rule one level down: each entry is a **key**, not a sentence. The
-client looks `validation.slugTaken` up in its own message file and prints Arabic, French or
-English. The keys are listed in `packages/shared/src/validation-messages.ts`, and a test fails
-if a schema emits one that no locale translates. See [[Validation at the Boundary]].
+`details` is keyed by field name, so a form can highlight the exact input. A single
+"Bad request" is technically correct and practically useless.
 
-`requestId` is also returned as the `X-Request-Id` header and appears in every log line for
-that request. A user quotes it, you find the exact failure. That is what makes rule #4 usable.
+`requestId` is also the `X-Request-Id` header and appears in every log line for that request.
+A user quotes it, you find the exact failure. That is what makes rule #4 usable.
 
 > [!warning] `NOT_FOUND` means both "does not exist" and "belongs to another agency"
-> Identical status, code and message. Any difference turns the API into a tool for
-> enumerating other agencies' data. There is a test asserting the two responses match exactly.
+> Identical status, code and body. Any difference turns the API into a tool for enumerating
+> other agencies' data. `apps/offers/tests.py` asserts the two responses match.
 
-`INSUFFICIENT_ROLE` **is** a 403, though — a member already knows the agency exists, so hiding
-the reason would only confuse them.
+One deliberate exception: passing an `agency_id` in the **path** that you are not a member of
+returns **403**, not 404. You already know that agency exists — you typed its id — so hiding
+the reason would only confuse a member who lost a role. The 404 rule protects *rows*, not
+agency ids. This asymmetry is the kind of thing that looks like an inconsistency until someone
+writes down why, so: this is why.
+
+**Anything not handled above is left to Django.** An unhandled 500 is an incident, and
+swallowing it into a tidy envelope is how an incident becomes a mystery.
 
 ---
 
 ## Open questions — yours to decide
 
-- **Should an `agent` see unassigned leads?** Right now they see only what is assigned to them,
-  so a brand-new inquiry is invisible until a manager assigns it. For a two-person agency that
-  may be friction rather than safety.
-- **Should travelers be able to list their own inquiries?** There is no `/me/inquiries` yet.
-  It needs a decision about what a traveler may see of an agency's CRM state — probably
-  nothing beyond "received".
-- **Staff invitations are not built.** The schema and `inviteMemberSchema` exist; the endpoint
-  does not, because it needs email or SMS delivery to be useful.
-- **The back office covers verification only.** Duplicate resolution and report triage are
-  still direct database work. The queue proves the shape; the other two follow it.
-- **Nobody is told when an agency joins the queue.** It sits there until an admin opens
-  `/admin`. That is fine for one person checking daily and wrong the first week it is missed —
-  see the open questions in [[Agency Verification]].
-- **Saved offers** (`SavedOffer`) has a table and no endpoints yet.
+- **Rate limiting is partial.** `/auth/login`, `/auth/refresh`, `/inquiries` and the assistant
+  are throttled; `/offers/{id}/report` and `/my-trip/{code}` still want one, and each wants a
+  different limit. This remains a launch blocker, not a nice-to-have.
+- **Should an `agent` see every lead, or only the ones assigned to them?** Today they see all
+  of their agency's. For a two-person agency that is right; at fifteen people it probably is
+  not. The NestJS repo took the other side — assigned-only, enforced in the `WHERE` clause.
+- **Registration is not an endpoint here.** Accounts are made in the Django admin or the shell.
+  See [[Accounts]] for the chicken-and-egg reasoning and what a real signup flow would need.
+- **Staff invitations are not built.** Adding a colleague means a `Membership` row created by
+  hand.
+- **Nobody is told when an agency joins the verification queue.** It sits there until staff
+  open the page — fine for one person checking daily, wrong the first week it is missed.
+- **Image uploads are URL-only.** An agency pastes a link; nothing is stored or resized here.
+  See [[Image Uploads]] for what changes when that stops being acceptable.
 
 ---
 
 Related: [[Auth Flow]] · [[Multi-Tenancy]] · [[Search and Filters]] ·
 [[Plan Limits and Quotas]] · [[Duplicate and Spam Control]] · [[Client Quality Labels]] ·
-[[Validation at the Boundary]] · [[Audit Log]] · [[The Seven Rules]]
+[[Validation at the Boundary]] · [[Audit Log]] · [[Trip Programme]] · [[Trip Manifest]] ·
+[[The Seven Rules]]

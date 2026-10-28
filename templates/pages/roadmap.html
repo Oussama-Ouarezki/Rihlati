@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Roadmap — Rihlati{% endblock %}
+
+{% block content %}
+  {% comment %} The page is in English because the milestones and the vault note are; the
+     chrome around it is still French until M2 lands. `lang` on the wrapper keeps a screen
+     reader from pronouncing English text with a French voice. {% endcomment %}
+  <div lang="en" class="mx-auto max-w-5xl">
+
+    <header class="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p class="text-xs font-semibold tracking-widest text-slate-400 uppercase">Delivery map</p>
+        <h1 class="mt-1 text-3xl font-bold text-slate-900">Roadmap</h1>
+        <p class="mt-2 max-w-xl text-sm text-slate-500">
+          Where Rihlati is, what gates the next phase, and what would make us stop.
+          A gate is a sentence, not a date.
+        </p>
+      </div>
+      <div class="text-end">
+        <p class="text-3xl font-bold text-brand-700">{{ done }}</p>
+        <p class="text-xs text-slate-500">of {{ total }} stops done</p>
+      </div>
+    </header>
+
+    <ul class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+      <li class="flex items-center gap-1.5">
+        <span class="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>Built
+      </li>
+      <li class="flex items-center gap-1.5">
+        <span class="h-2 w-2 rounded-full bg-blue-600" aria-hidden="true"></span>Next
+      </li>
+      <li class="flex items-center gap-1.5">
+        <span class="h-2 w-2 rounded-full bg-amber-600" aria-hidden="true"></span>Blocked on a decision
+      </li>
+      <li class="flex items-center gap-1.5">
+        <span class="h-2 w-2 rounded-full bg-slate-400" aria-hidden="true"></span>Later
+      </li>
+    </ul>
+
+    {% for phase in phases %}
+      <section class="mt-5 rounded-3xl border p-4 sm:p-6"
+               style="background: {{ phase.tint }}; border-color: {{ phase.border }};">
+        <header class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 class="text-base font-bold sm:text-lg" style="color: {{ phase.colour }}">
+            {{ phase.emoji }} {{ phase.label }}
+          </h2>
+          <span class="rounded-full bg-white/80 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+            {{ phase.done }} / {{ phase.total }} done
+          </span>
+        </header>
+        <p class="mt-0.5 text-xs text-slate-500">{{ phase.gate }}</p>
+
+        {% comment %} Row height is `ROW_HEIGHT` in apps/pages/roadmap.py and the road's
+           viewBox is exactly `stops × ROW_HEIGHT` tall, so pin centres and path points
+           stay in the same place at every width. Change one, change both. {% endcomment %}
+        <ol class="relative mt-3" style="height: {{ phase.height }}px">
+
+          {% comment %} Decorative on purpose: the emoji, title and note in each card carry
+             the meaning, and the path adds nothing a screen reader needs. {% endcomment %}
+          <svg class="pointer-events-none absolute inset-0 hidden h-full w-full md:block"
+               viewBox="0 0 1000 {{ phase.height }}" preserveAspectRatio="none"
+               aria-hidden="true" focusable="false">
+            <path d="{{ phase.path }}" fill="none" stroke="#0f172a" stroke-opacity="0.10"
+                  stroke-width="40" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+            <path d="{{ phase.path }}" fill="none" stroke="#334155"
+                  stroke-width="34" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+            <path d="{{ phase.path }}" fill="none" stroke="#f8fafc"
+                  stroke-width="2.5" stroke-dasharray="12 12" stroke-linecap="round"
+                  class="road-flow" vector-effect="non-scaling-stroke"/>
+          </svg>
+
+          {% comment %} The mobile road: one straight band in the left gutter. A 320px
+             column has no room for a wiggle and a readable card at once. {% endcomment %}
+          <div class="pointer-events-none absolute inset-y-0 left-7 w-9 -translate-x-1/2 rounded-full bg-slate-700 md:hidden"
+               aria-hidden="true">
+            <span class="absolute inset-y-0 left-1/2 -translate-x-1/2 border-l-2 border-dashed border-white/50"></span>
+          </div>
+
+          {% for stop in phase.stops %}
+            <li class="relative flex h-[116px] items-center" style="--x: {{ stop.x }}%;">
+
+              <span class="absolute top-1/2 left-7 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] bg-white text-xl shadow-sm md:left-[var(--x)]"
+                    style="border-color: {{ phase.colour }};" aria-hidden="true">{{ stop.emoji }}</span>
+
+              <article class="relative ml-16 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-sm md:ml-0 md:w-[38%]
+                              {% if stop.side == 'right' %}md:mr-0 md:ml-auto{% else %}md:mr-auto md:ml-0{% endif %}">
+                <div class="flex items-center gap-2">
+                  <span class="h-2 w-2 shrink-0 rounded-full"
+                        style="background: {{ stop.status_colour }};" aria-hidden="true"></span>
+                  <h3 class="text-sm leading-snug font-semibold text-slate-900">{{ stop.title }}</h3>
+                </div>
+                <p class="mt-1 text-xs leading-snug text-slate-500">{{ stop.note }}</p>
+                <p class="mt-1 text-[10px] font-medium tracking-wide uppercase"
+                   style="color: {{ stop.status_colour }};">{{ stop.status_label }}</p>
+              </article>
+
+            </li>
+          {% endfor %}
+        </ol>
+      </section>
+    {% endfor %}
+
+    <p class="mt-6 text-xs text-slate-400">
+      The map and the ledger are the same list. When a milestone moves, change its status in
+      <code class="rounded bg-slate-100 px-1 py-0.5">apps/pages/roadmap.py</code> — the pin,
+      the card and the counter follow.
+    </p>
+  </div>
+{% endblock %}

@@ -1,0 +1,238 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="3466" viewBox="0 0 1200 3466" role="img" aria-labelledby="title desc">
+<title id="title">Rihlati roadmap</title>
+<desc id="desc">A winding road through Preview, Pilot-ready, Public launch and Growth, with one stop per milestone.</desc>
+<defs><filter id="pinShadow" x="-60%" y="-60%" width="220%" height="220%"><feDropShadow dx="0" dy="2" stdDeviation="2.2" flood-color="#0f172a" flood-opacity="0.18"/></filter></defs>
+<rect width="100%" height="100%" fill="transparent"/>
+<text x="40" y="72" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" fill="#0f172a">🗺️ Rihlati — Roadmap</text>
+<text x="40" y="108" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="18" fill="#475569">Preview  →  Pilot  →  Public launch  →  Growth</text>
+<text x="1160" y="72" text-anchor="end" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#94a3b8">October 2026</text>
+<text x="1160" y="98" text-anchor="end" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#94a3b8">static map · ledger is the source of truth</text>
+<rect x="20" y="150" width="1160" height="384" rx="26" fill="#10b981" fill-opacity="0.055" stroke="#10b981" stroke-opacity="0.28" stroke-width="1.4" stroke-dasharray="4 6"/>
+<text x="44" y="192" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#10b981">🟢 0 · Preview — now</text>
+<text x="44" y="216" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">Built, tested and reachable from a browser</text>
+<rect x="20" y="560" width="1160" height="912" rx="26" fill="#2563eb" fill-opacity="0.055" stroke="#2563eb" stroke-opacity="0.28" stroke-width="1.4" stroke-dasharray="4 6"/>
+<text x="44" y="602" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#2563eb">🔵 1 · Pilot-ready</text>
+<text x="44" y="626" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">Gate: 5–15 hand-picked agencies, no payments</text>
+<rect x="20" y="1498" width="1160" height="1088" rx="26" fill="#d97706" fill-opacity="0.055" stroke="#d97706" stroke-opacity="0.28" stroke-width="1.4" stroke-dasharray="4 6"/>
+<text x="44" y="1540" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#d97706">🟠 2 · Public launch</text>
+<text x="44" y="1564" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">Gate: open traffic + first paying agency</text>
+<rect x="20" y="2612" width="1160" height="648" rx="26" fill="#7c3aed" fill-opacity="0.055" stroke="#7c3aed" stroke-opacity="0.28" stroke-width="1.4" stroke-dasharray="4 6"/>
+<text x="44" y="2654" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="22" font-weight="700" fill="#7c3aed">🟣 3 · Growth</text>
+<text x="44" y="2678" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">After paying agencies — pointers only</text>
+<path d="M 630.9 168.0 L 637.0 178.0 L 642.9 188.0 L 648.7 198.0 L 654.2 208.0 L 659.4 218.0 L 664.4 228.0 L 669.1 238.0 L 673.4 248.0 L 677.4 258.0 L 681.0 268.0 L 684.2 278.0 L 687.0 288.0 L 689.5 298.0 L 691.4 308.0 L 693.0 318.0 L 694.1 328.0 L 694.8 338.0 L 695.0 348.0 L 694.8 358.0 L 694.1 368.0 L 692.9 378.0 L 691.4 388.0 L 689.4 398.0 L 686.9 408.0 L 684.1 418.0 L 680.8 428.0 L 677.2 438.0 L 673.2 448.0 L 668.8 458.0 L 664.2 468.0 L 659.2 478.0 L 653.9 488.0 L 648.4 498.0 L 642.7 508.0 L 636.7 518.0 L 630.6 528.0 L 624.3 538.0 L 617.9 548.0 L 611.5 558.0 L 604.9 568.0 L 598.4 578.0 L 591.8 588.0 L 585.3 598.0 L 578.9 608.0 L 572.6 618.0 L 566.4 628.0 L 560.3 638.0 L 554.5 648.0 L 548.8 658.0 L 543.4 668.0 L 538.3 678.0 L 533.5 688.0 L 529.0 698.0 L 524.8 708.0 L 521.0 718.0 L 517.5 728.0 L 514.5 738.0 L 511.8 748.0 L 509.6 758.0 L 507.8 768.0 L 506.4 778.0 L 505.5 788.0 L 505.1 798.0 L 505.0 808.0 L 505.5 818.0 L 506.4 828.0 L 507.7 838.0 L 509.5 848.0 L 511.7 858.0 L 514.3 868.0 L 517.3 878.0 L 520.8 888.0 L 524.6 898.0 L 528.7 908.0 L 533.2 918.0 L 538.0 928.0 L 543.1 938.0 L 548.5 948.0 L 554.1 958.0 L 560.0 968.0 L 566.0 978.0 L 572.2 988.0 L 578.5 998.0 L 585.0 1008.0 L 591.5 1018.0 L 598.0 1028.0 L 604.5 1038.0 L 611.1 1048.0 L 617.5 1058.0 L 623.9 1068.0 L 630.2 1078.0 L 636.4 1088.0 L 642.3 1098.0 L 648.1 1108.0 L 653.6 1118.0 L 658.9 1128.0 L 663.9 1138.0 L 668.6 1148.0 L 672.9 1158.0 L 677.0 1168.0 L 680.6 1178.0 L 683.9 1188.0 L 686.8 1198.0 L 689.2 1208.0 L 691.3 1218.0 L 692.9 1228.0 L 694.0 1238.0 L 694.7 1248.0 L 695.0 1258.0 L 694.8 1268.0 L 694.2 1278.0 L 693.1 1288.0 L 691.6 1298.0 L 689.6 1308.0 L 687.2 1318.0 L 684.4 1328.0 L 681.2 1338.0 L 677.6 1348.0 L 673.6 1358.0 L 669.3 1368.0 L 664.7 1378.0 L 659.7 1388.0 L 654.5 1398.0 L 649.0 1408.0 L 643.3 1418.0 L 637.4 1428.0 L 631.2 1438.0 L 625.0 1448.0 L 618.6 1458.0 L 612.1 1468.0 L 605.6 1478.0 L 599.1 1488.0 L 592.5 1498.0 L 586.0 1508.0 L 579.6 1518.0 L 573.2 1528.0 L 567.0 1538.0 L 561.0 1548.0 L 555.1 1558.0 L 549.4 1568.0 L 544.0 1578.0 L 538.8 1588.0 L 534.0 1598.0 L 529.4 1608.0 L 525.2 1618.0 L 521.4 1628.0 L 517.9 1638.0 L 514.8 1648.0 L 512.1 1658.0 L 509.8 1668.0 L 508.0 1678.0 L 506.6 1688.0 L 505.6 1698.0 L 505.1 1708.0 L 505.0 1718.0 L 505.4 1728.0 L 506.3 1738.0 L 507.5 1748.0 L 509.3 1758.0 L 511.4 1768.0 L 514.0 1778.0 L 517.0 1788.0 L 520.4 1798.0 L 524.1 1808.0 L 528.3 1818.0 L 532.7 1828.0 L 537.5 1838.0 L 542.6 1848.0 L 547.9 1858.0 L 553.5 1868.0 L 559.3 1878.0 L 565.4 1888.0 L 571.5 1898.0 L 577.8 1908.0 L 584.3 1918.0 L 590.8 1928.0 L 597.3 1938.0 L 603.8 1948.0 L 610.4 1958.0 L 616.9 1968.0 L 623.3 1978.0 L 629.6 1988.0 L 635.7 1998.0 L 641.7 2008.0 L 647.5 2018.0 L 653.0 2028.0 L 658.3 2038.0 L 663.4 2048.0 L 668.1 2058.0 L 672.5 2068.0 L 676.6 2078.0 L 680.2 2088.0 L 683.6 2098.0 L 686.5 2108.0 L 689.0 2118.0 L 691.1 2128.0 L 692.7 2138.0 L 693.9 2148.0 L 694.7 2158.0 L 695.0 2168.0 L 694.9 2178.0 L 694.3 2188.0 L 693.2 2198.0 L 691.7 2208.0 L 689.8 2218.0 L 687.5 2228.0 L 684.7 2238.0 L 681.5 2248.0 L 678.0 2258.0 L 674.1 2268.0 L 669.8 2278.0 L 665.2 2288.0 L 660.3 2298.0 L 655.1 2308.0 L 649.6 2318.0 L 643.9 2328.0 L 638.0 2338.0 L 631.9 2348.0 L 625.7 2358.0 L 619.3 2368.0 L 612.8 2378.0 L 606.3 2388.0 L 599.8 2398.0 L 593.2 2408.0 L 586.7 2418.0 L 580.3 2428.0 L 573.9 2438.0 L 567.7 2448.0 L 561.6 2458.0 L 555.7 2468.0 L 550.0 2478.0 L 544.6 2488.0 L 539.4 2498.0 L 534.5 2508.0 L 529.9 2518.0 L 525.6 2528.0 L 521.7 2538.0 L 518.2 2548.0 L 515.1 2558.0 L 512.4 2568.0 L 510.0 2578.0 L 508.1 2588.0 L 506.7 2598.0 L 505.7 2608.0 L 505.1 2618.0 L 505.0 2628.0 L 505.4 2638.0 L 506.1 2648.0 L 507.4 2658.0 L 509.1 2668.0 L 511.2 2678.0 L 513.7 2688.0 L 516.7 2698.0 L 520.0 2708.0 L 523.7 2718.0 L 527.8 2728.0 L 532.2 2738.0 L 537.0 2748.0 L 542.0 2758.0 L 547.3 2768.0 L 552.9 2778.0 L 558.7 2788.0 L 564.7 2798.0 L 570.9 2808.0 L 577.2 2818.0 L 583.6 2828.0 L 590.1 2838.0 L 596.6 2848.0 L 603.2 2858.0 L 609.7 2868.0 L 616.2 2878.0 L 622.6 2888.0 L 628.9 2898.0 L 635.1 2908.0 L 641.1 2918.0 L 646.9 2928.0 L 652.5 2938.0 L 657.8 2948.0 L 662.8 2958.0 L 667.6 2968.0 L 672.0 2978.0 L 676.1 2988.0 L 679.9 2998.0 L 683.2 3008.0 L 686.2 3018.0 L 688.7 3028.0 L 690.9 3038.0 L 692.6 3048.0 L 693.8 3058.0 L 694.6 3068.0 L 695.0 3078.0 L 694.9 3088.0 L 694.3 3098.0 L 693.4 3108.0 L 691.9 3118.0 L 690.0 3128.0 L 687.7 3138.0 L 685.0 3148.0 L 681.9 3158.0 L 678.4 3168.0 L 674.5 3178.0 L 670.3 3188.0 L 665.7 3198.0 L 660.8 3208.0 L 655.6 3218.0 L 650.2 3228.0 L 644.5 3238.0 L 642.2 3242.0" fill="none" stroke="#0f172a" stroke-opacity="0.12" stroke-width="66" stroke-linecap="round"/>
+<path d="M 630.9 168.0 L 637.0 178.0 L 642.9 188.0 L 648.7 198.0 L 654.2 208.0 L 659.4 218.0 L 664.4 228.0 L 669.1 238.0 L 673.4 248.0 L 677.4 258.0 L 681.0 268.0 L 684.2 278.0 L 687.0 288.0 L 689.5 298.0 L 691.4 308.0 L 693.0 318.0 L 694.1 328.0 L 694.8 338.0 L 695.0 348.0 L 694.8 358.0 L 694.1 368.0 L 692.9 378.0 L 691.4 388.0 L 689.4 398.0 L 686.9 408.0 L 684.1 418.0 L 680.8 428.0 L 677.2 438.0 L 673.2 448.0 L 668.8 458.0 L 664.2 468.0 L 659.2 478.0 L 653.9 488.0 L 648.4 498.0 L 642.7 508.0 L 636.7 518.0 L 630.6 528.0 L 624.3 538.0 L 617.9 548.0 L 611.5 558.0 L 604.9 568.0 L 598.4 578.0 L 591.8 588.0 L 585.3 598.0 L 578.9 608.0 L 572.6 618.0 L 566.4 628.0 L 560.3 638.0 L 554.5 648.0 L 548.8 658.0 L 543.4 668.0 L 538.3 678.0 L 533.5 688.0 L 529.0 698.0 L 524.8 708.0 L 521.0 718.0 L 517.5 728.0 L 514.5 738.0 L 511.8 748.0 L 509.6 758.0 L 507.8 768.0 L 506.4 778.0 L 505.5 788.0 L 505.1 798.0 L 505.0 808.0 L 505.5 818.0 L 506.4 828.0 L 507.7 838.0 L 509.5 848.0 L 511.7 858.0 L 514.3 868.0 L 517.3 878.0 L 520.8 888.0 L 524.6 898.0 L 528.7 908.0 L 533.2 918.0 L 538.0 928.0 L 543.1 938.0 L 548.5 948.0 L 554.1 958.0 L 560.0 968.0 L 566.0 978.0 L 572.2 988.0 L 578.5 998.0 L 585.0 1008.0 L 591.5 1018.0 L 598.0 1028.0 L 604.5 1038.0 L 611.1 1048.0 L 617.5 1058.0 L 623.9 1068.0 L 630.2 1078.0 L 636.4 1088.0 L 642.3 1098.0 L 648.1 1108.0 L 653.6 1118.0 L 658.9 1128.0 L 663.9 1138.0 L 668.6 1148.0 L 672.9 1158.0 L 677.0 1168.0 L 680.6 1178.0 L 683.9 1188.0 L 686.8 1198.0 L 689.2 1208.0 L 691.3 1218.0 L 692.9 1228.0 L 694.0 1238.0 L 694.7 1248.0 L 695.0 1258.0 L 694.8 1268.0 L 694.2 1278.0 L 693.1 1288.0 L 691.6 1298.0 L 689.6 1308.0 L 687.2 1318.0 L 684.4 1328.0 L 681.2 1338.0 L 677.6 1348.0 L 673.6 1358.0 L 669.3 1368.0 L 664.7 1378.0 L 659.7 1388.0 L 654.5 1398.0 L 649.0 1408.0 L 643.3 1418.0 L 637.4 1428.0 L 631.2 1438.0 L 625.0 1448.0 L 618.6 1458.0 L 612.1 1468.0 L 605.6 1478.0 L 599.1 1488.0 L 592.5 1498.0 L 586.0 1508.0 L 579.6 1518.0 L 573.2 1528.0 L 567.0 1538.0 L 561.0 1548.0 L 555.1 1558.0 L 549.4 1568.0 L 544.0 1578.0 L 538.8 1588.0 L 534.0 1598.0 L 529.4 1608.0 L 525.2 1618.0 L 521.4 1628.0 L 517.9 1638.0 L 514.8 1648.0 L 512.1 1658.0 L 509.8 1668.0 L 508.0 1678.0 L 506.6 1688.0 L 505.6 1698.0 L 505.1 1708.0 L 505.0 1718.0 L 505.4 1728.0 L 506.3 1738.0 L 507.5 1748.0 L 509.3 1758.0 L 511.4 1768.0 L 514.0 1778.0 L 517.0 1788.0 L 520.4 1798.0 L 524.1 1808.0 L 528.3 1818.0 L 532.7 1828.0 L 537.5 1838.0 L 542.6 1848.0 L 547.9 1858.0 L 553.5 1868.0 L 559.3 1878.0 L 565.4 1888.0 L 571.5 1898.0 L 577.8 1908.0 L 584.3 1918.0 L 590.8 1928.0 L 597.3 1938.0 L 603.8 1948.0 L 610.4 1958.0 L 616.9 1968.0 L 623.3 1978.0 L 629.6 1988.0 L 635.7 1998.0 L 641.7 2008.0 L 647.5 2018.0 L 653.0 2028.0 L 658.3 2038.0 L 663.4 2048.0 L 668.1 2058.0 L 672.5 2068.0 L 676.6 2078.0 L 680.2 2088.0 L 683.6 2098.0 L 686.5 2108.0 L 689.0 2118.0 L 691.1 2128.0 L 692.7 2138.0 L 693.9 2148.0 L 694.7 2158.0 L 695.0 2168.0 L 694.9 2178.0 L 694.3 2188.0 L 693.2 2198.0 L 691.7 2208.0 L 689.8 2218.0 L 687.5 2228.0 L 684.7 2238.0 L 681.5 2248.0 L 678.0 2258.0 L 674.1 2268.0 L 669.8 2278.0 L 665.2 2288.0 L 660.3 2298.0 L 655.1 2308.0 L 649.6 2318.0 L 643.9 2328.0 L 638.0 2338.0 L 631.9 2348.0 L 625.7 2358.0 L 619.3 2368.0 L 612.8 2378.0 L 606.3 2388.0 L 599.8 2398.0 L 593.2 2408.0 L 586.7 2418.0 L 580.3 2428.0 L 573.9 2438.0 L 567.7 2448.0 L 561.6 2458.0 L 555.7 2468.0 L 550.0 2478.0 L 544.6 2488.0 L 539.4 2498.0 L 534.5 2508.0 L 529.9 2518.0 L 525.6 2528.0 L 521.7 2538.0 L 518.2 2548.0 L 515.1 2558.0 L 512.4 2568.0 L 510.0 2578.0 L 508.1 2588.0 L 506.7 2598.0 L 505.7 2608.0 L 505.1 2618.0 L 505.0 2628.0 L 505.4 2638.0 L 506.1 2648.0 L 507.4 2658.0 L 509.1 2668.0 L 511.2 2678.0 L 513.7 2688.0 L 516.7 2698.0 L 520.0 2708.0 L 523.7 2718.0 L 527.8 2728.0 L 532.2 2738.0 L 537.0 2748.0 L 542.0 2758.0 L 547.3 2768.0 L 552.9 2778.0 L 558.7 2788.0 L 564.7 2798.0 L 570.9 2808.0 L 577.2 2818.0 L 583.6 2828.0 L 590.1 2838.0 L 596.6 2848.0 L 603.2 2858.0 L 609.7 2868.0 L 616.2 2878.0 L 622.6 2888.0 L 628.9 2898.0 L 635.1 2908.0 L 641.1 2918.0 L 646.9 2928.0 L 652.5 2938.0 L 657.8 2948.0 L 662.8 2958.0 L 667.6 2968.0 L 672.0 2978.0 L 676.1 2988.0 L 679.9 2998.0 L 683.2 3008.0 L 686.2 3018.0 L 688.7 3028.0 L 690.9 3038.0 L 692.6 3048.0 L 693.8 3058.0 L 694.6 3068.0 L 695.0 3078.0 L 694.9 3088.0 L 694.3 3098.0 L 693.4 3108.0 L 691.9 3118.0 L 690.0 3128.0 L 687.7 3138.0 L 685.0 3148.0 L 681.9 3158.0 L 678.4 3168.0 L 674.5 3178.0 L 670.3 3188.0 L 665.7 3198.0 L 660.8 3208.0 L 655.6 3218.0 L 650.2 3228.0 L 644.5 3238.0 L 642.2 3242.0" fill="none" stroke="#334155" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M 630.9 168.0 L 637.0 178.0 L 642.9 188.0 L 648.7 198.0 L 654.2 208.0 L 659.4 218.0 L 664.4 228.0 L 669.1 238.0 L 673.4 248.0 L 677.4 258.0 L 681.0 268.0 L 684.2 278.0 L 687.0 288.0 L 689.5 298.0 L 691.4 308.0 L 693.0 318.0 L 694.1 328.0 L 694.8 338.0 L 695.0 348.0 L 694.8 358.0 L 694.1 368.0 L 692.9 378.0 L 691.4 388.0 L 689.4 398.0 L 686.9 408.0 L 684.1 418.0 L 680.8 428.0 L 677.2 438.0 L 673.2 448.0 L 668.8 458.0 L 664.2 468.0 L 659.2 478.0 L 653.9 488.0 L 648.4 498.0 L 642.7 508.0 L 636.7 518.0 L 630.6 528.0 L 624.3 538.0 L 617.9 548.0 L 611.5 558.0 L 604.9 568.0 L 598.4 578.0 L 591.8 588.0 L 585.3 598.0 L 578.9 608.0 L 572.6 618.0 L 566.4 628.0 L 560.3 638.0 L 554.5 648.0 L 548.8 658.0 L 543.4 668.0 L 538.3 678.0 L 533.5 688.0 L 529.0 698.0 L 524.8 708.0 L 521.0 718.0 L 517.5 728.0 L 514.5 738.0 L 511.8 748.0 L 509.6 758.0 L 507.8 768.0 L 506.4 778.0 L 505.5 788.0 L 505.1 798.0 L 505.0 808.0 L 505.5 818.0 L 506.4 828.0 L 507.7 838.0 L 509.5 848.0 L 511.7 858.0 L 514.3 868.0 L 517.3 878.0 L 520.8 888.0 L 524.6 898.0 L 528.7 908.0 L 533.2 918.0 L 538.0 928.0 L 543.1 938.0 L 548.5 948.0 L 554.1 958.0 L 560.0 968.0 L 566.0 978.0 L 572.2 988.0 L 578.5 998.0 L 585.0 1008.0 L 591.5 1018.0 L 598.0 1028.0 L 604.5 1038.0 L 611.1 1048.0 L 617.5 1058.0 L 623.9 1068.0 L 630.2 1078.0 L 636.4 1088.0 L 642.3 1098.0 L 648.1 1108.0 L 653.6 1118.0 L 658.9 1128.0 L 663.9 1138.0 L 668.6 1148.0 L 672.9 1158.0 L 677.0 1168.0 L 680.6 1178.0 L 683.9 1188.0 L 686.8 1198.0 L 689.2 1208.0 L 691.3 1218.0 L 692.9 1228.0 L 694.0 1238.0 L 694.7 1248.0 L 695.0 1258.0 L 694.8 1268.0 L 694.2 1278.0 L 693.1 1288.0 L 691.6 1298.0 L 689.6 1308.0 L 687.2 1318.0 L 684.4 1328.0 L 681.2 1338.0 L 677.6 1348.0 L 673.6 1358.0 L 669.3 1368.0 L 664.7 1378.0 L 659.7 1388.0 L 654.5 1398.0 L 649.0 1408.0 L 643.3 1418.0 L 637.4 1428.0 L 631.2 1438.0 L 625.0 1448.0 L 618.6 1458.0 L 612.1 1468.0 L 605.6 1478.0 L 599.1 1488.0 L 592.5 1498.0 L 586.0 1508.0 L 579.6 1518.0 L 573.2 1528.0 L 567.0 1538.0 L 561.0 1548.0 L 555.1 1558.0 L 549.4 1568.0 L 544.0 1578.0 L 538.8 1588.0 L 534.0 1598.0 L 529.4 1608.0 L 525.2 1618.0 L 521.4 1628.0 L 517.9 1638.0 L 514.8 1648.0 L 512.1 1658.0 L 509.8 1668.0 L 508.0 1678.0 L 506.6 1688.0 L 505.6 1698.0 L 505.1 1708.0 L 505.0 1718.0 L 505.4 1728.0 L 506.3 1738.0 L 507.5 1748.0 L 509.3 1758.0 L 511.4 1768.0 L 514.0 1778.0 L 517.0 1788.0 L 520.4 1798.0 L 524.1 1808.0 L 528.3 1818.0 L 532.7 1828.0 L 537.5 1838.0 L 542.6 1848.0 L 547.9 1858.0 L 553.5 1868.0 L 559.3 1878.0 L 565.4 1888.0 L 571.5 1898.0 L 577.8 1908.0 L 584.3 1918.0 L 590.8 1928.0 L 597.3 1938.0 L 603.8 1948.0 L 610.4 1958.0 L 616.9 1968.0 L 623.3 1978.0 L 629.6 1988.0 L 635.7 1998.0 L 641.7 2008.0 L 647.5 2018.0 L 653.0 2028.0 L 658.3 2038.0 L 663.4 2048.0 L 668.1 2058.0 L 672.5 2068.0 L 676.6 2078.0 L 680.2 2088.0 L 683.6 2098.0 L 686.5 2108.0 L 689.0 2118.0 L 691.1 2128.0 L 692.7 2138.0 L 693.9 2148.0 L 694.7 2158.0 L 695.0 2168.0 L 694.9 2178.0 L 694.3 2188.0 L 693.2 2198.0 L 691.7 2208.0 L 689.8 2218.0 L 687.5 2228.0 L 684.7 2238.0 L 681.5 2248.0 L 678.0 2258.0 L 674.1 2268.0 L 669.8 2278.0 L 665.2 2288.0 L 660.3 2298.0 L 655.1 2308.0 L 649.6 2318.0 L 643.9 2328.0 L 638.0 2338.0 L 631.9 2348.0 L 625.7 2358.0 L 619.3 2368.0 L 612.8 2378.0 L 606.3 2388.0 L 599.8 2398.0 L 593.2 2408.0 L 586.7 2418.0 L 580.3 2428.0 L 573.9 2438.0 L 567.7 2448.0 L 561.6 2458.0 L 555.7 2468.0 L 550.0 2478.0 L 544.6 2488.0 L 539.4 2498.0 L 534.5 2508.0 L 529.9 2518.0 L 525.6 2528.0 L 521.7 2538.0 L 518.2 2548.0 L 515.1 2558.0 L 512.4 2568.0 L 510.0 2578.0 L 508.1 2588.0 L 506.7 2598.0 L 505.7 2608.0 L 505.1 2618.0 L 505.0 2628.0 L 505.4 2638.0 L 506.1 2648.0 L 507.4 2658.0 L 509.1 2668.0 L 511.2 2678.0 L 513.7 2688.0 L 516.7 2698.0 L 520.0 2708.0 L 523.7 2718.0 L 527.8 2728.0 L 532.2 2738.0 L 537.0 2748.0 L 542.0 2758.0 L 547.3 2768.0 L 552.9 2778.0 L 558.7 2788.0 L 564.7 2798.0 L 570.9 2808.0 L 577.2 2818.0 L 583.6 2828.0 L 590.1 2838.0 L 596.6 2848.0 L 603.2 2858.0 L 609.7 2868.0 L 616.2 2878.0 L 622.6 2888.0 L 628.9 2898.0 L 635.1 2908.0 L 641.1 2918.0 L 646.9 2928.0 L 652.5 2938.0 L 657.8 2948.0 L 662.8 2958.0 L 667.6 2968.0 L 672.0 2978.0 L 676.1 2988.0 L 679.9 2998.0 L 683.2 3008.0 L 686.2 3018.0 L 688.7 3028.0 L 690.9 3038.0 L 692.6 3048.0 L 693.8 3058.0 L 694.6 3068.0 L 695.0 3078.0 L 694.9 3088.0 L 694.3 3098.0 L 693.4 3108.0 L 691.9 3118.0 L 690.0 3128.0 L 687.7 3138.0 L 685.0 3148.0 L 681.9 3158.0 L 678.4 3168.0 L 674.5 3178.0 L 670.3 3188.0 L 665.7 3198.0 L 660.8 3208.0 L 655.6 3218.0 L 650.2 3228.0 L 644.5 3238.0 L 642.2 3242.0" fill="none" stroke="#f8fafc" stroke-width="3.6" stroke-dasharray="22 18" stroke-linecap="round"/>
+<line x1="714.0" y1="288.0" x2="810" y2="288.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="259.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="288.0" r="5" fill="#10b981"/>
+<text x="842" y="286.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Marketplace, console, auth</text>
+<text x="842" y="305.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Search, offer pages, CRM, API</text>
+<circle cx="687.0" cy="288.0" r="26" fill="#ffffff" stroke="#10b981" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="687.0" y="288.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🏪</text>
+<line x1="720.2" y1="376.0" x2="810" y2="376.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="347.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="376.0" r="5" fill="#10b981"/>
+<text x="842" y="374.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Manifest, links, analytics</text>
+<text x="842" y="393.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Trips, tracked links, daily counters</text>
+<circle cx="693.2" cy="376.0" r="26" fill="#ffffff" stroke="#10b981" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="693.2" y="376.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🚌</text>
+<line x1="693.1" y1="464.0" x2="810" y2="464.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="435.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="464.0" r="5" fill="#10b981"/>
+<text x="842" y="462.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Chat v1</text>
+<text x="842" y="481.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Per-offer assistant, agency-editable</text>
+<circle cx="666.1" cy="464.0" r="26" fill="#ffffff" stroke="#10b981" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="666.1" y="464.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🤖</text>
+<line x1="502.0" y1="698.0" x2="390" y2="698.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="669.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="698.0" r="5" fill="#2563eb"/>
+<text x="72" y="696.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M1 · End-to-end tests</text>
+<text x="72" y="715.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Five pages, real browser</text>
+<circle cx="529.0" cy="698.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="529.0" y="698.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🧪</text>
+<line x1="478.7" y1="786.0" x2="390" y2="786.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="757.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="786.0" r="5" fill="#2563eb"/>
+<text x="72" y="784.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M2 · Interface translation</text>
+<text x="72" y="803.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Arabic + French, RTL, one switch</text>
+<circle cx="505.7" cy="786.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="505.7" y="786.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🌍</text>
+<line x1="489.1" y1="874.0" x2="390" y2="874.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="845.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="874.0" r="5" fill="#2563eb"/>
+<text x="72" y="872.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">G1 · Attributes schema</text>
+<text x="72" y="891.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Both entry points reject unknown keys</text>
+<circle cx="516.1" cy="874.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="516.1" y="874.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🧱</text>
+<line x1="529.4" y1="962.0" x2="390" y2="962.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="933.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="962.0" r="5" fill="#2563eb"/>
+<text x="72" y="960.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M5 · Image uploads</text>
+<text x="72" y="979.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Validated, EXIF stripped, off-process</text>
+<circle cx="556.4" cy="962.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="556.4" y="962.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📸</text>
+<line x1="639.4" y1="1050.0" x2="810" y2="1050.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="1021.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="1050.0" r="5" fill="#2563eb"/>
+<text x="842" y="1048.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M7 · Deploy + restore</text>
+<text x="842" y="1067.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Production path, rehearsed backup</text>
+<circle cx="612.4" cy="1050.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="612.4" y="1050.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🚀</text>
+<line x1="690.9" y1="1138.0" x2="810" y2="1138.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="1109.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="1138.0" r="5" fill="#94a3b8"/>
+<text x="842" y="1136.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Onboarding runbook</text>
+<text x="842" y="1155.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Documents → verification → first inquiry</text>
+<circle cx="663.9" cy="1138.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="663.9" y="1138.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🤝</text>
+<line x1="719.6" y1="1226.0" x2="810" y2="1226.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="1197.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="1226.0" r="5" fill="#d97706"/>
+<text x="842" y="1224.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Legal basics</text>
+<text x="842" y="1243.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Terms, privacy, Law 18-07 consent</text>
+<circle cx="692.6" cy="1226.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="692.6" y="1226.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">⚖️</text>
+<line x1="715.2" y1="1314.0" x2="810" y2="1314.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="1285.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="1314.0" r="5" fill="#94a3b8"/>
+<text x="842" y="1312.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Pilot measurement</text>
+<text x="842" y="1331.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Leads, response time, chat quality</text>
+<circle cx="688.2" cy="1314.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="688.2" y="1314.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📊</text>
+<line x1="679.3" y1="1402.0" x2="810" y2="1402.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="1373.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="1402.0" r="5" fill="#94a3b8"/>
+<text x="842" y="1400.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Support channel</text>
+<text x="842" y="1419.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">One named channel, one promise</text>
+<circle cx="652.3" cy="1402.0" r="26" fill="#ffffff" stroke="#2563eb" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="652.3" y="1402.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🎧</text>
+<line x1="491.5" y1="1636.0" x2="390" y2="1636.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="1607.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="1636.0" r="5" fill="#2563eb"/>
+<text x="72" y="1634.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M3 · Phone/email login</text>
+<text x="72" y="1653.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">One identifier, identical error text</text>
+<circle cx="518.5" cy="1636.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="518.5" y="1636.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🔐</text>
+<line x1="478.2" y1="1724.0" x2="390" y2="1724.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="1695.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="1724.0" r="5" fill="#2563eb"/>
+<text x="72" y="1722.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M4 · Report queue</text>
+<text x="72" y="1741.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Staff decision, audit row, counters drop</text>
+<circle cx="505.2" cy="1724.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="505.2" y="1724.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🚩</text>
+<line x1="498.7" y1="1812.0" x2="390" y2="1812.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="1783.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="1812.0" r="5" fill="#2563eb"/>
+<text x="72" y="1810.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">M6 · CRM redesign</text>
+<text x="72" y="1829.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">“What do I do right now”</text>
+<circle cx="525.7" cy="1812.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="525.7" y="1812.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📋</text>
+<line x1="545.8" y1="1900.0" x2="390" y2="1900.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="1871.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="1900.0" r="5" fill="#2563eb"/>
+<text x="72" y="1898.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Reviews UI</text>
+<text x="72" y="1917.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">A real lead, a reply, both sides render</text>
+<circle cx="572.8" cy="1900.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="572.8" y="1900.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">⭐</text>
+<line x1="656.6" y1="1988.0" x2="810" y2="1988.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="1959.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="1988.0" r="5" fill="#d97706"/>
+<text x="842" y="1986.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">G4 · Self-signup</text>
+<text x="842" y="2005.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">A second agency, created in-product</text>
+<circle cx="629.6" cy="1988.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="629.6" y="1988.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🪪</text>
+<line x1="702.8" y1="2076.0" x2="810" y2="2076.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="2047.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="2076.0" r="5" fill="#2563eb"/>
+<text x="842" y="2074.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">G5 · Single-offer read</text>
+<text x="842" y="2093.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">GET one offer + isolation test</text>
+<circle cx="675.8" cy="2076.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="675.8" y="2076.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🔎</text>
+<line x1="721.9" y1="2164.0" x2="810" y2="2164.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="2135.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="2164.0" r="5" fill="#d97706"/>
+<text x="842" y="2162.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Billing model</text>
+<text x="842" y="2181.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Credits, subscription or per-lead</text>
+<circle cx="694.9" cy="2164.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="694.9" y="2164.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">💳</text>
+<line x1="707.2" y1="2252.0" x2="810" y2="2252.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="2223.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="2252.0" r="5" fill="#d97706"/>
+<text x="842" y="2250.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Credits + plan gate</text>
+<text x="842" y="2269.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Manual top-up, has_feature()</text>
+<circle cx="680.2" cy="2252.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="680.2" y="2252.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🪙</text>
+<line x1="663.8" y1="2340.0" x2="810" y2="2340.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="2311.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="2340.0" r="5" fill="#2563eb"/>
+<text x="842" y="2338.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Cron</text>
+<text x="842" y="2357.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">purge_chat, rating reconcile, expiries</text>
+<circle cx="636.8" cy="2340.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="636.8" y="2340.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">⏰</text>
+<line x1="553.3" y1="2428.0" x2="390" y2="2428.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="2399.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="2428.0" r="5" fill="#2563eb"/>
+<text x="72" y="2426.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Shared cache (G6)</text>
+<text x="72" y="2445.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Login limit correct with N workers</text>
+<circle cx="580.3" cy="2428.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="580.3" y="2428.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🧠</text>
+<line x1="503.8" y1="2516.0" x2="390" y2="2516.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="2487.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="2516.0" r="5" fill="#94a3b8"/>
+<text x="72" y="2514.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Monitoring</text>
+<text x="72" y="2533.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Errors and downtime reach a human</text>
+<circle cx="530.8" cy="2516.0" r="26" fill="#ffffff" stroke="#d97706" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="530.8" y="2516.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📈</text>
+<line x1="511.0" y1="2750.0" x2="390" y2="2750.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="2721.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="2750.0" r="5" fill="#94a3b8"/>
+<text x="72" y="2748.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Promoted listings</text>
+<text x="72" y="2767.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Labelled, capped, never overrides trust</text>
+<circle cx="538.0" cy="2750.0" r="26" fill="#ffffff" stroke="#7c3aed" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="538.0" y="2750.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📣</text>
+<line x1="563.1" y1="2838.0" x2="390" y2="2838.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="40" y="2809.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="58" cy="2838.0" r="5" fill="#94a3b8"/>
+<text x="72" y="2836.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">WhatsApp Business API</text>
+<text x="72" y="2855.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Same bot, a second transport</text>
+<circle cx="590.1" cy="2838.0" r="26" fill="#ffffff" stroke="#7c3aed" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="590.1" y="2838.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">💬</text>
+<line x1="672.7" y1="2926.0" x2="810" y2="2926.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="2897.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="2926.0" r="5" fill="#94a3b8"/>
+<text x="842" y="2924.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Mobile app</text>
+<text x="842" y="2943.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">The API is already the hard part</text>
+<circle cx="645.7" cy="2926.0" r="26" fill="#ffffff" stroke="#7c3aed" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="645.7" y="2926.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📱</text>
+<line x1="712.1" y1="3014.0" x2="810" y2="3014.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="2985.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="3014.0" r="5" fill="#94a3b8"/>
+<text x="842" y="3012.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Chat v2</text>
+<text x="842" y="3031.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Tools, FAQ mining, hosted-model call</text>
+<circle cx="685.1" cy="3014.0" r="26" fill="#ffffff" stroke="#7c3aed" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="685.1" y="3014.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🛠</text>
+<line x1="721.0" y1="3102.0" x2="810" y2="3102.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="3073.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="3102.0" r="5" fill="#94a3b8"/>
+<text x="842" y="3100.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Cross-agency reputation</text>
+<text x="842" y="3119.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Lawyer first — it is personal data</text>
+<circle cx="694.0" cy="3102.0" r="26" fill="#ffffff" stroke="#7c3aed" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="694.0" y="3102.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">🌐</text>
+<line x1="696.4" y1="3190.0" x2="810" y2="3190.0" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="2 4"/>
+<rect x="810" y="3161.0" width="350" height="58" rx="12" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.2"/>
+<circle cx="828" cy="3190.0" r="5" fill="#94a3b8"/>
+<text x="842" y="3188.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16.5" font-weight="600" fill="#0f172a">Retire one vault</text>
+<text x="842" y="3207.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#64748b">Two descriptions of one product drift</text>
+<circle cx="669.4" cy="3190.0" r="26" fill="#ffffff" stroke="#7c3aed" stroke-width="3.5" filter="url(#pinShadow)"/>
+<text x="669.4" y="3190.0" text-anchor="middle" dominant-baseline="central" font-size="24" font-family="Noto Color Emoji, Apple Color Emoji, Segoe UI Emoji, sans-serif">📚</text>
+<text x="40" y="3344" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569">STATUS</text>
+<circle cx="46" cy="3370" r="6" fill="#10b981"/>
+<text x="60" y="3374" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">✅ built</text>
+<circle cx="266" cy="3370" r="6" fill="#2563eb"/>
+<text x="280" y="3374" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">🔜 next</text>
+<circle cx="486" cy="3370" r="6" fill="#d97706"/>
+<text x="500" y="3374" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">⛔ blocked on a decision</text>
+<circle cx="706" cy="3370" r="6" fill="#94a3b8"/>
+<text x="720" y="3374" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#475569">⬜ later</text>
+<text x="40" y="3410" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#94a3b8">Pins are milestones; the ledger in Roadmap.md is the text version and stays authoritative.</text>
+</svg>

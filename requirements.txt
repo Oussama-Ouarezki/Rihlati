@@ -1,0 +1,9 @@
+Django>=5.0,<6.0
+# Typed routes, Pydantic schemas, and an OpenAPI document generated from the
+# same classes the handlers validate against. See config/api.py for why this
+# rather than DRF or plain views.
+django-ninja>=1.4,<2.0
+# Error reporting (rule #4). Works against Sentry or a self-hosted GlitchTip —
+# same protocol. Installed unconditionally but INERT without SENTRY_DSN, so the
+# dependency costs nothing until you point it somewhere.
+sentry-sdk>=2.0,<3.0

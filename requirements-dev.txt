@@ -1,0 +1,8 @@
+# Development-only dependencies. Kept out of requirements.txt so the
+# production image never installs a linter.
+-r requirements.txt
+
+ruff>=0.6
+# ER-diagram generation only (manage.py graph_models). Not needed at runtime.
+django-extensions>=3.2
+pydot>=2.0
