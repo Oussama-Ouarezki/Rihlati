@@ -19,9 +19,14 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from apps.accounts.models import Agency, Membership
-from apps.chat.models import AgencyAssistant, assistant_is_enabled
+from apps.chat.models import (
+    MAX_FAQS,
+    AgencyAssistant,
+    assistant_is_enabled,
+)
 from apps.common.quotas import QuotaExceeded, assert_can_publish, quota_state
 from apps.common.tenancy import (
     Forbidden,
@@ -36,11 +41,13 @@ from apps.leads.services import client_for_contact
 from apps.offers.api import OfferFilters, apply_filters, record_metric
 from apps.offers.models import CheckpointType, Offer, OfferMilestone, TrackedLink
 from apps.pages.forms import (
+    AgencyFaqForm,
     AgencyProfileForm,
     AssistantForm,
     ClientForm,
     InquiryForm,
     MilestoneForm,
+    OfferAssistantForm,
     OfferForm,
     ReservationForm,
     TrackedLinkForm,
@@ -1014,36 +1021,57 @@ def agency_client_detail(request, agency_id, client_id):
 
 @login_required
 def agency_assistant(request, agency_id):
-    """The agency's own policy for its assistant.
+    """The agency's own policy and global Q&A for its assistant.
 
     Manager-only for the same reason the profile is: these sentences are spoken
     to travelers under the agency's name. The view never accepts an agency id
     from the form — `require_membership_or_404` already authorized the one in
-    the URL, and `AssistantForm` has no `agency` field to forge.
+    the URL, and the forms have no `agency` field to forge.
     """
     agency = require_membership_or_404(request.user, agency_id, Membership.MANAGER)
     assistant = AgencyAssistant.objects.filter(agency=agency).first()
+    form = AssistantForm(instance=assistant)
+    faq_form = AgencyFaqForm(agency=agency)
 
     if request.method == "POST":
-        instance = assistant or AgencyAssistant(agency=agency)
-        form = AssistantForm(request.POST, instance=instance)
-        if form.is_valid():
-            with transaction.atomic():
-                before = _assistant_snapshot(instance)
-                saved = form.save()
-                audit(
-                    request,
-                    "assistant.updated",
-                    saved,
-                    agency=agency,
-                    before=before,
-                    after=_assistant_snapshot(saved),
-                )
-            messages.success(request, "Assistant instructions saved.")
-            return redirect("agency-assistant", agency_id=agency.id)
-        messages.error(request, "Check the fields marked in red.")
-    else:
-        form = AssistantForm(instance=assistant)
+        action = request.POST.get("action", "policy")
+        if action == "faq_add":
+            if agency.assistant_faqs.count() >= MAX_FAQS:
+                faq_form = AgencyFaqForm(request.POST, agency=agency)
+                faq_form.add_error(None, f"Keep at most {MAX_FAQS} questions.")
+            else:
+                faq_form = AgencyFaqForm(request.POST, agency=agency)
+                if faq_form.is_valid():
+                    with transaction.atomic():
+                        faq = faq_form.save()
+                        audit(
+                            request,
+                            "assistant.faq_added",
+                            faq,
+                            agency=agency,
+                            after=_faq_snapshot(faq),
+                        )
+                    messages.success(request, "Question saved.")
+                    return redirect("agency-assistant", agency_id=agency.id)
+            messages.error(request, "Check the question marked in red.")
+        else:
+            instance = assistant or AgencyAssistant(agency=agency)
+            form = AssistantForm(request.POST, instance=instance)
+            if form.is_valid():
+                with transaction.atomic():
+                    before = _assistant_snapshot(instance)
+                    saved = form.save()
+                    audit(
+                        request,
+                        "assistant.updated",
+                        saved,
+                        agency=agency,
+                        before=before,
+                        after=_assistant_snapshot(saved),
+                    )
+                messages.success(request, "Assistant instructions saved.")
+                return redirect("agency-assistant", agency_id=agency.id)
+            messages.error(request, "Check the fields marked in red.")
 
     return render(
         request,
@@ -1052,6 +1080,9 @@ def agency_assistant(request, agency_id):
             "agency": agency,
             "form": form,
             "assistant": form.instance,
+            "faqs": agency.assistant_faqs.all(),
+            "faq_form": faq_form,
+            "max_faqs": MAX_FAQS,
             # Only offers a traveler can actually reach — a test link to a draft
             # or an expired listing would 404 and look like the assistant is broken.
             "offers": Offer.publicly_visible().filter(agency=agency).order_by("departure_date"),
@@ -1060,17 +1091,114 @@ def agency_assistant(request, agency_id):
     )
 
 
-def _assistant_snapshot(assistant):
-    """What the audit row needs: the state, and how much text — not the text.
+@login_required
+def agency_faq_edit(request, agency_id, faq_id):
+    agency = require_membership_or_404(request.user, agency_id, Membership.MANAGER)
+    faq = get_object_or_404(agency.assistant_faqs, pk=faq_id)
+    form = AgencyFaqForm(request.POST or None, instance=faq, agency=agency)
 
-    The instructions are public to travelers anyway, but the audit log is read
-    by staff and kept for years; duplicating a policy essay into it on every save
-    makes the log harder to scan without making it more useful.
-    """
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            before = _faq_snapshot(faq)
+            saved = form.save()
+            audit(
+                request,
+                "assistant.faq_updated",
+                saved,
+                agency=agency,
+                before=before,
+                after=_faq_snapshot(saved),
+            )
+        messages.success(request, "Question updated.")
+        return redirect("agency-assistant", agency_id=agency.id)
+    if request.method == "POST":
+        messages.error(request, "Check the question marked in red.")
+
+    return render(
+        request,
+        "pages/agency_faq_form.html",
+        {"agency": agency, "faq": faq, "form": form, "tab": "assistant"},
+    )
+
+
+@login_required
+@require_POST
+def agency_faq_delete(request, agency_id, faq_id):
+    agency = require_membership_or_404(request.user, agency_id, Membership.MANAGER)
+    faq = get_object_or_404(agency.assistant_faqs, pk=faq_id)
+    with transaction.atomic():
+        audit(
+            request,
+            "assistant.faq_deleted",
+            faq,
+            agency=agency,
+            before=_faq_snapshot(faq),
+        )
+        faq.delete()
+    messages.success(request, "Question deleted.")
+    return redirect("agency-assistant", agency_id=agency.id)
+
+
+@login_required
+def agency_offer_assistant(request, agency_id, offer_id):
+    agency = require_membership_or_404(request.user, agency_id, Membership.MANAGER)
+    offer = get_object_or_404(agency.offers, pk=offer_id)
+    assistant = getattr(offer, "assistant_config", None)
+    form = OfferAssistantForm(request.POST or None, instance=assistant)
+
+    if request.method == "POST" and form.is_valid():
+        with transaction.atomic():
+            before = _offer_assistant_snapshot(assistant)
+            saved = form.save(commit=False)
+            saved.agency = agency
+            saved.offer = offer
+            saved.save()
+            audit(
+                request,
+                "offer_assistant.updated",
+                saved,
+                agency=agency,
+                before=before,
+                after=_offer_assistant_snapshot(saved),
+            )
+        messages.success(request, "Offer instructions saved.")
+        return redirect("agency-offer-assistant", agency_id=agency.id, offer_id=offer.id)
+    if request.method == "POST":
+        messages.error(request, "Check the field marked in red.")
+
+    return render(
+        request,
+        "pages/agency_offer_assistant.html",
+        {
+            "agency": agency,
+            "offer": offer,
+            "form": form,
+            "assistant": form.instance,
+            "tab": "offers",
+        },
+    )
+
+
+def _assistant_snapshot(assistant):
+    """What the audit row needs: the state, and how much text — not the text."""
     return {
         "is_enabled": assistant.is_enabled,
         "instructions_chars": len((assistant.instructions or "").strip()),
     }
+
+
+def _faq_snapshot(faq):
+    return {
+        "question": faq.question,
+        "answer_chars": len((faq.answer or "").strip()),
+        "is_active": faq.is_active,
+    }
+
+
+def _offer_assistant_snapshot(assistant):
+    if assistant is None:
+        return {"instructions_chars": 0}
+    return {"instructions_chars": len((assistant.instructions or "").strip())}
 
 
 @login_required

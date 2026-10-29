@@ -6,7 +6,7 @@
     <div>
       <p class="eyebrow">Automation</p>
       <h2 class="page-title">Assistant</h2>
-      <p class="page-lede">Your booking rules, added to what each offer already says.</p>
+      <p class="page-lede">Global policy and answers, plus instructions for individual offers.</p>
     </div>
   </header>
 
@@ -66,7 +66,10 @@
                   <span class="block truncate text-sm font-medium text-slate-900">{{ offer.title_fr }}</span>
                   <span class="block text-xs text-slate-500">{{ offer.departure_date|date:"j M Y" }} · {{ offer.price_dzd|floatformat:0 }} DZD</span>
                 </span>
-                <a href="{% url 'offer-assistant' offer.id %}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Open</a>
+                <span class="flex gap-1.5">
+                  <a href="{% url 'agency-offer-assistant' agency.id offer.id %}" class="btn btn-ghost btn-sm">Instructions</a>
+                  <a href="{% url 'offer-assistant' offer.id %}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Open</a>
+                </span>
               </li>
             {% endfor %}
           </ul>
@@ -90,4 +93,77 @@
       </section>
     </div>
   </div>
+
+  <section class="card card-pad mt-6">
+    <div class="flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <h3 class="section-title">Global Q&amp;A</h3>
+        <p class="mt-1 max-w-2xl text-sm text-slate-500">
+          Answers that apply to every offer. The assistant uses them after your policy and before the offer's own instructions.
+        </p>
+      </div>
+      <span class="pill pill-neutral">{{ faqs|length }} / {{ max_faqs }}</span>
+    </div>
+
+    {% if faqs %}
+      <ul class="mt-4 divide-y divide-slate-100">
+        {% for faq in faqs %}
+          <li class="flex flex-wrap items-start justify-between gap-3 py-4">
+            <div class="min-w-0 max-w-2xl">
+              <p class="text-sm font-medium text-slate-900">{{ faq.question }}</p>
+              <p class="mt-1 text-sm leading-6 text-slate-600">{{ faq.answer }}</p>
+            </div>
+            <div class="flex items-center gap-1.5">
+              {% if faq.is_active %}
+                <span class="pill pill-success">Active</span>
+              {% else %}
+                <span class="pill pill-neutral">Inactive</span>
+              {% endif %}
+              <a href="{% url 'agency-faq-edit' agency.id faq.id %}" class="btn btn-ghost btn-sm">Edit</a>
+              <form method="post" action="{% url 'agency-faq-delete' agency.id faq.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-sm text-red-600">Delete</button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="mt-4 rounded-xl border border-slate-200 bg-sand-50/50 px-4 py-3 text-sm text-slate-600">
+        No global answers yet. Add the questions travellers ask before every booking.
+      </p>
+    {% endif %}
+
+    {{ faq_form.non_field_errors }}
+
+    {% if faqs|length < max_faqs %}
+      <form method="post" class="mt-5 border-t border-slate-100 pt-5">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="faq_add">
+        <div class="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+          <div>
+            <label for="{{ faq_form.question.id_for_label }}" class="field-label">{{ faq_form.question.label }}</label>
+            {{ faq_form.question }}
+            {% if faq_form.question.help_text %}<span class="helptext">{{ faq_form.question.help_text }}</span>{% endif %}
+            {{ faq_form.question.errors }}
+          </div>
+          <div>
+            <label for="{{ faq_form.answer.id_for_label }}" class="field-label">{{ faq_form.answer.label }}</label>
+            {{ faq_form.answer }}
+            {% if faq_form.answer.help_text %}<span class="helptext">{{ faq_form.answer.help_text }}</span>{% endif %}
+            {{ faq_form.answer.errors }}
+          </div>
+        </div>
+        <label for="{{ faq_form.is_active.id_for_label }}" class="mt-3 flex cursor-pointer items-start gap-3 text-sm text-slate-700">
+          {{ faq_form.is_active }}
+          <span>{{ faq_form.is_active.label }}</span>
+        </label>
+        <button type="submit" class="btn btn-primary mt-4">Add question</button>
+      </form>
+    {% else %}
+      <p class="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        You have reached the {{ max_faqs }}-question limit. Delete one to add another.
+      </p>
+    {% endif %}
+  </section>
 {% endblock %}

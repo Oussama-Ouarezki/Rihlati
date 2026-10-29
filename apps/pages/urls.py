@@ -28,6 +28,11 @@ urlpatterns = [
         name="agency-offer-edit",
     ),
     path(
+        "a/<uuid:agency_id>/offers/<uuid:offer_id>/assistant/",
+        views.agency_offer_assistant,
+        name="agency-offer-assistant",
+    ),
+    path(
         "a/<uuid:agency_id>/offers/<uuid:offer_id>/programme/",
         views.agency_programme,
         name="agency-programme",
@@ -82,6 +87,16 @@ urlpatterns = [
     ),
     path("a/<uuid:agency_id>/settings/", views.agency_settings, name="agency-settings"),
     path("a/<uuid:agency_id>/assistant/", views.agency_assistant, name="agency-assistant"),
+    path(
+        "a/<uuid:agency_id>/assistant/faqs/<uuid:faq_id>/",
+        views.agency_faq_edit,
+        name="agency-faq-edit",
+    ),
+    path(
+        "a/<uuid:agency_id>/assistant/faqs/<uuid:faq_id>/delete/",
+        views.agency_faq_delete,
+        name="agency-faq-delete",
+    ),
     # --- staff ------------------------------------------------------------
     path("verification/", views.verification_queue, name="verification-queue"),
     # --- auth -------------------------------------------------------------

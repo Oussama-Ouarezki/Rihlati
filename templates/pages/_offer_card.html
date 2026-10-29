@@ -1,8 +1,27 @@
 {% comment %} Photo-first, marketplace-familiar: photos sell trips, and the rest of the
    card answers the two questions asked before tapping — how much, and who is
    behind it. {% endcomment %}
-<a href="{% url 'offer-detail' offer.id %}"
-   class="card card-interactive group flex flex-col overflow-hidden">
+   <a href="{% url 'offer-detail' offer.id %}"
+      class="card card-interactive group flex flex-col overflow-hidden">
+    {% comment %} Like button: toggles favourite state, sends feedback to AI search.
+       The `offer.id` is the primary key; `relevant=true` means the traveller
+       found this offer relevant for their needs. {% endcomment %}
+      <form method="POST" action="{% url 'search-like' %}" class="like-form"
+            data-offer-id="{{ offer.id }}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" name="relevant" value="true"
+                class="like-btn rounded-full p-1 transition-colors"
+                aria-label="Mark this offer as relevant">
+          <svg class="h-4 w-4 opacity-50 like-icon" fill="none" stroke="currentColor"
+               viewBox="0 0 24 24">
+            <path class="like-path" d="M20.842 4.51a5.5 5.5 0 0 1-.636 1.351l-.295.373a3.5 3.5 0 0 0 .086 2.203l.694.022a3.5 3.5 0 0 0 2.187 1.067l.384-.655a3.5 3.5 0 0 0-1.017-2.355l-.612-.339a3.5 3.5 0 0 0-2.251-1.06l-.267.055a5.5 5.5 0 0 1-1.442-.671l-.286-.343a3.5 3.5 0 0 0-.706-2.155l-.278-.647a3.5 3.5 0 0 0-2.109-.185l-.644.228a3.5 3.5 0 0 0-.068 2.318l.285.372a3.5 3.5 0 0 0 1.81 1.05l.378-.655a5.5 5.5 0 0 1 1.295-.16z"/>
+          </svg>
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</a>
 
   <div class="relative aspect-[4/3] overflow-hidden bg-sand-100">
     {% if offer.cover_image_url %}

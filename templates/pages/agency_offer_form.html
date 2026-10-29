@@ -14,6 +14,9 @@
       <h2 class="page-title">{% if offer %}Edit offer{% else %}New offer{% endif %}</h2>
       <p class="page-lede">A clear title, an honest price and a real departure date do most of the work.</p>
     </div>
+    {% if offer %}
+      <a href="{% url 'agency-offer-assistant' agency.id offer.id %}" class="btn btn-secondary">Assistant instructions</a>
+    {% endif %}
   </header>
 
   <div class="card card-pad mt-5 max-w-3xl">

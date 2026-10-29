@@ -99,6 +99,7 @@
               <td class="text-slate-600 tabular-nums">{{ offer.lead_count }}</td>
               <td>
                 <div class="flex justify-end gap-1.5">
+                  <a href="{% url 'agency-offer-assistant' agency.id offer.id %}" class="btn btn-secondary btn-sm">Assistant</a>
                   <a href="{% url 'agency-programme' agency.id offer.id %}" class="btn btn-secondary btn-sm">Programme</a>
                   <a href="{% url 'agency-manifest' agency.id offer.id %}" class="btn btn-secondary btn-sm">Travellers</a>
                   <a href="{% url 'agency-offer-edit' agency.id offer.id %}" class="btn btn-ghost btn-sm">Edit</a>
@@ -144,6 +145,7 @@
             <span>{{ offer.lead_count }} inquir{{ offer.lead_count|pluralize:"y,ies" }}</span>
           </div>
           <div class="mt-3 flex flex-wrap gap-1.5">
+            <a href="{% url 'agency-offer-assistant' agency.id offer.id %}" class="btn btn-secondary btn-sm">Assistant</a>
             <a href="{% url 'agency-programme' agency.id offer.id %}" class="btn btn-secondary btn-sm">Programme</a>
             <a href="{% url 'agency-manifest' agency.id offer.id %}" class="btn btn-secondary btn-sm">Travellers</a>
             <a href="{% url 'agency-offer-edit' agency.id offer.id %}" class="btn btn-ghost btn-sm">Edit</a>

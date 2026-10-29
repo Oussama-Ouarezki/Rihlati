@@ -1,7 +1,7 @@
 # Agency Chatbot
 
-> [!info] Status: v1 built — read-only, local model, no tools, agency-editable, two surfaces
-> What actually exists, as of 2026-10-28:
+> [!info] Status: built — read-only, local model, no tools, agency-editable, global Q&A and per-offer instructions
+> What actually exists, as of 2026-10-29:
 > - **`POST /api/chat/offers/{offer_id}`** — public, throttled per IP, returns an answer and
 >   up to three other listings from the same agency. See [[API Endpoints]].
 > - **`apps/chat/`** — `ChatConversation` + `ChatMessage` rows, a context builder, a French
@@ -15,17 +15,23 @@
 >   of free-text `instructions` (deposit, documents, cancellation). Edited by a manager/owner
 >   at `/a/<id>/assistant/`, audited as `assistant.updated`. No row means enabled, no extra
 >   instructions — so old agencies needed no backfill.
+> - **`AgencyFaq`** — up to 20 active global Q&A entries per agency: 200-character question,
+>   600-character answer, unique per agency. Added, edited and deleted from the same assistant
+>   page, audited as `assistant.faq_added`, `assistant.faq_updated` and
+>   `assistant.faq_deleted`.
+> - **`OfferAssistant`** — one optional row per offer, up to 2 000 characters of instructions
+>   that apply only to that offer. Edited at
+>   `/a/<agency_id>/offers/<offer_id>/assistant/`, audited as `offer_assistant.updated`.
 > - **`manage.py purge_chat`** — deletes conversations past their 90-day expiry. Not scheduled.
 >
 > What is deliberately **not** built yet:
 > - **No tools.** The bot cannot create a reservation, change a price, or call any API. v1 is
 >   read-only Q&A plus the existing inquiry form beside it. The tool table below is the plan
 >   for v2, not a description of the code.
-> - **No FAQ table, no `AgencyFaq` model, no unanswered-question queue.** The chat rows are
->   the raw material for that queue, but nothing reads them.
-> - **No structured instruction fields, no per-offer instructions.** The agency writes one
->   free-text policy block shared by all its offers (`AgencyAssistant.instructions`); offers
->   carry their own facts, and the prompt already has those.
+> - **No unanswered-question queue.** The chat rows are the raw material for it, but nothing
+>   reads them yet.
+> - **No structured instruction fields.** The agency writes free text for the global policy,
+>   global Q&A and each offer; there is no deposit-percentage or cancellation-window schema.
 > - **No plan gate.** Any published offer from a verified agency gets the assistant when
 >   `CHAT_ENABLED=1`; `apps/common/quotas.py` still gates only published offers.
 > - **No `attributes` validation.** `OfferIn` still types it as a bare `dict`. The chat context
@@ -67,9 +73,11 @@ Build the context like this per conversation:
 System prompt:
   - who the bot is (assistant of agency X, never of Rihlati, never of other agencies)
   - the rules (below)
-  - AGENCY POLICY: the agency's own free-text booking/deposit/cancellation terms
+  - AGENCY INSTRUCTIONS: the agency's own free-text booking/deposit/cancellation terms
+  - AGENCY Q&A: up to 20 active question/answer pairs, oldest first
+  - OFFER INSTRUCTIONS: free text that applies only to this offer
   - AGENCY DATA: profile + published offers (title, price, dates, seats left,
-    attributes) + enabled FAQ entries, serialized as compact JSON
+    attributes), serialized as compact JSON
 ```
 
 The `attributes` column earns its keep here: "distance to the Haram: 400m, half board,
@@ -100,9 +108,9 @@ authorization it applies to every caller.
 ### 3. Three languages for free
 
 The local model handles Arabic, French and English natively. Rule: **answer in the language
-the traveler wrote in.** v1 has no FAQ entries to translate; the offer facts are language-
-neutral data plus one French description, and the model answers in the traveler's language
-regardless. Don't build a translation layer.
+the traveler wrote in.** Q&A entries are stored as the agency wrote them; the model uses their
+substance and answers in the traveler's language. The offer facts are language-neutral data
+plus one French description. Don't build a translation layer.
 
 ### 4. Which model
 
@@ -141,12 +149,16 @@ Two options are deliberately **not** enabled:
 * **Related offers are chosen by the server, not the model.** The same rows that fed the
   prompt become the cards under the answer, with URLs built by `reverse()`, so prose and
   links cannot disagree.
-* **The agency's own policy is appended, never merged.** `AgencyAssistant.instructions` is
-  injected as a `CONSIGNES DE L'AGENCE` block *after* the platform rules in
-  `apps/chat/prompts.py`. It can add detail the offer row does not carry — a deposit
-  percentage, a cancellation window — but "never invent a price" still wins. The heading
-  states that precedence explicitly, because a 14B model follows proximity better than a
-  rule it has to recall.
+* **Agency content is layered after the platform rules, never merged into them.** The prompt
+  in `apps/chat/prompts.py` appends, in order: `AGENCY INSTRUCTIONS`, `AGENCY Q&A`, then
+  `OFFER INSTRUCTIONS`. Each block can add detail the offer row does not carry — a deposit
+  percentage, a visa answer, an airport-transfer exception — but the platform rules and
+  `DATA` still win on price, dates, seats and inclusions. Every heading says so in plain
+  language, because a 14B model follows proximity better than a rule it has to recall.
+* **The Q&A is global; the exception is per offer.** A deposit answer belongs to the agency
+  and should not be retyped on every trip. An airport-transfer answer often belongs to one
+  offer only, so `OfferAssistant` is a separate one-to-one row. The offer editor links back to
+  the global editor instead of copying its text.
 * **Two surfaces, one conversation.** The token is kept in `sessionStorage` under
   `rihlati-chat:<offer_id>`, so moving from the offer-page widget to
   `/offers/<id>/assistant/` keeps the same thread. It is never in the URL: a token in a URL
@@ -166,12 +178,14 @@ Two options are deliberately **not** enabled:
    worth having).
 2. **Tenant isolation applies to the prompt.** The context contains ONE agency's data.
    Never build a shared bot that "knows" every agency — that's a cross-tenant leak through
-   the model instead of the database, and no guard would catch it. The editable instructions
-   are read from `offer.agency` only, never from a request body.
-3. **Agency instructions are subordinate, by construction.** They are appended after the
-   platform rules and their own heading says so. A manager cannot write "say the visa is
-   included" into a policy block and have it outrank the data; the rule that wins is still
-   "answer only from the DONNÉES".
+   the model instead of the database, and no guard would catch it. The editable instructions,
+   Q&A and offer overrides are read from `offer.agency` only, never from a request body; the
+   editor forms have no `agency` field to forge, and `OfferAssistant.save()` copies the
+   agency from its offer.
+3. **Agency content is subordinate, by construction.** Instructions, Q&A and per-offer
+   text are appended after the platform rules, and their headings say so. A manager cannot
+   write "say the visa is included" into a policy block and have it outrank the data; the
+   rule that wins is still "answer only from the DATA".
 4. **Never invent availability or price.** If it isn't in the provided data: "je ne sais
    pas — contactez l'agence", plus the handoff link. An unanswered question is logged
    (below) — it's product gold, not a failure.
@@ -196,8 +210,9 @@ Two options are deliberately **not** enabled:
 
 ## Features worth adding (your "add any good feature" list)
 
-- **FAQ mining** — every question the bot couldn't answer lands in a queue; one click turns
-  it into an FAQ entry. The knowledge base builds itself from real demand.
+- **FAQ mining** — the global FAQ table exists; the missing half is the queue of questions
+  the bot could not answer, with one click to turn one into an entry. The knowledge base then
+  builds itself from real demand.
 - **Demand analytics** — what travelers ask (destination, month, budget) is what the agency
   should stock. This feeds the analytics they pay for.
 - **Seat urgency** — "il reste 4 places" from `seats_left`, honestly. Never fake scarcity.
@@ -220,11 +235,13 @@ Two options are deliberately **not** enabled:
    `/a/<id>/assistant/`, `AssistantForm`.
 6. ~~A dedicated assistant page per offer.~~ **Built:** `/offers/<id>/assistant/`, with the
    conversation token carried across surfaces via `sessionStorage`.
-7. **Next, in order:** an FAQ table (the cheapest useful half on its own), the unanswered-
-   question queue read from `ChatMessage`, then tools (`create_reservation`, `handoff`) — and
-   only then a plan gate. Each of those is a separate decision, not a continuation.
+7. ~~Agency-wide Q&A and per-offer instructions.~~ **Built:** `AgencyFaq`,
+   `OfferAssistant`, the expanded editor, and prompt layering.
+8. **Next, in order:** the unanswered-question queue read from `ChatMessage`, then tools
+   (`create_reservation`, `handoff`) — and only then a plan gate. Each of those is a
+   separate decision, not a continuation.
 
-Steps 1–6 shipped as one weekend-sized slice; 5 and 6 were added the same day, after the
+Steps 1–7 shipped as one weekend-sized slice; 5 and 6 were added the same day, after the
 first version answered correctly but every agency sounded identical.
 
 What none of it proves is that travelers will use it, or that a 14B model answers accurately

@@ -10,8 +10,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.accounts.models import Agency, Membership
-from apps.chat.models import AgencyAssistant
+from apps.accounts.models import Agency, AuditLog, Membership
+from apps.chat.models import MAX_FAQS, AgencyAssistant, AgencyFaq, OfferAssistant
 from apps.common.testing import (
     make_agency,
     make_client,
@@ -909,6 +909,191 @@ class AssistantPageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(AgencyAssistant.objects.filter(agency=self.agency).exists())
+
+    def test_the_editor_renders_global_qa(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(self.settings_url())
+
+        self.assertContains(response, "Global Q&amp;A")
+        self.assertContains(response, "No global answers yet")
+
+    def test_a_manager_adds_a_global_question(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.settings_url(),
+            {
+                "action": "faq_add",
+                "question": "What is the deposit?",
+                "answer": "A 30% deposit is due on confirmation.",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        faq = AgencyFaq.objects.get(agency=self.agency)
+        self.assertEqual(faq.question, "What is the deposit?")
+        self.assertTrue(faq.is_active)
+        self.assertTrue(
+            AuditLog.objects.filter(action="assistant.faq_added", agency=self.agency).exists()
+        )
+
+    def test_duplicate_global_question_is_refused(self):
+        AgencyFaq.objects.create(
+            agency=self.agency, question="What is the deposit?", answer="A 30% deposit."
+        )
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.settings_url(),
+            {
+                "action": "faq_add",
+                "question": "What is the deposit?",
+                "answer": "Another answer.",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AgencyFaq.objects.filter(agency=self.agency).count(), 1)
+
+    def test_an_agent_cannot_add_a_global_question(self):
+        self.client.force_login(self.agent)
+        response = self.client.post(
+            self.settings_url(),
+            {"action": "faq_add", "question": "Q?", "answer": "A.", "is_active": "on"},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(AgencyFaq.objects.filter(agency=self.agency).exists())
+
+    def test_a_manager_edits_a_global_question(self):
+        faq = AgencyFaq.objects.create(
+            agency=self.agency, question="Old question?", answer="Old answer."
+        )
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            reverse("agency-faq-edit", args=[self.agency.id, faq.id]),
+            {"question": "New question?", "answer": "New answer.", "is_active": "on"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        faq.refresh_from_db()
+        self.assertEqual(faq.question, "New question?")
+        self.assertEqual(faq.answer, "New answer.")
+        self.assertTrue(
+            AuditLog.objects.filter(action="assistant.faq_updated", agency=self.agency).exists()
+        )
+
+    def test_a_manager_deletes_a_global_question(self):
+        faq = AgencyFaq.objects.create(agency=self.agency, question="Delete me?", answer="Gone.")
+        self.client.force_login(self.manager)
+        response = self.client.post(reverse("agency-faq-delete", args=[self.agency.id, faq.id]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(AgencyFaq.objects.filter(pk=faq.pk).exists())
+        self.assertTrue(
+            AuditLog.objects.filter(action="assistant.faq_deleted", agency=self.agency).exists()
+        )
+
+    def test_cannot_edit_or_delete_another_agencys_question(self):
+        other = make_agency("Other Assistant SARL", city="Oran")
+        faq = AgencyFaq.objects.create(
+            agency=other, question="Their question?", answer="Their answer."
+        )
+        self.client.force_login(self.manager)
+
+        self.assertEqual(
+            self.client.get(reverse("agency-faq-edit", args=[self.agency.id, faq.id])).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse("agency-faq-delete", args=[self.agency.id, faq.id])
+            ).status_code,
+            404,
+        )
+
+    def test_overlong_faq_answer_is_refused(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.settings_url(),
+            {
+                "action": "faq_add",
+                "question": "Question?",
+                "answer": "x" * 601,
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(AgencyFaq.objects.filter(agency=self.agency).exists())
+
+    def test_the_faq_cap_is_refused(self):
+        AgencyFaq.objects.bulk_create(
+            [
+                AgencyFaq(agency=self.agency, question=f"Question {i}?", answer="Answer.")
+                for i in range(MAX_FAQS)
+            ]
+        )
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.settings_url(),
+            {
+                "action": "faq_add",
+                "question": "One too many?",
+                "answer": "No.",
+                "is_active": "on",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(AgencyFaq.objects.filter(agency=self.agency).count(), MAX_FAQS)
+
+    def offer_assistant_url(self, offer=None):
+        return reverse(
+            "agency-offer-assistant",
+            args=[self.agency.id, (offer or self.offer).id],
+        )
+
+    def test_a_manager_saves_offer_instructions(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.offer_assistant_url(),
+            {"instructions": "Airport transfer is included from Constantine."},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        config = OfferAssistant.objects.get(offer=self.offer)
+        self.assertEqual(config.agency, self.agency)
+        self.assertIn("Airport transfer", config.instructions)
+        self.assertTrue(
+            AuditLog.objects.filter(action="offer_assistant.updated", agency=self.agency).exists()
+        )
+
+    def test_an_agent_cannot_open_the_offer_assistant_editor(self):
+        self.client.force_login(self.agent)
+        self.assertEqual(
+            self.client.get(self.offer_assistant_url()).status_code,
+            404,
+        )
+
+    def test_another_agencys_offer_has_no_offer_assistant_editor(self):
+        other = make_agency("Other Offer SARL", city="Oran")
+        theirs = make_offer(other, title_fr="Leur offre")
+        self.client.force_login(self.manager)
+        self.assertEqual(
+            self.client.get(self.offer_assistant_url(theirs)).status_code,
+            404,
+        )
+
+    def test_overlong_offer_instructions_are_refused(self):
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            self.offer_assistant_url(),
+            {"instructions": "x" * 2001},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(OfferAssistant.objects.filter(offer=self.offer).exists())
 
     def test_the_full_page_renders_for_a_public_offer(self):
         response = self.client.get(reverse("offer-assistant", args=[self.offer.id]))

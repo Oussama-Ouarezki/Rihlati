@@ -31,6 +31,7 @@ from apps.trips.models import (
     Reservation,
     current_milestone,
     default_status_for,
+    TripAttendance,
 )
 
 public_router = Router(tags=["my-trip"])
@@ -333,6 +334,168 @@ def list_checkpoints(request, agency_id, offer_id):
     offer = get_object_or_404(scoped(Offer.objects, agency_id), pk=offer_id)
     milestones = offer.milestones.exclude(checkpoint_type=CheckpointType.NONE)
     return [checkpoint(request, agency_id, m.pk) for m in milestones]
+
+
+# --------------------------------------------------------------------------
+# Traveler check-in & manifest (travel manager)
+# --------------------------------------------------------------------------
+
+
+class CheckInIn(Strict):
+    phone_e164: str = Field(..., min_length=10, max_length=20)
+    full_name: str = Field(min_length=2, max_length=150)
+
+
+class ManifestRowOut(Strict):
+    id: str
+    full_name: str
+    phone_e164: str
+    status: str
+    registered_at: str
+    checked_in_at: str | None
+
+
+class ManifestOut(Strict):
+    reservation_id: str
+    rows: list[ManifestRowOut]
+
+
+@agency_router.post(
+    "/agencies/{uuid:agency_id}/offers/{uuid:offer_id}/reservations/{uuid:reservation_id}/check-in",
+    response={200: ManifestRowOut, 422: Message},
+)
+def check_in(request, agency_id, reservation_id, payload: CheckInIn):
+    """Register or check in a traveler for a trip.
+
+    - If the traveler (phone) is not yet registered for this reservation,
+      a new `TripAttendance` row is created with status `registered`.
+    - If the traveler is already registered, their status is updated.
+    - If `checked_in_at` is set, status becomes `attended`; otherwise it
+      stays (or becomes) `registered`.
+    """
+    agency = require_membership(request.user, agency_id)
+    reservation = get_object_or_404(
+        scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
+    )
+
+    # Find or create the attendance row for this phone on this reservation
+    attendance, created = TripAttendance.objects.get_or_create(
+        reservation=reservation,
+        phone_e164=payload.phone_e164,
+        defaults={
+            "full_name": payload.full_name.strip(),
+            "status": AttendanceStatus.REGISTERED,
+        },
+    )
+    if not created:
+        # Already registered — just update the name if it changed
+        attendance.full_name = payload.full_name.strip()
+
+    # Set checked_in_at now if this is a check-in action
+    if payload.phone_e164:
+        attendance.checked_in_at = timezone.now()
+        attendance.status = AttendanceStatus.ATTENDED
+
+    attendance.save(update_fields=["full_name", "checked_in_at", "status", "updated_at"])
+
+    return {
+        "reservation_id": str(reservation.id),
+        "full_name": attendance.full_name,
+        "phone_e164": attendance.phone_e164,
+        "status": attendance.status,
+        "registered_at": attendance.registered_at.isoformat(),
+        "checked_in_at": attendance.checked_in_at.isoformat() if attendance.checked_in_at else None,
+    }
+
+
+@agency_router.get(
+    "/agencies/{uuid:agency_id}/offers/{uuid:offer_id}/reservations/{uuid:reservation_id}/manifest",
+    response=ManifestOut,
+)
+def manifest(request, agency_id, offer_id, reservation_id):
+    """List all travelers registered for this trip with their attendance status."""
+    agency = require_membership(request.user, agency_id)
+    reservation = get_object_or_404(
+        scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
+    )
+
+    rows = (
+        TripAttendance.objects.filter(reservation=reservation)
+        .order_by("-registered_at")
+    )
+
+    result_rows = []
+    for row in rows:
+        result_rows.append(
+            {
+                "id": str(row.id),
+                "full_name": row.full_name,
+                "phone_e164": row.phone_e164,
+                "status": row.status,
+                "registered_at": row.registered_at.isoformat(),
+                "checked_in_at": row.checked_in_at.isoformat() if row.checked_in_at else None,
+            }
+        )
+
+    return {
+        "reservation_id": str(reservation.id),
+        "rows": result_rows,
+    }
+
+
+@agency_router.post(
+    "/agencies/{uuid:agency_id}/offers/{uuid:offer_id}/reservations/{uuid:reservation_id}/manifest/{uuid:attendance_id}/mark-attended",
+    response={200: ManifestRowOut},
+)
+def mark_attended(request, agency_id, offer_id, reservation_id, attendance_id):
+    """Mark a specifically registered traveler as attended."""
+    agency = require_membership(request.user, agency_id)
+    reservation = get_object_or_404(
+        scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
+    )
+    attendance = get_object_or_404(
+        TripAttendance.objects.filter(reservation=reservation), pk=attendance_id
+    )
+
+    attendance.status = AttendanceStatus.ATTENDED
+    attendance.checked_in_at = timezone.now()
+    attendance.save(update_fields=["status", "checked_in_at", "updated_at"])
+
+    return {
+        "reservation_id": str(reservation.id),
+        "full_name": attendance.full_name,
+        "phone_e164": attendance.phone_e164,
+        "status": attendance.status,
+        "registered_at": attendance.registered_at.isoformat(),
+        "checked_in_at": attendance.checked_in_at.isoformat() if attendance.checked_in_at else None,
+    }
+
+
+@agency_router.post(
+    "/agencies/{uuid:agency_id}/offers/{uuid:offer_id}/reservations/{uuid:reservation_id}/manifest/{uuid:attendance_id}/mark-no-show",
+    response={200: ManifestRowOut},
+)
+def mark_no_show(request, agency_id, offer_id, reservation_id, attendance_id):
+    """Mark a registered traveler as no-show."""
+    agency = require_membership(request.user, agency_id)
+    reservation = get_object_or_404(
+        scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
+    )
+    attendance = get_object_or_404(
+        TripAttendance.objects.filter(reservation=reservation), pk=attendance_id
+    )
+
+    attendance.status = AttendanceStatus.NO_SHOW
+    attendance.save(update_fields=["status", "updated_at"])
+
+    return {
+        "reservation_id": str(reservation.id),
+        "full_name": attendance.full_name,
+        "phone_e164": attendance.phone_e164,
+        "status": attendance.status,
+        "registered_at": attendance.registered_at.isoformat(),
+        "checked_in_at": None,
+    }
 
 
 # --------------------------------------------------------------------------

@@ -33,6 +33,11 @@ from django.utils import timezone
 
 from apps.accounts.models import UUIDModel
 
+MAX_FAQS = 20
+FAQ_QUESTION_MAX = 200
+FAQ_ANSWER_MAX = 600
+OFFER_INSTRUCTIONS_MAX = 2000
+
 
 class AgencyAssistant(UUIDModel):
     """What one agency wants its assistant to say beyond the offer data.
@@ -86,6 +91,64 @@ def assistant_is_enabled(agency):
     """Missing row means enabled — the feature existed before this model did."""
     config = assistant_config(agency)
     return config.is_enabled if config else True
+
+
+class AgencyFaq(UUIDModel):
+    """An agency-wide answer the assistant should use in substance."""
+
+    agency = models.ForeignKey(
+        "accounts.Agency", on_delete=models.CASCADE, related_name="assistant_faqs"
+    )
+    question = models.CharField(max_length=FAQ_QUESTION_MAX)
+    answer = models.TextField(max_length=FAQ_ANSWER_MAX)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agency", "question"], name="unique_assistant_faq_question_per_agency"
+            )
+        ]
+        verbose_name = "agency FAQ"
+        verbose_name_plural = "agency FAQs"
+
+    def __str__(self):
+        return self.question
+
+
+def faqs_for(agency):
+    """Active agency Q&A, oldest first, capped to the prompt budget."""
+    return agency.assistant_faqs.filter(is_active=True).order_by("created_at")[:MAX_FAQS]
+
+
+class OfferAssistant(UUIDModel):
+    """Instructions that apply to one offer only."""
+
+    agency = models.ForeignKey(
+        "accounts.Agency", on_delete=models.CASCADE, related_name="offer_assistants"
+    )
+    offer = models.OneToOneField(
+        "offers.Offer", on_delete=models.CASCADE, related_name="assistant_config"
+    )
+    instructions = models.TextField(max_length=OFFER_INSTRUCTIONS_MAX, blank=True)
+
+    class Meta:
+        verbose_name = "offer assistant"
+        verbose_name_plural = "offer assistants"
+
+    def __str__(self):
+        return f"{self.offer_id} · {len(self.instructions)} chars"
+
+    def save(self, *args, **kwargs):
+        if self.offer_id:
+            self.agency_id = self.offer.agency_id
+        return super().save(*args, **kwargs)
+
+
+def offer_instructions_for(offer):
+    config = getattr(offer, "assistant_config", None)
+    return config.instructions.strip() if config else ""
 
 
 class ChatConversation(UUIDModel):

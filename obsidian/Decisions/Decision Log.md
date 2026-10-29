@@ -901,6 +901,66 @@ every verified agency's published offers get it while `CHAT_ENABLED=1`.
 
 ---
 
+## 033 — Agencies teach the assistant global Q&A and per-offer instructions
+
+**Date:** 2026-10-29
+
+**Decided:** the assistant now reads from three agency-authored layers after the platform
+rules, in this order: global policy (`AgencyAssistant.instructions`), global Q&A
+(`AgencyFaq`) and per-offer instructions (`OfferAssistant.instructions`). Both new models
+are edited by a **manager or owner** from the existing assistant page; the offer editor lives
+at `/a/<agency_id>/offers/<offer_id>/assistant/`. Every write is audited in the same
+transaction: `assistant.faq_added`, `assistant.faq_updated`, `assistant.faq_deleted` and
+`offer_assistant.updated`.
+
+The shape is deliberately asymmetric:
+
+- **Global Q&A is a table, not prose in the policy block.** Up to 20 entries per agency, each
+  a 200-character question and 600-character answer, unique per agency on the exact question,
+  with an `is_active` switch. The prompt gets only active rows, oldest first. A table gives a
+  future FAQ-mining queue a row to create, and lets one answer be switched off without
+  rewriting the policy paragraph.
+- **Per-offer instructions are a separate one-to-one row.** `OfferAssistant` belongs to one
+  offer, copies `agency` from that offer on save, and is capped at 2 000 characters. A field
+  on `Offer` would have loaded instruction text into every listing query; a row is fetched
+  only by the assistant path through `select_related("assistant_config")`.
+- **The prompt is layered, not concatenated by hand.** `apps/chat/prompts.py` emits
+  `AGENCY INSTRUCTIONS`, `AGENCY Q&A` and `OFFER INSTRUCTIONS` blocks after the seven rules.
+  Empty layers emit no heading. `DATA` still wins on price, dates, seats and inclusions, and
+  the per-offer block overrides agency defaults only where the two disagree.
+- **The API contract did not change.** `POST /api/chat/offers/{offer_id}` still accepts the
+  same body and returns the same shape. The new content is server-side context, scoped by the
+  offer's agency — never accepted from the traveler's request.
+
+**Rejected:**
+
+- *Keeping Decision 032's "no per-offer instructions".* It assumed the offer row already
+  carried everything that differs. It does not: airport transfers, a hotel-specific
+  cancellation rule or a Ramadan exception are policy that changes per trip but is not a
+  field. Repeating those in the global paragraph makes every offer sound like every other.
+- *Putting instructions in a new `Offer.assistant_instructions` column.* Simple to write,
+  expensive to read: every offer list, sitemap and public query starts carrying a text column
+  it does not need. A one-to-one row keeps the hot paths unchanged.
+- *One shared textarea with `--- offer: ... ---` delimiters.* It looks cheaper until the
+  agency edits the wrong section, or a delimiter appears in the text. Separate rows give
+  separate forms, separate caps and separate audit events.
+- *Unlimited Q&A entries.* The local model runs with `CHAT_NUM_CTX=8192`. Twenty 800-character
+  entries is already a large prompt; an unbounded knowledge base would silently truncate the
+  rules or the offer data. The cap is a prompt-budget guard disguised as a product limit.
+- *Structured Q&A categories or required fields.* The agency knows the question a traveler
+  asks; forcing it into "deposit/cancellation/visa" tabs adds a taxonomy nobody maintains.
+
+**Cost:** the prompt budget is now the feature's real limit. The caps are per field, not a
+combined character budget: 20 Q&A entries plus both 2 000-character blocks can approach the
+8 192-token context before history, especially in Arabic, so the next change should measure
+prompt size rather than add another layer. The unique constraint is exact-match, so "What is
+the deposit?" and "what is the deposit?" can both exist. Three editing surfaces (policy, Q&A,
+offer) mean more places to keep honest; sharing the assistant page and its navigation is the
+mitigation. And the read-side `attributes` allowlist from G1 still applies — this decision does
+not make the write side safer.
+
+---
+
 ## Template for new entries
 
 ```

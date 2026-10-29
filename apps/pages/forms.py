@@ -1,7 +1,7 @@
 from django import forms
 
 from apps.accounts.models import Agency
-from apps.chat.models import AgencyAssistant
+from apps.chat.models import AgencyAssistant, AgencyFaq, OfferAssistant
 from apps.common.validators import (
     PHONE_HELP,
     validate_dz_phone,
@@ -288,6 +288,80 @@ class AssistantForm(StyledFormMixin, forms.ModelForm):
                     ),
                 }
             ),
+        }
+
+    def clean_instructions(self):
+        return self.cleaned_data["instructions"].strip()
+
+
+class AgencyFaqForm(StyledFormMixin, forms.ModelForm):
+    def __init__(self, *args, agency, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.agency = agency
+
+    def clean_question(self):
+        question = self.cleaned_data["question"].strip()
+        duplicate = self.instance.agency.assistant_faqs.filter(question=question)
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise forms.ValidationError("This question already has an answer.")
+        return question
+
+    class Meta:
+        model = AgencyFaq
+        fields = ["question", "answer", "is_active"]
+        labels = {
+            "question": "Traveller question",
+            "answer": "Approved answer",
+            "is_active": "Use this answer",
+        }
+        help_texts = {
+            "question": "The question as a traveller would ask it. 200 characters maximum.",
+            "answer": (
+                "The answer the assistant should give, in substance. It may be translated "
+                "to the traveller's language. 600 characters maximum."
+            ),
+        }
+        widgets = {
+            "question": forms.TextInput(attrs={"placeholder": "What is the deposit?"}),
+            "answer": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": "A 30% deposit is due on confirmation.",
+                }
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={"class": "mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600"}
+            ),
+        }
+
+    def clean_answer(self):
+        return self.cleaned_data["answer"].strip()
+
+
+class OfferAssistantForm(StyledFormMixin, forms.ModelForm):
+    class Meta:
+        model = OfferAssistant
+        fields = ["instructions"]
+        labels = {"instructions": "Offer instructions"}
+        help_texts = {
+            "instructions": (
+                "Added only to this offer, after the agency's global policy and Q&A. "
+                "Use it for details that differ from the agency's defaults. 2,000 "
+                "characters maximum. Travellers can see everything written here."
+            )
+        }
+        widgets = {
+            "instructions": forms.Textarea(
+                attrs={
+                    "rows": 9,
+                    "placeholder": (
+                        "This departure includes airport transfer from Constantine. "
+                        "Rooms are double occupancy; a single room costs 15,000 DZD extra."
+                    ),
+                }
+            )
         }
 
     def clean_instructions(self):

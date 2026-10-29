@@ -29,7 +29,14 @@ from ninja.errors import HttpError
 
 from apps.chat.context import facts_json, related_offer_cards
 from apps.chat.llm import LLMUnavailable, complete
-from apps.chat.models import ChatConversation, ChatMessage, assistant_is_enabled, instructions_for
+from apps.chat.models import (
+    ChatConversation,
+    ChatMessage,
+    assistant_is_enabled,
+    faqs_for,
+    instructions_for,
+    offer_instructions_for,
+)
 from apps.chat.prompts import system_prompt
 from apps.common.schemas import Strict
 from apps.common.throttling import ChatThrottle
@@ -87,7 +94,9 @@ def chat_about_offer(request, offer_id, payload: ChatIn):
     # unverified agency's offer is a 404 here too. The assistant cannot become a
     # side door onto a listing the marketplace is hiding.
     offer = get_object_or_404(
-        Offer.publicly_visible().select_related("agency__assistant").prefetch_related("milestones"),
+        Offer.publicly_visible()
+        .select_related("agency__assistant", "assistant_config")
+        .prefetch_related("milestones"),
         pk=offer_id,
     )
 
@@ -111,7 +120,13 @@ def chat_about_offer(request, offer_id, payload: ChatIn):
     messages = [
         {
             "role": "system",
-            "content": system_prompt(offer, facts_json(offer), instructions_for(offer.agency)),
+            "content": system_prompt(
+                offer,
+                facts_json(offer),
+                instructions_for(offer.agency),
+                faqs=faqs_for(offer.agency),
+                offer_instructions=offer_instructions_for(offer),
+            ),
         }
     ]
     messages += _history(conversation)

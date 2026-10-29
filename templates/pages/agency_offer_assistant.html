@@ -1,0 +1,43 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Offer instructions — {{ offer.title_fr }}{% endblock %}
+
+{% block agency_content %}
+  <nav class="flex items-center gap-2 text-sm text-slate-500" aria-label="Breadcrumb">
+    <a href="{% url 'agency-offers' agency.id %}" class="hover:text-brand-700">Offers</a>
+    <span aria-hidden="true">/</span>
+    <a href="{% url 'agency-offer-edit' agency.id offer.id %}" class="hover:text-brand-700">{{ offer.title_fr }}</a>
+    <span aria-hidden="true">/</span>
+    <span class="text-slate-700">Assistant</span>
+  </nav>
+
+  <header class="page-header mt-4">
+    <div>
+      <p class="eyebrow">Automation</p>
+      <h2 class="page-title">Offer instructions</h2>
+      <p class="page-lede">Details that apply only to “{{ offer.title_fr }}”, after the agency's global policy and Q&amp;A.</p>
+    </div>
+    {% if offer.status == 'published' and agency.is_verified %}
+      <a href="{% url 'offer-assistant' offer.id %}" target="_blank" rel="noopener" class="btn btn-secondary">Preview assistant</a>
+    {% endif %}
+  </header>
+
+  <div class="card card-pad mt-5 max-w-3xl">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <div>
+        <label for="{{ form.instructions.id_for_label }}" class="field-label">{{ form.instructions.label }}</label>
+        {{ form.instructions }}
+        <span class="helptext">{{ form.instructions.help_text }}</span>
+        {{ form.instructions.errors }}
+      </div>
+
+      <div class="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-5">
+        <button type="submit" class="btn btn-primary">Save instructions</button>
+        <a href="{% url 'agency-offers' agency.id %}" class="btn btn-ghost">Cancel</a>
+        <a href="{% url 'agency-assistant' agency.id %}" class="btn btn-ghost">Global Q&amp;A</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

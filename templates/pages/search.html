@@ -23,7 +23,7 @@
 
   {% comment %} A plain GET form, no JavaScript. Filters land in the URL, so a search is
      shareable and back-button friendly. {% endcomment %}
-  <form method="get" class="card relative z-10 -mt-3 grid gap-3 p-4 sm:-mt-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_1fr_8rem_auto] lg:items-end">
+  <form method="get" class="card relative z-10 -mt-3 grid gap-3 p-4 sm:-mt-3 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_1fr_8rem_auto] lg:items-end">
     <div>
       <label for="filter-kind" class="field-label">Trip type</label>
       <select id="filter-kind" name="kind" class="field-input">
@@ -51,6 +51,10 @@
       <label for="filter-q" class="field-label">Search</label>
       <input id="filter-q" type="search" name="q" value="{{ selected.q }}"
              placeholder="Omra, Istanbul, visa…" class="field-input">
+      <button type="button" class="btn btn-sm text-slate-400 ml-2 ai-search-trigger"
+              data-query="">
+        🔍 AI
+      </button>
     </div>
 
     <div>
@@ -74,30 +78,87 @@
     </div>
   </form>
 
-  <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
-    <p class="text-sm text-slate-600">
-      <span class="font-semibold text-slate-900">{{ total }}</span> trip{{ total|pluralize }}
-      from verified agencies
-    </p>
-    {% if selected.q or selected.kind or selected.wilaya or selected.max_price %}
-      <a href="{% url 'search' %}" class="text-sm font-medium text-slate-500 hover:text-brand-700">
-        Clear filters
-      </a>
-    {% endif %}
+  {% comment %}
+  AI Search modal HTML — hidden by default, shown when the AI trigger button is clicked.
+  Uses the same form method (GET) so results are URL-shareable and back-button friendly.
+  {% endcomment %}
+  <div id="ai-search-modal" class="fixed inset-0 hidden items-center justify-center bg-black/60 z-50 modal-content">
+    <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold">AI Search</h3>
+        <button class="close-modal text-slate-500 hover:text-slate-700" aria-label="Close search modal">×</button>
+      </div>
+      <form method="get" class="space-y-4">
+        <div>
+          <label class="field-label">Describe your trip</label>
+          <input type="text" id="ai-query" name="nlp_query" placeholder="e.g. Omra with visa included under 400 DZD"
+                 class="field-input w-full py-2 px-3 rounded border focus:outline-none focus:border-brand-600"
+                 value="{{ nlp_query|default:'' }}">
+        </div>
+        <div>
+          <label class="field-label">Max budget (DZD)</label>
+          <input type="number" id="ai-budget" name="max_price" min="0" step="1000"
+                 value="{{ selected.max_price|default:'' }}" class="field-input w-full py-2 px-3 rounded border">
+        </div>
+        <div>
+          <label class="field-label">Sort</label>
+          <select id="ai-sort" name="sort" class="field-input">
+            <option value="departure" {% if selected.sort == 'departure' or not selected.sort %}selected{% endif %}>Soonest departure</option>
+            <option value="price" {% if selected.sort == 'price' %}selected{% endif %}>Price: low to high</option>
+            <option value="price_desc" {% if selected.sort == 'price_desc' %}selected{% endif %}>Price: high to low</option>
+            <option value="quality" {% if selected.sort == 'quality' %}selected{% endif %}>Best described</option>
+          </select>
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary flex-1">Search with AI</button>
+          <button type="button" class="btn btn-outline close-modal flex-1">Cancel</button>
+        </div>
+      </form>
+      <div class="mt-6">
+        <p class="text-sm text-slate-600">Powered by natural language processing</p>
+      </div>
+    </div>
   </div>
 
-  <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-    {% for offer in offers %}
-      {% include "pages/_offer_card.html" %}
-    {% empty %}
-      <div class="empty-state col-span-full">
-        <span class="empty-state-icon" aria-hidden="true">✈</span>
-        <h2 class="mt-3 text-base font-semibold text-slate-900">No trips match these filters</h2>
-        <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Try a wider budget, another departure wilaya, or clear the filters to see everything.
-        </p>
-        <a href="{% url 'search' %}" class="btn btn-primary mt-4">Clear filters</a>
-      </div>
-    {% endfor %}
-  </div>
-{% endblock %}
+  <script>
+    // Simple AI search modal toggle
+    document.addEventListener('DOMContentLoaded', function() {
+      const aiTrigger = document.querySelector('.ai-search-trigger');
+      const modal = document.getElementById('ai-search-modal');
+      const closeBtn = modal ? modal.querySelector('.close-modal') : null;
+      const queryInput = document.getElementById('ai-query');
+      
+      if (!aiTrigger || !modal) return;
+      
+      // Open modal
+      aiTrigger.addEventListener('click', function() {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        if (queryInput) queryInput.focus();
+      });
+      
+      // Close on close button
+      if (closeBtn) {
+        closeBtn.addEventListener('click', function() {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        });
+      }
+      
+      // Close on overlay click
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        }
+      });
+      
+      // Escape key to close
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        }
+      });
+    });
+  </script>

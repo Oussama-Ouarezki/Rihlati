@@ -1,0 +1,118 @@
+{% extends "pages/agency_base.html" %}
+{% block title %}Travel Manager — {{ agency.name }}{% endblock %}
+
+{% block agency_action %}
+  <a href="{% url 'agency-offers' agency.id %}" class="btn btn-secondary">Offers →</a>
+{% endblock %}
+
+{% block agency_content %}
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Trip Manager</p>
+      <h2 class="page-title">Travelers registered for {{ reservation.offer.title_fr }}</h2>
+      <p class="page-lede">Registered, attended, and no-show travelers for this trip.</p>
+    </div>
+  </header>
+
+  {% if not reservation.is_active %}
+    <div class="alert alert-warning">
+      This reservation is archived and no longer active.
+    </div>
+  {% endif %}
+
+  <div class="mt-5">
+    <!-- Check-in form -->
+    <div class="card border-border p-4 mb-4">
+      <h3 class="card-title margin-bottom-3">Register / Check in traveler</h3>
+      <form method="POST" action="{% url 'trips:check-in' agency.id reservation.offer.id reservation.id %}" class="space-y-3">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="label" for="id_full_name">Full name</label>
+            <input type="text" name="full_name" class="input input-bordered w-full" required>
+          </div>
+          <div>
+            <label class="label" for="id_phone_e164">Phone (E.164, +213...)</label>
+            <input type="tel" name="phone_e164" class="input input-bordered w-full" placeholder="+213555123456" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">Register / Check in</button>
+      </form>
+    </div>
+
+    <!-- Manifest table -->
+    {% if rows %}
+      <div class="card border-border p-4">
+        <h3 class="card-title margin-bottom-3">Manifest ({{ rows|length }} travelers)</h3>
+        <div class="overflow-x-auto">
+          <table class="table table-borderless text-sm">
+            <thead>
+              <tr>
+                <th class="text-left">Name</th>
+                <th class="text-left">Phone</th>
+                <th class="text-left">Status</th>
+                <th class="text-left">Registered</th>
+                <th class="text-left">Checked in</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+                <tr class="border-b last:border-0">
+                  <td class="font-medium">{{ row.full_name }}</td>
+                  <td class="font-sans whitespace-nowrap">
+                    {{ row.phone_e164 }}
+                    {% if row.phone_e164 %}
+                      <a href="https://wa.me{{ row.phone_e164 }}" class="text-xs underline text-slate-500 ms-2" target="_blank" rel="noopener">
+                        WhatsApp
+                      </a>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge badge-{{ row.status | lower }}">
+                      {{ row.status | title }}
+                    </span>
+                  </td>
+                  <td class="font-sonspace text-xs opacity-60">{{ row.registered_at | date:"M j H:i" }}</td>
+                  <td class="font-sonspace text-xs opacity-60">
+                    {% if row.checked_in_at %}
+                      {{ row.checked_in_at | date:"M j H:i" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                  <td class="text-right">
+                    {% if row.status == "registered" %}
+                      <form method="POST" action="{% url 'trips:mark-attended' agency.id reservation.offer.id reservation.id row.id %}" style="display:inline">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs text-brand-600 hover underline">Mark attended</button>
+                      </form>
+                      <form method="POST" action="{% url 'trips:mark-no-show' agency.id reservation.offer.id reservation.id row.id %}" style="display:inline; margin-left:8px">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs text-danger hover underline">Mark no-show</button>
+                      </form>
+                    {% elif row.status == "attended" %}
+                      <span class="text-xs text-success">✓ Attended</span>
+                    {% elif row.status == "no_show" %}
+                      <span class="text-xs text-danger">✗ No-show</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td class="align-middle text-center col-span-6" style="height: 200px;">
+                    No travelers registered yet. Use the form above to register the first traveler.
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% else %}
+      <div class="alert alert-info">
+        No travelers registered for this trip yet.
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

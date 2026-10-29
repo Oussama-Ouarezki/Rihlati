@@ -53,6 +53,10 @@ class Reservation(UUIDModel):
     full_name = models.CharField(max_length=150)
     phone_e164 = models.CharField(max_length=20)
     party_size = models.PositiveSmallIntegerField(default=1)
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Soft delete: reservations are hidden when False but not removed.",
+    )
     note = models.TextField(blank=True)
 
     status = models.CharField(
@@ -124,6 +128,58 @@ class MilestoneCheckIn(UUIDModel):
 
     def __str__(self):
         return f"{self.reservation.full_name} @ {self.milestone.title}: {self.status}"
+
+
+class TripAttendance(UUIDModel):
+    """Who is registered for a trip and their attendance status.
+
+    One row per (trip, traveler/phone). A traveler registers with a phone number,
+    is marked `attended` when they check in, or `no_show` if they never checked in.
+    """
+
+    reservation = models.ForeignKey(
+        "trips.Reservation", on_delete=models.CASCADE, related_name="attendances"
+    )
+    # Nullable user: a traveler may register without an account (the common case).
+    # The phone is the stable identifier; the user row may be created later.
+    user = models.ForeignKey(
+        "accounts.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="trip_attendances",
+    )
+    phone_e164 = models.CharField(max_length=20, db_index=True)
+    # The person behind the phone, snapshotted at registration.
+    full_name = models.CharField(max_length=150)
+
+    STATUS_CHOICES = [
+        ("registered", "Registered"),
+        ("attended", "Attended"),
+        ("no_show", "No-show"),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="registered")
+    registered_at = models.DateTimeField(auto_now_add=True)
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-registered_at"]
+        indexes = [
+            models.Index(fields=["reservation", "status"]),
+            models.Index(fields=["reservation", "-registered_at"]),
+            models.Index(fields=["phone_e164"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reservation", "phone_e164"], name="one_attendance_per_traveler_per_trip"
+            )
+        ]
+
+    def __str__(self):
+        # Rule 4: never render a full phone number into a log or a repr.
+        short_phone = self.phone_e164[-4:] if self.phone_e164 else "___"
+        title = self.reservation.offer.title_fr
+        return f"{self.full_name} ({short_phone}) — {self.status} on {title}"
 
 
 def default_status_for(milestone, reservation):

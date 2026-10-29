@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from apps.chat.context import build_context, facts_json
 from apps.chat.llm import LLMUnavailable
-from apps.chat.models import AgencyAssistant, ChatConversation
+from apps.chat.models import AgencyAssistant, AgencyFaq, ChatConversation, OfferAssistant
 from apps.chat.prompts import system_prompt
 from apps.common.testing import make_agency, make_milestone, make_offer
 from apps.offers.models import Offer
@@ -81,7 +81,69 @@ class ContextTests(TestCase):
         self.assertIn("Acompte de 30 %", prompt)
 
     def test_empty_instructions_leave_no_empty_heading(self):
-        self.assertNotIn("AGENCY INSTRUCTIONS", system_prompt(self.offer, "{}"))
+        self.assertNotIn("AGENCY INSTRUCTIONS —", system_prompt(self.offer, "{}"))
+
+    def test_agency_faqs_are_added_as_answers(self):
+        faq = AgencyFaq(question="What is the deposit?", answer="A 30% deposit is due.")
+
+        prompt = system_prompt(self.offer, "{}", faqs=[faq])
+
+        self.assertIn("AGENCY Q&A", prompt)
+        self.assertIn("Q: What is the deposit?", prompt)
+        self.assertIn("A: A 30% deposit is due.", prompt)
+
+    def test_inactive_faqs_are_dropped(self):
+        faq = AgencyFaq(
+            question="What is the deposit?",
+            answer="A 30% deposit is due.",
+            is_active=False,
+        )
+
+        self.assertNotIn("AGENCY Q&A —", system_prompt(self.offer, "{}", faqs=[faq]))
+
+    def test_offer_instructions_are_added(self):
+        prompt = system_prompt(
+            self.offer,
+            "{}",
+            offer_instructions="Airport transfer is included from Constantine.",
+        )
+
+        self.assertIn("OFFER INSTRUCTIONS", prompt)
+        self.assertIn("Airport transfer is included from Constantine.", prompt)
+
+    def test_empty_faqs_and_offer_instructions_leave_no_headings(self):
+        prompt = system_prompt(self.offer, "{}")
+
+        self.assertNotIn("AGENCY Q&A —", prompt)
+        self.assertNotIn("OFFER INSTRUCTIONS —", prompt)
+
+    def test_agency_content_sits_between_the_rules_and_the_data(self):
+        prompt = system_prompt(
+            self.offer,
+            "{}",
+            "Deposit policy.",
+            faqs=[AgencyFaq(question="Deposit?", answer="30%.")],
+            offer_instructions="This departure includes a transfer.",
+        )
+
+        self.assertLess(
+            prompt.index("RULES, without exception"), prompt.index("AGENCY INSTRUCTIONS")
+        )
+        self.assertLess(prompt.index("AGENCY INSTRUCTIONS"), prompt.index("AGENCY Q&A"))
+        self.assertLess(prompt.index("AGENCY Q&A"), prompt.index("OFFER INSTRUCTIONS"))
+        self.assertLess(prompt.index("OFFER INSTRUCTIONS"), prompt.index("DATA —"))
+
+    def test_platform_rules_still_win_on_prices(self):
+        prompt = system_prompt(
+            self.offer,
+            "10000 DZD",
+            "Deposit policy.",
+            faqs=[AgencyFaq(question="Price?", answer="1 DZD.")],
+            offer_instructions="The price is 2 DZD.",
+        )
+
+        self.assertIn("use DATA only", prompt)
+        self.assertIn("10000 DZD", prompt)
 
 
 @override_settings(CHAT_ENABLED=True)
@@ -204,6 +266,77 @@ class ChatApiTests(TestCase):
         # The platform rules still come first and still name the price source.
         self.assertIn("Answer ONLY", system)
         self.assertIn("10000 DZD", system)
+
+    @patch("apps.chat.api.complete", return_value=REPLY)
+    def test_agency_faqs_reach_the_model(self, complete):
+        AgencyFaq.objects.create(
+            agency=self.agency,
+            question="What is the deposit?",
+            answer="A 30% deposit is due on confirmation.",
+        )
+
+        self.post()
+
+        system = complete.call_args.args[0][0]["content"]
+        self.assertIn("AGENCY Q&A", system)
+        self.assertIn("A 30% deposit is due on confirmation.", system)
+
+    @patch("apps.chat.api.complete", return_value=REPLY)
+    def test_inactive_faqs_do_not_reach_the_model(self, complete):
+        AgencyFaq.objects.create(
+            agency=self.agency,
+            question="What is the deposit?",
+            answer="A 30% deposit is due on confirmation.",
+            is_active=False,
+        )
+
+        self.post()
+
+        system = complete.call_args.args[0][0]["content"]
+        self.assertNotIn("AGENCY Q&A —", system)
+        self.assertNotIn("A 30% deposit is due", system)
+
+    @patch("apps.chat.api.complete", return_value=REPLY)
+    def test_offer_instructions_reach_the_model(self, complete):
+        OfferAssistant.objects.create(
+            agency=self.agency,
+            offer=self.offer,
+            instructions="Airport transfer is included from Constantine.",
+        )
+
+        self.post()
+
+        system = complete.call_args.args[0][0]["content"]
+        self.assertIn("OFFER INSTRUCTIONS", system)
+        self.assertIn("Airport transfer is included from Constantine.", system)
+
+    @patch("apps.chat.api.complete", return_value=REPLY)
+    def test_other_offers_instructions_do_not_leak(self, complete):
+        other = make_offer(self.agency, title_fr="Tunisie — 5 nuits")
+        OfferAssistant.objects.create(
+            agency=self.agency,
+            offer=other,
+            instructions="This text belongs to the other offer.",
+        )
+
+        self.post()
+
+        system = complete.call_args.args[0][0]["content"]
+        self.assertNotIn("This text belongs to the other offer.", system)
+
+    @patch("apps.chat.api.complete", return_value=REPLY)
+    def test_other_agencies_faqs_do_not_leak(self, complete):
+        other = make_agency("Wahran Tours")
+        AgencyFaq.objects.create(
+            agency=other,
+            question="What is the deposit?",
+            answer="This answer belongs to another agency.",
+        )
+
+        self.post()
+
+        system = complete.call_args.args[0][0]["content"]
+        self.assertNotIn("This answer belongs to another agency.", system)
 
     @override_settings(CHAT_ENABLED=False)
     @patch("apps.chat.api.complete", return_value=REPLY)
