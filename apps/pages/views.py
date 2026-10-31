@@ -22,6 +22,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import Agency, Membership
+from apps.chat import discovery
 from apps.chat.models import (
     MAX_FAQS,
     AgencyAssistant,
@@ -69,10 +70,10 @@ def search(request):
     """A plain GET form, no JavaScript. Filters land in the URL, so a search is
     shareable and back-button friendly — someone pastes a link into a family
     WhatsApp group and everyone opens the same results."""
-    
+
     # Determine search mode: keyword or NLP
     mode = request.GET.get("mode", "keyword")
-    
+
     raw = {
         "kind": request.GET.get("kind") or None,
         "wilaya": request.GET.get("wilaya") or None,
@@ -82,23 +83,24 @@ def search(request):
     max_price = request.GET.get("max_price") or ""
     if max_price.isdigit():
         raw["price_max"] = int(max_price) * 100
-    
+
     try:
         filters = OfferFilters(**{k: v for k, v in raw.items() if v is not None})
     except Exception:
         filters = OfferFilters()
-    
+
     # Apply NLP parsing if in nlp mode
     if mode == "nlp" and raw.get("q"):
         from apps.common.nlp_parser import parse_query
+
         parsed = parse_query(raw["q"])
-        
+
         # Build NLP filter parameters
         nlp_kind = parsed["kind"] if parsed["kind"] else None
-        nlp_budget_max = parsed["budget_max"]  # already in centimes per nlp_parser docs
+        nlp_budget_max = parsed["budget_max"]  # in DZD; apply_filters converts to centimes
         nlp_destination = parsed["destination"]
         nlp_inclusions = parsed["inclusions"]
-        
+
         # Create filter dict with NLP parameters
         # reuse OfferFilters and override NLP params
         nlp_filters = OfferFilters(
@@ -118,15 +120,12 @@ def search(request):
             nlp_destination=nlp_destination,
             nlp_inclusions=nlp_inclusions,
         )
-        
+
         # Apply NLP filters using apply_filters
-        offers = apply_filters(
-            Offer.publicly_visible().select_related("agency"), 
-            nlp_filters
-        )
+        offers = apply_filters(Offer.publicly_visible().select_related("agency"), nlp_filters)
     else:
         offers = apply_filters(Offer.publicly_visible().select_related("agency"), filters)
-    
+
     wilayas = (
         Offer.publicly_visible()
         .exclude(departure_wilaya_code="")
@@ -134,7 +133,7 @@ def search(request):
         .distinct()
         .order_by("departure_wilaya_code")
     )
-    
+
     # Build selected context for template
     selected = {
         "kind": filters.kind or "",
@@ -144,7 +143,17 @@ def search(request):
         "max_price": max_price,
         "mode": mode,
     }
-    
+
+    active_filters = []
+    if filters.q:
+        active_filters.append(f"“{filters.q}”")
+    if filters.kind:
+        active_filters.append(dict(Offer.KINDS).get(filters.kind, filters.kind))
+    if filters.wilaya:
+        active_filters.append(WILAYA_NAMES_FR.get(filters.wilaya, filters.wilaya))
+    if max_price:
+        active_filters.append(f"Under {int(max_price):,} DZD".replace(",", " "))
+
     return render(
         request,
         "pages/search.html",
@@ -153,7 +162,27 @@ def search(request):
             "wilayas": [(code, WILAYA_NAMES_FR.get(code, code)) for code in wilayas],
             "kinds": Offer.KINDS,
             "selected": selected,
+            "active_filters": active_filters,
             "total": offers.count(),
+        },
+    )
+
+
+def discover(request):
+    """The marketplace-wide chat page.
+
+    Same visibility rule as search: only published offers from verified
+    agencies are ever suggested. The conversation itself is stateless on the
+    server until the first message; `?q=` lets a shared link arrive with the
+    question already in the box.
+    """
+    return render(
+        request,
+        "pages/discover.html",
+        {
+            "starter_suggestions": discovery.STARTER_SUGGESTIONS,
+            "featured_offers": discovery.featured_offers(),
+            "initial_query": (request.GET.get("q") or "").strip(),
         },
     )
 

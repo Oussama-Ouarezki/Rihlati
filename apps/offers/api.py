@@ -25,10 +25,10 @@ from ninja import Field, Query, Router
 from ninja.errors import HttpError
 
 from apps.accounts.models import Agency, Membership
+from apps.common.nlp_parser import parse_query
 from apps.common.quotas import QuotaExceeded, assert_can_publish, quota_state
 from apps.common.schemas import Message, Strict
 from apps.common.tenancy import audit, require_membership, scoped
-from apps.common.nlp_parser import parse_query
 from apps.common.validators import (
     validate_date_range,
     validate_price_centimes,
@@ -405,14 +405,25 @@ def apply_filters(queryset, filters):
             | models.Q(destination_country__icontains=filters.nlp_destination)
         )
     if filters.nlp_inclusions:
-        inclusions = filters.nlp_inclusions or {}
-        # Build Q objects for attribute-based filtering
-        from apps.offers.models import Offer as OfferModel
-        # We can check if key inclusions are present in the attributes JSON
-        # For now, this is a placeholder: the real implementation would use
-        # __contains or a JSON query. We'll just note it and let the LLM re-rank.
-        # TODO: implement JSONField contains lookup for attributes
-        pass
+        # Only keys this codebase actually writes are mapped. `Offer.attributes`
+        # is still unvalidated (Known Gaps G1), so a blind loop over the JSON
+        # would let a caller filter on keys no agency sets and silently get an
+        # empty page. Unknown inclusion keys are ignored rather than trusted.
+        inclusion_lookups = {
+            "visa": {"attributes__visa_included": True},
+            "flight": {"attributes__flight_included": True},
+            "transport": {"attributes__transport_included": True},
+            "hotel": {"attributes__hotel_stars__isnull": False},
+            "meals": {"attributes__meal_plan__isnull": False},
+            "beach": {"attributes__beachfront": True},
+        }
+        for inclusion, value in filters.nlp_inclusions.items():
+            if not value:
+                continue
+            lookup = inclusion_lookups.get(inclusion)
+            if lookup is None:
+                continue
+            queryset = queryset.filter(**lookup)
 
     return queryset.order_by(*SORTS[filters.sort])
 
@@ -1021,6 +1032,7 @@ def _link_out(link):
 # AI Search endpoint
 # --------------------------------------------------------------------------
 
+
 class SearchQueryIn(Strict):
     query: str = Field(..., min_length=1, max_length=500)
 
@@ -1050,45 +1062,24 @@ def search_query(request, payload: SearchQueryIn):
     """
     parsed = parse_query(payload.query)
 
-    # Build a temporary filters object for apply_filters
-    from ninja import Field
-
-    class _TmpFilters(Strict):
-        kind: str | None = None
-        wilaya: str | None = None
-        q: str | None = None
-        price_min: int | None = None
-        price_max: int | None = None
-        date_from: date | None = None
-        date_to: date | None = None
-        sort: str = "departure"
-        limit: int = 20
-        offset: int = 0
-        nlp_kind: list[str] | None = None
-        nlp_budget_max: int | None = None
-        nlp_duration_days: int | None = None
-        nlp_destination: str | None = None
-        nlp_inclusions: dict[str, bool] | None = None
-
-    tmp = _TmpFilters(
-        kind=parsed["kind"][0] if parsed["kind"] else None,
-        nlp_kind=parsed["kind"],
+    # Reuse the real filter schema. A second copy of the fields was how the
+    # endpoint and the search page could start disagreeing about a parameter.
+    filters = OfferFilters(
+        kind=parsed["kind"][0] if len(parsed["kind"]) == 1 else None,
+        nlp_kind=parsed["kind"] or None,
         nlp_budget_max=parsed["budget_max"],
         nlp_duration_days=parsed["duration_days"],
         nlp_destination=parsed["destination"],
-        nlp_inclusions=parsed["inclusions"],
+        nlp_inclusions={key: value for key, value in parsed["inclusions"].items() if value} or None,
     )
 
     # Apply the normal filter pipeline
     qs = Offer.publicly_visible()
-    qs = apply_filters(qs, tmp)
+    qs = apply_filters(qs, filters)
 
     # Order by relevance: quality_score first, then departure date
     qs = qs.order_by("-quality_score", "departure_date")
-
-    # Limit results
-    limit = tmp.limit if 'tmp' in dir() else 20
-    qs = qs[tmp.offset : tmp.offset + limit] if 'tmp' in dir() else qs[:limit]
+    qs = qs[filters.offset : filters.offset + filters.limit]
 
     results = []
     for offer in qs:
@@ -1129,6 +1120,7 @@ def search_like(request, payload: dict):
     # TODO: store feedback in a model (SearchFeedback) per user/session
     # for now, just log it
     import logging
+
     logger = logging.getLogger(__name__)
     logger.info(
         "search_like offer=%s relevant=%s query_session=%s",

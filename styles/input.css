@@ -133,6 +133,55 @@
     @apply rounded-3xl border border-sand-200 bg-gradient-to-br from-sand-50 via-sand-100/70 to-brand-50;
   }
 
+  /* ---------------------------------------------------- marketplace surfaces */
+  .search-panel {
+    @apply mt-6 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card sm:p-5;
+  }
+  .search-primary {
+    @apply flex flex-col gap-2 sm:flex-row;
+  }
+  .search-filters {
+    @apply mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4;
+  }
+  .result-toolbar {
+    @apply mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3;
+  }
+  .filter-chip {
+    @apply inline-flex min-h-8 items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600;
+  }
+
+  /* ------------------------------------------------------------- discovery */
+  .chat-panel {
+    @apply overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card;
+  }
+  .chat-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5;
+  }
+  .chat-log {
+    @apply max-h-[min(56vh,40rem)] space-y-5 overflow-y-auto bg-slate-50/60 p-4 sm:p-5;
+  }
+  .chat-composer {
+    @apply mx-auto mt-3 max-w-3xl rounded-2xl border border-slate-200/80 bg-white/95 p-3 shadow-lift backdrop-blur sm:p-4;
+  }
+  [data-discover][data-state='chat'] .chat-composer {
+    @apply sticky bottom-3 z-10;
+  }
+  .chat-suggestions {
+    @apply mt-2 flex flex-wrap gap-2;
+  }
+  .chat-chip {
+    @apply inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700;
+  }
+  .discover-result {
+    @apply flex overflow-hidden rounded-xl border border-slate-200 bg-white transition hover:border-brand-300 hover:shadow-sm;
+  }
+  .discover-result-media {
+    @apply relative h-24 w-24 shrink-0 overflow-hidden bg-sand-100 sm:h-28 sm:w-32;
+  }
+  .discover-result-body {
+    @apply flex min-w-0 flex-1 flex-col p-3;
+  }
+
   /* ----------------------------------------------------------------- controls */
   .btn {
     @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold whitespace-nowrap transition focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50;

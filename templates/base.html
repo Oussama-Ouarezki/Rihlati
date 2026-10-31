@@ -26,31 +26,20 @@
       </a>
 
       <div class="flex items-center gap-2 sm:gap-3">
-        <span class="hidden rounded-full bg-sand-100 px-2.5 py-1 text-[11px] font-medium text-sand-700 sm:inline">
-          Django preview
-        </span>
-
-        {% comment %} Search bar: persistent across all pages, keyword or NLP mode. {% endcomment %}
-        <form method="get" action="{% url 'search' %}" class="relative w-64 sm:w-auto">
-          <input type="hidden" name="mode" id="search-mode" value="keyword">
-          <input type="text"
-                 name="q"
-                 id="search-input"
-                 placeholder="Search offers… (kind, wilaya, budget, or ask in natural language)"
-                 class="search-input block w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent">
-          <button type="button"
-                  class="search-mode-toggle absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-600"
-                  aria-label="Switch to NLP mode">
-            🔍
-          </button>
-          <button type="submit"
-                  class="search-submit absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-brand">
-            Go
-          </button>
-        </form>
+        <a href="{% url 'search' %}"
+           class="btn btn-ghost btn-sm hidden sm:inline-flex">
+          Browse trips
+        </a>
+        <a href="{% url 'discover' %}"
+           class="btn btn-primary btn-sm whitespace-nowrap">
+          Ask Rihlati
+        </a>
 
         {% if user.is_authenticated %}
-          <a href="{% url 'dashboard' %}" class="btn btn-primary btn-sm">Agency console</a>
+          <a href="{% url 'dashboard' %}" class="btn btn-secondary btn-sm">
+            <span class="hidden sm:inline">Agency console</span>
+            <span class="sm:hidden">Console</span>
+          </a>
           <details class="group relative">
             <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
               <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-50 text-[11px] font-bold text-brand-700">
@@ -80,13 +69,12 @@
             </div>
           </details>
         {% else %}
-          <a href="{% url 'login' %}" class="btn btn-primary btn-sm">Agency login</a>
+          <a href="{% url 'login' %}" class="btn btn-secondary btn-sm">
+            <span class="hidden sm:inline">Agency login</span>
+            <span class="sm:hidden">Agency</span>
+          </a>
         {% endif %}
 
-        <a href="{% url 'search' %}"
-           class="hidden text-sm font-medium text-slate-600 hover:text-brand-700 sm:inline">
-          Explore trips
-        </a>
     </div>
   </header>
 
@@ -120,6 +108,7 @@
       <div class="text-sm">
         <p class="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">Explore</p>
         <ul class="mt-3 space-y-2 text-slate-600">
+          <li><a href="{% url 'discover' %}" class="hover:text-brand-700">Ask Rihlati</a></li>
           <li><a href="{% url 'search' %}" class="hover:text-brand-700">All trips</a></li>
           <li><a href="{% url 'login' %}" class="hover:text-brand-700">Agency console</a></li>
           <li><a href="{% url 'roadmap' %}" class="hover:text-brand-700">Product roadmap</a></li>
@@ -130,6 +119,9 @@
         <p class="mt-3 leading-6 text-slate-500">
           Sample data only — no real names, phone numbers or bookings.
         </p>
+        <p class="mt-3 inline-flex rounded-full bg-sand-100 px-2.5 py-1 text-[11px] font-medium text-sand-700">
+          Django preview
+        </p>
       </div>
     </div>
   </footer>
@@ -137,48 +129,5 @@
   {% comment %} Draws the trip programme's road through its pins. Decoration only:
      with this script off the programme still renders, over a straight band. {% endcomment %}
   <script src="{% static 'road.js' %}" defer></script>
-  <script>
-    // Search bar mode switching (Keyword / NLP)
-    document.addEventListener('DOMContentLoaded', function() {
-      const modeToggle = document.querySelector('.search-mode-toggle');
-      const searchInput = document.getElementById('search-input');
-      const searchForm = document.querySelector('form[action*="search"]');
-      const modeInput = document.getElementById('search-mode');
-      
-      if (!modeToggle || !searchInput || !searchForm) return;
-      
-      let isNLP = false;
-      
-      // Toggle mode
-      modeToggle.addEventListener('click', function() {
-        isNLP = !isNLP;
-        modeInput.value = isNLP ? 'nlp' : 'keyword';
-        
-        if (isNLP) {
-          searchInput.placeholder = 'Describe your trip in natural language…\n(e.g. "Omra with visa included under 400 DZD" or "organized trip to Oran under 30000 DZD")';
-          searchInput.classList.add('nlp-mode');
-          this.setAttribute('aria-label', 'Switch to keyword mode');
-          this.textContent = '✒️';
-        } else {
-          searchInput.placeholder = 'Search offers… (kind, wilaya, budget, or ask in natural language)';
-          searchInput.classList.remove('nlp-mode');
-          this.setAttribute('aria-label', 'Switch to NLP mode');
-          this.textContent = '🔍';
-        }
-      });
-      
-      // Update placeholder on load based on existing mode param
-      const urlParams = new URLSearchParams(window.location.search);
-      const initialMode = urlParams.get('mode');
-      if (initialMode === 'nlp') {
-        isNLP = true;
-        modeInput.value = 'nlp';
-        searchInput.placeholder = 'Describe your trip in natural language…\n(e.g. "Omra with visa included under 400 DZD")';
-        searchInput.classList.add('nlp-mode');
-        modeToggle.setAttribute('aria-label', 'Switch to keyword mode');
-        modeToggle.textContent = '✒️';
-      }
-    });
-  </script>
 </body>
 </html>

@@ -29,9 +29,9 @@ from apps.trips.models import (
     AttendanceStatus,
     MilestoneCheckIn,
     Reservation,
+    TripAttendance,
     current_milestone,
     default_status_for,
-    TripAttendance,
 )
 
 public_router = Router(tags=["my-trip"])
@@ -373,7 +373,7 @@ def check_in(request, agency_id, reservation_id, payload: CheckInIn):
     - If `checked_in_at` is set, status becomes `attended`; otherwise it
       stays (or becomes) `registered`.
     """
-    agency = require_membership(request.user, agency_id)
+    require_membership(request.user, agency_id)
     reservation = get_object_or_404(
         scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
     )
@@ -414,15 +414,12 @@ def check_in(request, agency_id, reservation_id, payload: CheckInIn):
 )
 def manifest(request, agency_id, offer_id, reservation_id):
     """List all travelers registered for this trip with their attendance status."""
-    agency = require_membership(request.user, agency_id)
+    require_membership(request.user, agency_id)
     reservation = get_object_or_404(
         scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
     )
 
-    rows = (
-        TripAttendance.objects.filter(reservation=reservation)
-        .order_by("-registered_at")
-    )
+    rows = TripAttendance.objects.filter(reservation=reservation).order_by("-registered_at")
 
     result_rows = []
     for row in rows:
@@ -449,7 +446,7 @@ def manifest(request, agency_id, offer_id, reservation_id):
 )
 def mark_attended(request, agency_id, offer_id, reservation_id, attendance_id):
     """Mark a specifically registered traveler as attended."""
-    agency = require_membership(request.user, agency_id)
+    require_membership(request.user, agency_id)
     reservation = get_object_or_404(
         scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
     )
@@ -477,7 +474,7 @@ def mark_attended(request, agency_id, offer_id, reservation_id, attendance_id):
 )
 def mark_no_show(request, agency_id, offer_id, reservation_id, attendance_id):
     """Mark a registered traveler as no-show."""
-    agency = require_membership(request.user, agency_id)
+    require_membership(request.user, agency_id)
     reservation = get_object_or_404(
         scoped(Reservation.objects.select_related("offer"), agency_id), pk=reservation_id
     )

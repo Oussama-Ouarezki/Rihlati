@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Ask Rihlati — find a trip{% endblock %}
+
+{% block content %}
+  <div data-discover
+       data-state="empty"
+       data-discover-url="{% url 'api:discover' %}"
+       data-initial-query="{{ initial_query|escapejs }}">
+
+    <section data-discover-intro class="mx-auto max-w-2xl pt-2 text-center sm:pt-6">
+      <p class="eyebrow">Ask Rihlati</p>
+      <h1 class="page-title mt-2 sm:text-4xl">Tell us the trip you want.</h1>
+      <p class="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-600 sm:text-base">
+        One sentence is enough. We search verified agencies and suggest the
+        closest departures — no account needed.
+      </p>
+    </section>
+
+    <section data-discover-chat class="mx-auto mt-6 hidden max-w-3xl">
+      <div class="chat-panel">
+        <div class="chat-head">
+          <div class="min-w-0">
+            <p class="text-sm font-semibold text-slate-900">Your search</p>
+            <p data-discover-summary class="mt-0.5 truncate text-xs text-slate-500"></p>
+          </div>
+          <button type="button" data-discover-reset class="btn btn-secondary btn-sm">
+            New search
+          </button>
+        </div>
+        <div data-discover-log class="chat-log" role="log"></div>
+      </div>
+    </section>
+
+    <div data-discover-composer class="chat-composer mx-auto max-w-3xl">
+      <form data-discover-form autocomplete="off" class="mx-auto max-w-xl">
+        <label class="sr-only" for="discover-input">Describe your trip</label>
+        <div class="relative flex items-center">
+          <input id="discover-input"
+                 data-discover-input
+                 type="text"
+                 name="q"
+                 maxlength="500"
+                 value="{{ initial_query }}"
+                 placeholder="Omra under 400 000 DZD from Algiers…"
+                 class="field-input py-3.5 pe-24">
+          <button data-discover-send
+                  type="submit"
+                  class="absolute end-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60">
+            Ask
+          </button>
+        </div>
+      </form>
+
+      <div data-discover-suggestions class="chat-suggestions justify-center">
+        {% for suggestion in starter_suggestions %}
+          <button type="button"
+                  data-discover-suggestion="{{ suggestion }}"
+                  class="chat-chip">
+            {{ suggestion }}
+          </button>
+        {% endfor %}
+      </div>
+
+      <p data-discover-error class="mt-2 hidden text-xs text-rose-600" role="alert"></p>
+    </div>
+
+    <p data-discover-status class="sr-only" aria-live="polite"></p>
+
+    <section data-discover-empty class="mx-auto mt-10 max-w-5xl">
+      <div class="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 class="section-title">Next departures</h2>
+          <p class="mt-0.5 text-xs text-slate-500">A starting point — ask for something narrower.</p>
+        </div>
+        <a href="{% url 'search' %}" class="text-sm font-medium text-brand-700 hover:underline">
+          Browse all trips →
+        </a>
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {% for offer in featured_offers %}
+          {% include "pages/_offer_card.html" %}
+        {% empty %}
+          <p class="text-sm text-slate-500">No published trips yet.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% comment %} Classes live in templates because Tailwind scans templates, not
+       static/discover.js. A bubble built from a class string in the script
+       would be invisible to the compiler and unstyled. {% endcomment %}
+    <template data-discover-bubble-user>
+      <p dir="auto" class="ms-auto max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 px-4 py-2.5 text-sm leading-6 text-white"></p>
+    </template>
+
+    <template data-discover-bubble-bot>
+      <div class="me-auto max-w-[92%]">
+        <div class="rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm">
+          <p dir="auto" data-bot-text class="whitespace-pre-line"></p>
+        </div>
+        <div data-bot-offers class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
+        <a data-bot-more class="mt-3 hidden text-sm font-medium text-brand-700 hover:underline"></a>
+      </div>
+    </template>
+
+    <template data-discover-card>
+      <a class="discover-result group">
+        <span class="discover-result-media">
+          <span data-card-fallback class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-sand-100 via-sand-50 to-brand-50 text-2xl text-brand-300" aria-hidden="true">✈</span>
+          <img data-card-image alt="" loading="lazy" hidden class="relative h-full w-full object-cover">
+        </span>
+        <span class="discover-result-body">
+          <span data-card-kind class="text-[10px] font-semibold tracking-[0.12em] text-sand-700 uppercase"></span>
+          <span data-card-title class="mt-0.5 line-clamp-2 text-sm leading-5 font-semibold text-slate-900 group-hover:text-brand-700"></span>
+          <span data-card-meta class="mt-1 truncate text-xs text-slate-500"></span>
+          <span class="mt-auto flex items-baseline justify-between gap-2 pt-2">
+            <span data-card-price class="text-sm font-bold text-slate-900 tabular-nums"></span>
+            <span data-card-agency class="min-w-0 truncate text-[11px] text-slate-500"></span>
+          </span>
+        </span>
+      </a>
+    </template>
+
+    <template data-discover-chip>
+      <button type="button" class="chat-chip"></button>
+    </template>
+  </div>
+
+  <script src="{% static 'discover.js' %}" defer></script>
+{% endblock %}

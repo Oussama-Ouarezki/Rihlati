@@ -152,6 +152,10 @@ class AuthorizationTests(SimpleTestCase):
         # the returned 128-bit conversation token is the credential for the
         # rest of the exchange, and it names exactly one conversation.
         "POST /api/chat/offers/{offer_id}",
+        # Marketplace-wide discovery. Same argument as the search page: a
+        # stranger comparing Omra packages at 23h has no account. It only
+        # reads published offers and stores the parsed intent in the session.
+        "POST /api/chat/discover",
         # You cannot require a token in order to get a token.
         "POST /api/auth/login",
         "POST /api/auth/refresh",

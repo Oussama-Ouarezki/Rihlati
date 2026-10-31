@@ -27,6 +27,7 @@ from django.utils import timezone
 from ninja import Field, Router
 from ninja.errors import HttpError
 
+from apps.chat import discovery
 from apps.chat.context import facts_json, related_offer_cards
 from apps.chat.llm import LLMUnavailable, complete
 from apps.chat.models import (
@@ -81,6 +82,62 @@ class ChatOut(Strict):
     token: str
     reply: str
     related_offers: list[RelatedOfferOut]
+
+
+class DiscoverIn(Strict):
+    """A discovery message. There is no agency or offer id: this surface
+    searches every verified agency's public listings, not one tenant's row."""
+
+    message: str = Field(min_length=1, max_length=500)
+    reset: bool = False
+
+
+class DiscoverOfferOut(Strict):
+    id: str
+    url: str
+    title: str
+    kind: str
+    kind_code: str
+    price_centimes: int
+    price_dzd: int
+    departure_date: str
+    destination: str
+    agency: str
+    verified: bool
+    seats_left: int
+    cover_image_url: str = ""
+
+
+class DiscoverOut(Strict):
+    reply: str
+    summary: str
+    search_url: str
+    intent: dict
+    parsed: dict
+    reset: bool
+    offers: list[DiscoverOfferOut]
+    suggestions: list[str]
+    total: int
+
+
+@public_router.post(
+    "/discover",
+    response=DiscoverOut,
+    auth=None,
+    throttle=[ChatThrottle()],
+)
+def discover(request, payload: DiscoverIn):
+    """Marketplace search in plain language.
+
+    Public like the search page, because the traveller comparing three Omra
+    packages at 23h does not have an account. The only thing kept between
+    turns is the parsed intent in the session — never the message text — so a
+    phone number typed into the chat does not outlive the request.
+    """
+    previous = None if payload.reset else request.session.get(discovery.SESSION_KEY)
+    result = discovery.build_response(payload.message, previous)
+    request.session[discovery.SESSION_KEY] = result["intent"]
+    return result
 
 
 @public_router.post(

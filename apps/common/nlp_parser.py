@@ -9,59 +9,71 @@ is introduced between the pieces.
 """
 
 import re
-from decimal import Decimal
-
-from django.conf import settings
 
 # --------------------------------------------------------------------------
 # Currency & number patterns (Algerian DZD)
 # --------------------------------------------------------------------------
 
 # Match price in various formats:
-#   "400 DZD", "400000", "400k", "400 000", "under 400", "above 500"
-PRICE_PATTERN = re.compile(
-    r"(?:"
-    r"(?:under|above|over|more than|less than)\s+)?"
-    r"("
-    r"\d{1,10}"  # integer part
-    r"(?:[\s.,]\d{3})*"  # optional grouped thousands
-    r")"
-    r"(?:\s*(?:DZD|dinars|din|centimes))?",
+#   "400 DZD", "400000", "400 000", "under 400", "budget 300 000"
+#
+# A budget word is tried before a bare number on purpose: in "7 nights under
+# 400 000 DZD" the first number is the duration, and matching it as the budget
+# made every explicit budget wrong.
+BUDGET_PREFIX_PATTERN = re.compile(
+    r"\b(?:under|below|less\s+than|up\s+to|max(?:imum)?|budget(?:\s+of)?|"
+    r"moins\s+de|jusqu'à|أقل\s+من)\s*"
+    r"(\d{1,10}(?:[\s.,]\d{3})*)"
+    r"(?:\s*(?:DZD|dinars?|din|centimes))?",
     re.IGNORECASE,
 )
+PRICE_AFTER_PATTERN = re.compile(
+    r"\b(?:above|over|more\s+than|plus\s+de)\s*"
+    r"(\d{1,10}(?:[\s.,]\d{3})*)"
+    r"(?:\s*(?:DZD|dinars?|din|centimes))?",
+    re.IGNORECASE,
+)
+CURRENCY_SUFFIX_PATTERN = re.compile(
+    r"(\d{1,10}(?:[\s.,]\d{3})*)\s*(?:DZD|dinars?|din|centimes)\b",
+    re.IGNORECASE,
+)
+BARE_NUMBER_PATTERN = re.compile(r"\d{1,10}(?:[\s.,]\d{3})*")
+DURATION_AFTER_NUMBER = re.compile(r"\s*(?:day|days|night|nights|d|n)\b", re.IGNORECASE)
 
 # Match duration in days or nights
-DURATION_DAYS_PATTERN = re.compile(
-    r"\b(\d+)\s*(?:day|days|d)\b", re.IGNORECASE
-)
-DURATION_NIGHTS_PATTERN = re.compile(
-    r"\b(\d+)\s*(?:night|nights|n)\b", re.IGNORECASE
-)
+DURATION_DAYS_PATTERN = re.compile(r"\b(\d+)\s*(?:day|days|d)\b", re.IGNORECASE)
+DURATION_NIGHTS_PATTERN = re.compile(r"\b(\d+)\s*(?:night|nights|n)\b", re.IGNORECASE)
 
 # Match "15 days", "7 nights", etc.
-DURATION_COMBINED_PATTERN = re.compile(
-    r"\b(\d+)\s*(?:day|days|night|nights|d|n)\b", re.IGNORECASE
-)
+DURATION_COMBINED_PATTERN = re.compile(r"\b(\d+)\s*(?:day|days|night|nights|d|n)\b", re.IGNORECASE)
 
 # --------------------------------------------------------------------------
 # Destination / city / country patterns
 # --------------------------------------------------------------------------
 
-# Common travel destinations mentioned in Rihlati offers
-COMMON_DESTINATIONS = frozenset({
-    "makkah",
-    "medinah",
-    "saudi",
-    "turkey",
-    "istanbul",
-    "tunisia",
-    "hammamet",
-    "cairo",
-    "dubai",
-    "jeddah",
-    "costa",
-    "beach",
-})
+# Common travel destinations mentioned in Rihlati offers. Only real places:
+# "beach" is a theme, not a city, and filtering destination_city on it returned
+# zero rows for the most natural query in the catalogue.
+COMMON_DESTINATIONS = frozenset(
+    {
+        "makkah",
+        "madinah",
+        "medinah",
+        "saudi",
+        "turkey",
+        "istanbul",
+        "tunisia",
+        "hammamet",
+        "djerba",
+        "cairo",
+        "dubai",
+        "jeddah",
+        "marrakech",
+        "morocco",
+        "paris",
+        "france",
+    }
+)
 
 # Simple heuristic: if a token matches a known destination, capture it.
 # We do NOT build a heavy NLP model here — just keyword harvesting.
@@ -117,43 +129,51 @@ def _find_kind_keywords(text: str) -> list[str]:
 # --------------------------------------------------------------------------
 
 
-def extract_price_centimes(query: str) -> int | None:
-    """Extract maximum budget in centimes from a query.
-
-    Returns the price threshold, or None if no price found.
-    If 'under'/'less than'/'below' is used, return that cap.
-    If 'over'/'above'/'more than' is used, return None (price floor,
-    not supported yet — treat as unrestricted).
-
-    The value is returned in DZD centimes (1 DZD = 100 centimes for
-    internal storage, but we store full integer centimes e.g. 42000000 = 420 000.00 DZD).
-    """
-    m = PRICE_PATTERN.search(query)
-    if not m:
-        return None
-
-    raw = m.group(1).strip()
-    # Remove thousand separators (spaces, dots, commas)
-    raw = raw.replace(" ", "").replace(".", "").replace(",", "")
-
-    # Strip currency tokens
-    raw = raw.replace("DZD", "").replace("dinars", "").replace("din", "").replace("centimes", "").strip()
-
+def _to_int(raw: str) -> int | None:
+    """A grouped integer ("400 000", "400,000") as an int, or None."""
+    digits = raw.replace(" ", "").replace(".", "").replace(",", "").strip()
     try:
-        value = int(raw)
+        return int(digits)
     except ValueError:
         return None
 
-    # If the query had "under"/"less than"/"below", this is a max cap
-    query_lower = query.lower()
-    if any(
-        word in query_lower
-        for word in ["under", "less than", "below", "under"]
-    ):
-        return value  # this is the max budget
 
-    # If "over"/"above"/"more than" — not yet supported; return None
-    # Caller can treat as "no price filter"
+def extract_price_centimes(query: str) -> int | None:
+    """Extract the maximum budget, in DZD, from a query.
+
+    Returns the cap for "under"/"less than"/"budget", the value for
+    "400 000 DZD", and a plausible bare number. A minimum ("over", "above")
+    is not a maximum, so it returns None rather than silently excluding cheap
+    trips.
+
+    The stored value is in dinars; `apply_filters()` multiplies by 100 because
+    `Offer.price_centimes` is stored in centimes. Keeping the parser's unit in
+    dinars matches what a traveller types.
+    """
+    m = BUDGET_PREFIX_PATTERN.search(query)
+    if m:
+        value = _to_int(m.group(1))
+        return value if value and value > 0 else None
+
+    # "over 500 000" is a floor, not a ceiling. Returning None is the honest
+    # answer until the schema has a price_min filter on the NLP path.
+    if PRICE_AFTER_PATTERN.search(query):
+        return None
+
+    m = CURRENCY_SUFFIX_PATTERN.search(query)
+    if m:
+        value = _to_int(m.group(1))
+        return value if value and value > 0 else None
+
+    # Last resort: a bare large number ("omra 400000"). Duration numbers are
+    # filtered out, and 10 000 is the floor that keeps a year ("Hajj 2027")
+    # from becoming a budget.
+    for match in BARE_NUMBER_PATTERN.finditer(query):
+        if DURATION_AFTER_NUMBER.match(query[match.end() :]):
+            continue
+        value = _to_int(match.group(0))
+        if value and value >= 10_000:
+            return value
     return None
 
 
@@ -183,14 +203,15 @@ def extract_destination(query: str) -> str | None:
     """
     query_lower = query.lower()
 
-    # First: check against common destinations list
-    for dest in COMMON_DESTINATIONS:
-        if dest in query_lower:
+    # Longest name first: "madinah" must win over a short substring, and
+    # "saudi arabia" over "saudi".
+    for dest in sorted(COMMON_DESTINATIONS, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(dest)}\b", query_lower):
             return dest
 
-    # Second: look for capitalized place names that aren't common words
-    # Simple heuristic: words starting with uppercase-like patterns after "to"
-    # This is deliberately coarse — we fall back to title/q search later.
+    # Unknown place names are deliberately not guessed. A wrong guess filters
+    # the catalogue to zero rows, which looks like "no such trip" rather than
+    # "I did not understand you".
     return None
 
 
@@ -206,21 +227,47 @@ def extract_kind(query: str) -> list[str]:
 def extract_inclusions(query: str) -> dict[str, bool]:
     """Extract boolean inclusion flags from the query.
 
-    Returns dict with keys: visa, flight, transport, hotel, meals.
-    Values are True if the keyword appears, False otherwise (not "known
-    negative", just "not explicitly mentioned").
+    Returns dict with keys: visa, flight, transport, hotel, meals, beach.
+    Values are True when the traveller explicitly asks for that inclusion,
+    False when the word is merely present. The distinction matters: the query
+    "visa assistance" is a `kind`, not a request for every offer that happens
+    to include a visa, so a naive `"visa" in q` filtered the visa offers out of
+    their own search.
     """
     q = query.lower()
-    defaults = {
-        "visa": "visa" in q or "visa included" in q,
-        "flight": "flight" in q or "flight included" in q,
-        "transport": "transport" in q or "transfer" in q,
-        "hotel": "hotel" in q,
-        "meals": any(
-            word in q for word in ["meal", "board", "half board", "full board"]
+
+    def wants(*phrases: str) -> bool:
+        return any(re.search(phrase, q) for phrase in phrases)
+
+    return {
+        "visa": wants(
+            r"\bvisa\s+(?:is\s+)?included\b",
+            r"\bwith\s+(?:the\s+)?visa\b",
+            r"\bvisa\s+and\s+flight\b",
         ),
+        "flight": wants(
+            r"\bflight\s+(?:is\s+)?included\b",
+            r"\bwith\s+(?:the\s+)?flight\b",
+            r"\bflights?\s+and\s+hotel\b",
+        ),
+        "transport": wants(
+            r"\btransport\s+(?:is\s+)?included\b",
+            r"\btransfers?\s+(?:are\s+)?included\b",
+            r"\bwith\s+(?:the\s+)?transfer\b",
+        ),
+        "hotel": wants(
+            r"\bhotel\s+(?:is\s+)?included\b",
+            r"\bwith\s+(?:the\s+)?hotel\b",
+        ),
+        "meals": wants(
+            r"\bmeals?\s+(?:are\s+)?included\b",
+            r"\bhalf[\s-]board\b",
+            r"\bfull[\s-]board\b",
+            r"\ball[\s-]inclusive\b",
+            r"\bbreakfast\s+included\b",
+        ),
+        "beach": wants(r"\bbeach(?:front)?\b", r"\bseaside\b", r"\bby\s+the\s+sea\b"),
     }
-    return defaults
 
 
 # --------------------------------------------------------------------------
@@ -233,16 +280,18 @@ def parse_query(query: str) -> dict[str, object]:
 
     Returns dict with possible keys:
         kind:        list[str]   | None  (e.g. ["omra"] or [])
-        budget_max:  int | None  | maximum price in centimes (for "under X")
+        budget_max:  int | None  | maximum price in DZD (for "under X")
         duration_days: int | None| requested days (None = no filter)
         destination: str | None  | destination city/country
-        inclusions:  dict[str, bool]  (visa, flight, transport, hotel, meals)
+        inclusions:  dict[str, bool]  (visa, flight, transport, hotel, meals, beach)
 
     Example
     -------
     >>> parse_query("Omra with visa included under 400 DZD")
-    {'kind': ['omra'], 'budget_max': 40000000, 'duration_days': None,
-     'destination': None, 'inclusions': {'visa': True, 'flight': True, 'transport': False, 'hotel': False, 'meals': False}}
+    {'kind': ['omra'], 'budget_max': 400, 'duration_days': None,
+     'destination': None,
+     'inclusions': {'visa': True, 'flight': False, 'transport': False,
+                    'hotel': False, 'meals': False, 'beach': False}}
     """
     if not query or not query.strip():
         return {
@@ -256,6 +305,7 @@ def parse_query(query: str) -> dict[str, object]:
                 "transport": False,
                 "hotel": False,
                 "meals": False,
+                "beach": False,
             },
         }
 

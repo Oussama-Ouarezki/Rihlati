@@ -2,72 +2,72 @@
 {% block title %}Find your next trip — Rihlati{% endblock %}
 
 {% block content %}
-  <section class="hero-band relative overflow-hidden px-5 py-8 sm:px-8 sm:py-10">
-    <div class="relative max-w-3xl">
+  <section class="page-head">
+    <div>
       <p class="eyebrow">Verified Algerian agencies</p>
-      <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-        Find the trip you have been putting off.
-      </h1>
-      <p class="mt-3 max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
-        Compare Omra, Hajj, organised trips and visa assistance from agencies whose
-        paperwork has been checked. Ask a question without creating an account.
+      <h1 class="page-title mt-2 sm:text-4xl">Find your next trip.</h1>
+      <p class="page-lede">
+        Compare Omra, Hajj, organised trips and visa assistance from agencies
+        whose paperwork has been checked.
       </p>
-      <ul class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs font-medium text-slate-600">
-        <li class="flex items-center gap-1.5"><span class="text-brand-600" aria-hidden="true">✓</span> Verified agencies only</li>
-        <li class="flex items-center gap-1.5"><span class="text-brand-600" aria-hidden="true">✓</span> No account needed</li>
-        <li class="flex items-center gap-1.5"><span class="text-brand-600" aria-hidden="true">✓</span> Talk to the agency directly</li>
-      </ul>
+      <p class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-slate-500">
+        <span class="flex items-center gap-1.5"><span class="text-brand-600" aria-hidden="true">✓</span> Verified agencies only</span>
+        <span class="flex items-center gap-1.5"><span class="text-brand-600" aria-hidden="true">✓</span> No account needed</span>
+      </p>
     </div>
-    <div class="pointer-events-none absolute -end-10 -top-10 hidden h-48 w-48 rounded-full bg-brand-200/30 blur-2xl sm:block" aria-hidden="true"></div>
+    <a href="{% url 'discover' %}" class="btn btn-secondary shrink-0">
+      Not sure? Ask Rihlati
+    </a>
   </section>
 
   {% comment %} A plain GET form, no JavaScript. Filters land in the URL, so a search is
      shareable and back-button friendly. {% endcomment %}
-  <form method="get" action="{% url 'search' %}" class="card relative z-10 -mt-3 grid gap-3 p-4 sm:-mt-3 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_1fr_8rem_auto] lg:items-end">
-    <input type="hidden" name="mode" id="search-mode-header" value="{{ selected.mode|default:'keyword'}}">
-
-    <div>
-      <label for="filter-kind" class="field-label">Trip type</label>
-      <select id="filter-kind" name="kind" class="field-input">
-        <option value="">All types</option>
-        {% for value, label in kinds %}
-          <option value="{{ value }}" {% if selected.kind == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
+  <form method="get" action="{% url 'search' %}" class="search-panel">
+    <div class="search-primary">
+      <div class="relative flex-1">
+        <label for="filter-q" class="sr-only">Search trips</label>
+        <span class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4"><path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 3.47 9.77l3.63 3.63a.75.75 0 1 0 1.06-1.06l-3.63-3.63A5.5 5.5 0 0 0 9 3.5ZM5 9a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"/></svg>
+        </span>
+        <input id="filter-q" type="search" name="q" value="{{ selected.q|default:'' }}"
+               placeholder="Destination, agency or trip name…"
+               class="field-input ps-10">
+      </div>
+      <button type="submit" class="btn btn-primary sm:px-6">Show trips</button>
     </div>
 
-    {% comment %} Wilaya, not a free-text city. A traveller in Bordj Bou Arréridj types it
-       four different ways; the 58 official codes are the one spelling everyone
-       shares, and they are what the offer actually stores. {% endcomment %}
-    <div>
-      <label for="filter-wilaya" class="field-label">Departure wilaya</label>
-      <select id="filter-wilaya" name="wilaya" class="field-input">
-        <option value="">All wilayas</option>
-        {% for code, name in wilayas %}
-          <option value="{{ code }}" {% if selected.wilaya == code %}selected{% endif %}>{{ code }} — {{ name }}</option>
-        {% endfor %}
-      </select>
-    </div>
+    <div class="search-filters">
+      <div>
+        <label for="filter-kind" class="field-label">Trip type</label>
+        <select id="filter-kind" name="kind" class="field-input">
+          <option value="">All types</option>
+          {% for value, label in kinds %}
+            <option value="{{ value }}" {% if selected.kind == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-    <div>
-      <label for="filter-q" class="field-label">Search</label>
-      <input id="filter-q" type="search" name="q" value="{{ selected.q|default:'' }}"
-             placeholder="Omra, Istanbul, visa…" class="field-input">
-      <button type="button" class="btn btn-sm text-slate-400 ml-2 ai-search-trigger"
-              data-query="">
-        🔍 AI
-      </button>
-    </div>
+      {% comment %} Wilaya, not a free-text city. A traveller in Bordj Bou Arréridj types it
+         four different ways; the 58 official codes are the one spelling everyone
+         shares, and they are what the offer actually stores. {% endcomment %}
+      <div>
+        <label for="filter-wilaya" class="field-label">Departure wilaya</label>
+        <select id="filter-wilaya" name="wilaya" class="field-input">
+          <option value="">All wilayas</option>
+          {% for code, name in wilayas %}
+            <option value="{{ code }}" {% if selected.wilaya == code %}selected{% endif %}>{{ code }} — {{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-    <div>
-      <label for="filter-price" class="field-label">Max budget (DZD)</label>
-      <input id="filter-price" type="number" name="max_price" min="0" step="1000"
-             value="{{ selected.max_price }}" placeholder="500000" class="field-input">
-    </div>
+      <div>
+        <label for="filter-price" class="field-label">Max budget (DZD)</label>
+        <input id="filter-price" type="number" name="max_price" min="0" step="1000"
+               value="{{ selected.max_price }}" placeholder="500000" class="field-input">
+      </div>
 
-    <div class="flex items-end gap-2">
-      <div class="flex-1">
-        <label for="filter-sort" class="field-label">Sort</label>
+      <div>
+        <label for="filter-sort" class="field-label">Sort by</label>
         <select id="filter-sort" name="sort" class="field-input">
           <option value="departure" {% if selected.sort == 'departure' %}selected{% endif %}>Soonest departure</option>
           <option value="price" {% if selected.sort == 'price' %}selected{% endif %}>Price: low to high</option>
@@ -76,120 +76,42 @@
           <option value="quality" {% if selected.sort == 'quality' %}selected{% endif %}>Best described</option>
         </select>
       </div>
-      <button type="submit" class="btn btn-primary">Filter</button>
     </div>
   </form>
 
-  {% comment %} NLP Search modal - appears when AI trigger is clicked {% endcomment %}
-  <div id="ai-search-modal" class="fixed inset-0 hidden items-center justify-center bg-black/60 z-50 modal-content">
-    <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-2xl">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">AI Search</h3>
-        <button class="close-modal text-slate-500 hover:text-slate-700" aria-label="Close search modal">×</button>
-      </div>
-
-      {% comment %} Determine if we're in NLP mode from the header search bar {% endcomment %}
-      {% if selected.mode == 'nlp' %}
-        <input type="hidden" name="mode" value="nlp">
-        <div class="mb-4 p-3 bg-slate-50 rounded-lg">
-          <p class="text-sm text-slate-600">Mode: Natural Language Search</p>
-          <p class="text-xs text-slate-500 mt-1">Your query was parsed as natural language. You can modify it below.</p>
-        </div>
-      {% endif %}
-
-      <form method="get" class="space-y-4">
-        {% if selected.mode == 'nlp' %}
-          {% comment %} NLP mode: show parsed intent and allow editing {% endcomment %}
-          <div>
-            <label class="field-label">Natural language query</label>
-            <input type="text" id="ai-query" name="q"
-                   placeholder="e.g. Omra with visa included under 400 DZD"
-                   class="field-input w-full py-2 px-3 rounded border focus:outline-none focus:border-brand-600"
-                   value="{{ selected.q|default:'' }}">
-            <p class="text-xs text-slate-500 mt-1 break-all" id="parsed-intent">
-              {% if selected.q %}
-                {% load i18n %}
-                {% if kind%}Kind: {{ kind }}{% endif %}{% if budget_max %}, Budget: {{ budget_max|default:"" }}{% endif %}{% if destination %}, Destination: {{ destination }}{% endif %}
-              {% endif %}
-            </p>
-          </div>
-        {% else %}
-          <div>
-            <label class="field-label">Describe your trip</label>
-            <input type="text" id="ai-query" name="nlp_query"
-                   placeholder="e.g. Omra with visa included under 400 DZD"
-                   class="field-input w-full py-2 px-3 rounded border focus:outline-none focus:border-brand-600"
-                   value="{{ nlp_query|default:'' }}">
-          </div>
-        {% endif %}
-
-        <div>
-          <label class="field-label">Max budget (DZD)</label>
-          <input type="number" id="ai-budget" name="max_price" min="0" step="1000"
-                 value="{{ selected.max_price|default:'' }}" class="field-input w-full py-2 px-3 rounded border">
-        </div>
-
-        <div>
-          <label class="field-label">Sort</label>
-          <select id="ai-sort" name="sort" class="field-input">
-            <option value="departure" {% if selected.sort == 'departure' or not selected.sort %}selected{% endif %}>Soonest departure</option>
-            <option value="price" {% if selected.sort == 'price' %}selected{% endif %}>Price: low to high</option>
-            <option value="price_desc" {% if selected.sort == 'price_desc' %}selected{% endif %}>Price: high to low</option>
-            <option value="quality" {% if selected.sort == 'quality' %}selected{% endif %}>Best described</option>
-          </select>
-        </div>
-
-        <div class="flex gap-2">
-          <button type="submit" class="btn btn-primary flex-1">Search</button>
-          <button type="button" class="btn btn-outline close-modal flex-1">Cancel</button>
-        </div>
-      </form>
-      <div class="mt-6">
-        <p class="text-sm text-slate-600">Powered by natural language processing</p>
-      </div>
-    </div>
+  <div class="result-toolbar">
+    <p class="text-sm text-slate-600">
+      <span class="font-semibold text-slate-900">{{ total }}</span> trip{{ total|pluralize }}
+      from verified agencies
+    </p>
+    {% if selected.q or selected.kind or selected.wilaya or selected.max_price %}
+      <a href="{% url 'search' %}" class="text-sm font-medium text-slate-500 hover:text-brand-700">
+        Clear all filters
+      </a>
+    {% endif %}
   </div>
 
-  <script>
-    // Simple AI search modal toggle
-    document.addEventListener('DOMContentLoaded', function() {
-      const aiTrigger = document.querySelector('.ai-search-trigger');
-      const modal = document.getElementById('ai-search-modal');
-      const closeBtn = modal ? modal.querySelector('.close-modal') : null;
-      const queryInput = document.getElementById('ai-query');
-      
-      if (!aiTrigger || !modal) return;
-      
-      // Open modal
-      aiTrigger.addEventListener('click', function() {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        if (queryInput) queryInput.focus();
-      });
-      
-      // Close on close button
-      if (closeBtn) {
-        closeBtn.addEventListener('click', function() {
-          modal.classList.add('hidden');
-          modal.classList.remove('flex');
-        });
-      }
-      
-      // Close on overlay click
-      modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-          modal.classList.add('hidden');
-          modal.classList.remove('flex');
-        }
-      });
-      
-      // Escape key to close
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-          modal.classList.add('hidden');
-          modal.classList.remove('flex');
-        }
-      });
-    });
-  </script>
+  {% if active_filters %}
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <span class="text-xs font-medium text-slate-500">Filtered by</span>
+      {% for label in active_filters %}
+        <span class="filter-chip">{{ label }}</span>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {% for offer in offers %}
+      {% include "pages/_offer_card.html" %}
+    {% empty %}
+      <div class="empty-state col-span-full">
+        <span class="empty-state-icon" aria-hidden="true">✈</span>
+        <h2 class="mt-3 text-base font-semibold text-slate-900">No trips match these filters</h2>
+        <p class="mx-auto mt-1 max-w-md text-sm text-slate-500">
+          Try a wider budget, another departure wilaya, or ask Rihlati in plain language.
+        </p>
+        <a href="{% url 'discover' %}" class="btn btn-primary mt-4">Ask Rihlati</a>
+      </div>
+    {% endfor %}
+  </div>
 {% endblock %}

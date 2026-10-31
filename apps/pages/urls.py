@@ -6,6 +6,9 @@ from apps.pages import views
 urlpatterns = [
     # --- traveler ---------------------------------------------------------
     path("", views.search, name="search"),
+    # The chat is its own page, not a modal over the filters: one input, a few
+    # suggestions, and results that stay out of the middle of the page.
+    path("discover/", views.discover, name="discover"),
     # Public on purpose: the preview's most honest page is the one that says
     # what is not built yet.
     path("roadmap/", views.roadmap, name="roadmap"),

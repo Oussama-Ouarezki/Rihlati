@@ -40,6 +40,9 @@ PHOTOS = {
     "tunis": "https://images.unsplash.com/photo-1548574505-5e239809ee19?w=800&q=70",
     "visa": "https://images.unsplash.com/photo-1569154941061-e231b4725ef1?w=800&q=70",
     "hajj": "https://images.unsplash.com/photo-1519817650390-64a93db51149?w=800&q=70",
+    "marrakech": "https://images.unsplash.com/photo-1597212618440-806262de4f6b?w=800&q=70",
+    "djerba": "https://images.unsplash.com/photo-1603565816030-6b389eeb23cb?w=800&q=70",
+    "paris": "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=70",
 }
 
 # Programmes are data, not logic: one list per offer, keyed by its English
@@ -178,6 +181,76 @@ PROGRAMMES = {
         (5, "09:00", "Departure for Madinah", MilestoneKind.TRANSPORT, CheckpointType.MANDATORY),
         (7, "10:00", "Ziyara of the holy sites", MilestoneKind.ZIYARA, CheckpointType.OPTIONAL),
         (10, "14:00", "Return flight Jeddah — Oran", MilestoneKind.FLIGHT, CheckpointType.NONE),
+    ],
+    "Omra Chaabane — 12 days": [
+        (0, "05:30", "Meeting at Algiers airport", MilestoneKind.MEETING, CheckpointType.MANDATORY),
+        (0, "08:00", "Flight Algiers — Jeddah", MilestoneKind.FLIGHT, CheckpointType.NONE),
+        (0, "17:00", "Hotel check-in in Makkah", MilestoneKind.HOTEL, CheckpointType.NONE),
+        (1, "04:00", "Umrah — Tawaf and Sa'i", MilestoneKind.RITUAL, CheckpointType.OPTIONAL),
+        (6, "08:00", "Departure for Madinah", MilestoneKind.TRANSPORT, CheckpointType.MANDATORY),
+        (7, "10:00", "Ziyara of the holy sites", MilestoneKind.ZIYARA, CheckpointType.OPTIONAL),
+        (11, "15:00", "Return flight Jeddah — Algiers", MilestoneKind.FLIGHT, CheckpointType.NONE),
+    ],
+    "Omra express — 10 days": [
+        (0, "04:30", "Meeting at Oran airport", MilestoneKind.MEETING, CheckpointType.MANDATORY),
+        (0, "07:00", "Flight Oran — Jeddah", MilestoneKind.FLIGHT, CheckpointType.NONE),
+        (0, "16:00", "Hotel check-in in Makkah", MilestoneKind.HOTEL, CheckpointType.NONE),
+        (1, "04:30", "Umrah — Tawaf and Sa'i", MilestoneKind.RITUAL, CheckpointType.OPTIONAL),
+        (5, "08:00", "Departure for Madinah", MilestoneKind.TRANSPORT, CheckpointType.MANDATORY),
+        (9, "13:00", "Return flight Jeddah — Oran", MilestoneKind.FLIGHT, CheckpointType.NONE),
+    ],
+    "Hajj 2027 — 20 days": [
+        (0, "05:00", "Meeting at Algiers airport", MilestoneKind.MEETING, CheckpointType.MANDATORY),
+        (0, "08:00", "Flight Algiers — Jeddah", MilestoneKind.FLIGHT, CheckpointType.NONE),
+        (0, "18:00", "Hotel check-in in Makkah", MilestoneKind.HOTEL, CheckpointType.NONE),
+        (2, "04:00", "Hajj — Ihram and Tawaf", MilestoneKind.RITUAL, CheckpointType.OPTIONAL),
+        (3, "06:00", "Day in Mina", MilestoneKind.RITUAL, CheckpointType.MANDATORY),
+        (8, "09:00", "Departure for Madinah", MilestoneKind.TRANSPORT, CheckpointType.MANDATORY),
+        (12, "10:00", "Ziyara of the holy sites", MilestoneKind.ZIYARA, CheckpointType.OPTIONAL),
+        (19, "14:00", "Return flight Jeddah — Algiers", MilestoneKind.FLIGHT, CheckpointType.NONE),
+    ],
+    "Marrakech — 6 nights": [
+        (0, "06:00", "Meeting at Oran airport", MilestoneKind.MEETING, CheckpointType.MANDATORY),
+        (0, "09:00", "Flight Oran — Marrakech", MilestoneKind.FLIGHT, CheckpointType.NONE),
+        (0, "15:00", "Riad check-in and free evening", MilestoneKind.HOTEL, CheckpointType.NONE),
+        (1, "09:00", "Guided tour of the medina", MilestoneKind.OTHER, CheckpointType.OPTIONAL),
+        (
+            3,
+            "08:00",
+            "Day trip to the Atlas mountains",
+            MilestoneKind.OTHER,
+            CheckpointType.OPTIONAL,
+        ),
+        (6, "11:00", "Return flight Marrakech — Oran", MilestoneKind.FLIGHT, CheckpointType.NONE),
+    ],
+    "Djerba — 7 nights all inclusive": [
+        (0, "06:00", "Meeting at Algiers airport", MilestoneKind.MEETING, CheckpointType.MANDATORY),
+        (0, "09:00", "Flight Algiers — Djerba", MilestoneKind.FLIGHT, CheckpointType.NONE),
+        (0, "14:00", "Beach hotel check-in", MilestoneKind.HOTEL, CheckpointType.NONE),
+        (1, "10:00", "Breakfast and beach day", MilestoneKind.MEAL, CheckpointType.OPTIONAL),
+        (3, "09:00", "Houmt Souk market visit", MilestoneKind.OTHER, CheckpointType.OPTIONAL),
+        (5, "10:00", "Free day and water sports", MilestoneKind.FREE_TIME, CheckpointType.OPTIONAL),
+        (7, "12:00", "Return flight Djerba — Algiers", MilestoneKind.FLIGHT, CheckpointType.NONE),
+    ],
+    "France visa assistance": [
+        (
+            0,
+            "09:00",
+            "File review and first contact",
+            MilestoneKind.MEETING,
+            CheckpointType.MANDATORY,
+        ),
+        (1, "10:00", "Documents checklist", MilestoneKind.OTHER, CheckpointType.NONE),
+        (3, "14:00", "Complete file check", MilestoneKind.OTHER, CheckpointType.OPTIONAL),
+        (5, "09:00", "Visa appointment booking", MilestoneKind.OTHER, CheckpointType.MANDATORY),
+        (
+            10,
+            "08:00",
+            "Submission at the consulate",
+            MilestoneKind.MEETING,
+            CheckpointType.MANDATORY,
+        ),
+        (14, "10:00", "Application follow-up", MilestoneKind.OTHER, CheckpointType.OPTIONAL),
     ],
 }
 
@@ -397,11 +470,212 @@ class Command(BaseCommand):
             status=Offer.PUBLISHED,
         )
 
+        # --- the wider catalogue -------------------------------------------
+        # These are the listings the discovery chat has to choose between. One
+        # offer per common request (Omra, Hajj, beach, city break, visa) and a
+        # second departure city for Omra, so "from Oran" and "cheaper" produce
+        # different answers instead of the same singleton.
+        omra_chaabane = Offer.objects.create(
+            agency=alger,
+            title_fr="Omra Chaabane — 12 days",
+            cover_image_url=PHOTOS["omra"],
+            title_ar="عمرة شعبان — ١٢ يوم",
+            kind=Offer.OMRA,
+            description=(
+                "Twelve-day Omra with seven nights in Makkah and three in Madinah, "
+                "four-star hotels within walking distance of the sanctuaries. Visa, "
+                "flight and transfers included."
+            ),
+            price_centimes=38_500_000,
+            departure_date=date.today() + timedelta(days=45),
+            return_date=date.today() + timedelta(days=57),
+            departure_wilaya_code="16",
+            destination_country="Saudi Arabia",
+            destination_city="Makkah",
+            seats_total=40,
+            seats_left=18,
+            attributes={
+                "visa_included": True,
+                "flight_included": True,
+                "transport_included": True,
+                "hotel_stars": 4,
+                "nights_makkah": 7,
+                "nights_madinah": 3,
+                "meal_plan": "Half board",
+                "room_type": "Double room",
+                "ziyarat_included": True,
+            },
+            status=Offer.PUBLISHED,
+        )
+        omra_express = Offer.objects.create(
+            agency=oran,
+            title_fr="Omra express — 10 days",
+            cover_image_url=PHOTOS["omra"],
+            title_ar="عمرة سريعة — ١٠ أيام",
+            kind=Offer.OMRA,
+            description=(
+                "A shorter Omra from Oran for travellers with limited leave: six nights "
+                "in Makkah, three in Madinah, visa and return flight included."
+            ),
+            price_centimes=34_000_000,
+            departure_date=date.today() + timedelta(days=30),
+            return_date=date.today() + timedelta(days=40),
+            departure_wilaya_code="31",
+            destination_country="Saudi Arabia",
+            destination_city="Makkah",
+            seats_total=35,
+            seats_left=9,
+            attributes={
+                "visa_included": True,
+                "flight_included": True,
+                "transport_included": True,
+                "hotel_stars": 3,
+                "nights_makkah": 6,
+                "nights_madinah": 3,
+                "meal_plan": "Breakfast",
+                "room_type": "Triple room",
+                "ziyarat_included": True,
+            },
+            status=Offer.PUBLISHED,
+        )
+        hajj_long = Offer.objects.create(
+            agency=alger,
+            title_fr="Hajj 2027 — 20 days",
+            cover_image_url=PHOTOS["hajj"],
+            title_ar="حج ٢٠٢٧ — ٢٠ يوم",
+            kind=Offer.HAJJ,
+            description=(
+                "Twenty-day Hajj package with full guidance, Mina tents, Makkah and "
+                "Madinah hotels, visa, flights and all transfers included."
+            ),
+            price_centimes=95_000_000,
+            departure_date=date.today() + timedelta(days=280),
+            return_date=date.today() + timedelta(days=300),
+            departure_wilaya_code="16",
+            destination_country="Saudi Arabia",
+            destination_city="Makkah",
+            seats_total=25,
+            seats_left=14,
+            attributes={
+                "visa_included": True,
+                "flight_included": True,
+                "transport_included": True,
+                "hotel_stars": 4,
+                "nights_makkah": 12,
+                "nights_madinah": 6,
+                "meal_plan": "Full board",
+                "room_type": "Quad room",
+                "ziyarat_included": True,
+            },
+            status=Offer.PUBLISHED,
+        )
+        marrakech = Offer.objects.create(
+            agency=oran,
+            title_fr="Marrakech — 6 nights",
+            cover_image_url=PHOTOS["marrakech"],
+            title_ar="مراكش — ٦ ليالٍ",
+            kind=Offer.TRIP,
+            description=(
+                "Six nights in a traditional riad in the medina, with a guided tour, "
+                "a day in the Atlas mountains and return flights from Oran."
+            ),
+            price_centimes=11_200_000,
+            departure_date=date.today() + timedelta(days=25),
+            return_date=date.today() + timedelta(days=31),
+            departure_wilaya_code="31",
+            destination_country="Morocco",
+            destination_city="Marrakech",
+            seats_total=20,
+            seats_left=11,
+            attributes={
+                "visa_included": False,
+                "flight_included": True,
+                "transport_included": True,
+                "hotel_stars": 4,
+                "nights": 6,
+                "meal_plan": "Breakfast",
+                "room_type": "Double room",
+                "beachfront": False,
+                "excursions_included": True,
+            },
+            status=Offer.PUBLISHED,
+        )
+        djerba = Offer.objects.create(
+            agency=alger,
+            title_fr="Djerba — 7 nights all inclusive",
+            cover_image_url=PHOTOS["djerba"],
+            title_ar="جربة — ٧ ليالٍ شاملة",
+            kind=Offer.TRIP,
+            description=(
+                "Seven nights all inclusive in a beachfront hotel in Djerba, with return "
+                "flights from Algiers, transfers and meals included."
+            ),
+            price_centimes=9_800_000,
+            departure_date=date.today() + timedelta(days=18),
+            return_date=date.today() + timedelta(days=25),
+            departure_wilaya_code="16",
+            destination_country="Tunisia",
+            destination_city="Djerba",
+            seats_total=40,
+            seats_left=22,
+            attributes={
+                "visa_included": False,
+                "flight_included": True,
+                "transport_included": True,
+                "hotel_stars": 4,
+                "nights": 7,
+                "meal_plan": "All inclusive",
+                "room_type": "Double room",
+                "beachfront": True,
+                "excursions_included": False,
+            },
+            status=Offer.PUBLISHED,
+        )
+        france_visa = Offer.objects.create(
+            agency=oran,
+            title_fr="France visa assistance",
+            cover_image_url=PHOTOS["paris"],
+            title_ar="مساعدة في تأشيرة فرنسا",
+            kind=Offer.VISA,
+            description=(
+                "France Schengen visa support from Oran: document checklist, file review, "
+                "appointment booking and travel insurance."
+            ),
+            price_centimes=1_800_000,
+            departure_date=date.today() + timedelta(days=10),
+            departure_wilaya_code="31",
+            destination_country="France",
+            destination_city="Paris",
+            seats_total=80,
+            seats_left=64,
+            attributes={
+                "visa_type": "Schengen short stay",
+                "processing_days": 15,
+                "appointment_included": True,
+                "insurance_included": True,
+            },
+            status=Offer.PUBLISHED,
+        )
+
+        catalogue = [
+            omra,
+            istanbul,
+            hajj,
+            tunis,
+            visa,
+            omra_chaabane,
+            omra_express,
+            hajj_long,
+            marrakech,
+            djerba,
+            france_visa,
+        ]
+
         # --- a programme for every listing, not just the Omra one ----------
         # A listing without an itinerary is the empty-page problem this seed
         # exists to prevent: the Trip Programme page, the public "you are here"
         # marker and the quality score all read these rows.
-        for offer in (omra, istanbul, tunis, visa, hajj):
+        for offer in catalogue:
             for order, (day, hour, title, kind, checkpoint) in enumerate(
                 PROGRAMMES[offer.title_fr]
             ):
