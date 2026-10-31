@@ -45,14 +45,14 @@ cp .env.example .env          # then fill in DJANGO_SECRET_KEY
 .venv/bin/python manage.py runserver
 ```
 
-No `DATABASE_URL` means SQLite (`preview.sqlite3`), which is the point: clone and run. CI and
-production set it to Postgres. Nothing in the code branches on which one you are using.
+> [!info] No `DATABASE_URL` needed locally
+> Without `DATABASE_URL`, SQLite (`preview.sqlite3`) is used. CI and production set it to Postgres.
+> Nothing in the code branches on which one you are using.
 
-> **After pulling new code, re-run those last two lines.** A `preview.sqlite3` left at an older
-> schema does not fail loudly — the home page 500s on a missing column, and rows created before
-> a field existed keep its default, so agencies seeded before verification existed read as
-> unverified and the whole marketplace renders empty. `manage.py migrate && manage.py
-> seed_preview` is the fix, and it is the first thing to try when "nothing works".
+> **[warning] After pulling new code**
+> Re-run `manage.py migrate && manage.py seed_preview`. A stale `preview.sqlite3` causes 500s
+> (missing columns) or empty marketplace (old defaults persist). This is the first thing to try
+> when "nothing works".
 
 The CSS is generated, so after editing a template:
 
@@ -71,27 +71,6 @@ For the admin surface (agency verification), make yourself a superuser:
 ```bash
 .venv/bin/python manage.py createsuperuser
 ```
-
-### Pages
-
-| Path | What |
-|---|---|
-| `/` | Search: type, city, budget, sort |
-| `/offers/<id>/` | Offer detail, programme, reviews, inquiry form — no account needed |
-| `/mon-voyage/<code>/` | The traveler's live trip view, opened from a link, no login |
-| `/l/<code>/` | Tracked-link redirect (campaign attribution) |
-| `/login/` · `/logout/` | Agency login |
-| `/dashboard/` | Redirects to your agency |
-| `/a/<agency_id>/offers/` | Your offers, quota, lead counts; create, edit, publish, archive |
-| `/a/<agency_id>/leads/` | CRM inbox: filter, status, notes, tags, quality labels |
-| `/a/<agency_id>/links/` | Tracked links |
-| `/a/<agency_id>/settings/` | Agency profile, submit for verification |
-| `/verification/` | Staff-only review queue |
-| `/admin/` | Django admin |
-
-To *see* tenant isolation: log in as `karim`, take an offer id belonging to Dar Essalam from
-the search page, and paste it into your own agency's edit URL. 404 — not 403, because a
-missing row and a forbidden row must look identical.
 
 ### API
 
@@ -112,7 +91,25 @@ separate decision.
 That OpenAPI document is this repo's answer to a shared types package: a client generates its
 types from it rather than hand-writing a second copy of every interface, which then drifts.
 
-## Checks
+> [!tip] `/api/docs` is the single most useful URL in the project
+> It is not hand-written documentation — it is generated from the same Pydantic schemas the
+> handlers validate against, so it cannot drift from the code. Every endpoint, every field,
+> every response shape, and a "Try it out" button. When [[API Endpoints]] and `/api/docs`
+> disagree, `/api/docs` is right and the note is a bug.
+
+### See tenant isolation with your own eyes (90 seconds)
+
+This takes ninety seconds and teaches more than the note does:
+
+1. Log in as `karim` (Wahran Tours, Oran).
+2. Go to `/` and open an offer belonging to **Dar Essalam**. Copy its id out of the URL.
+3. Paste that id into *your own* agency's edit URL: `/a/<your-agency-id>/offers/<their-offer-id>/`.
+4. **404.** Not "forbidden" — as far as that page is concerned, the row does not exist.
+
+That is [[Multi-Tenancy]], and step 4 is the whole point: the row was never in the queryset,
+so there was nothing to reject.
+
+### Checks
 
 ```bash
 ./scripts/check.sh
@@ -120,7 +117,25 @@ types from it rather than hand-writing a second copy of every interface, which t
 
 Lint, format, Django system checks, missing-migration check, then the test suite —
 **218 tests**, all green. CI runs this exact script rather than a parallel list of steps,
-because two lists drift and the one that drifts is always the local one.
+because two lists drift and the one that drifts is always the local one — at which point
+"it passed on my machine" stops meaning anything.
+
+It runs five things, in this order:
+
+| Step | Catches |
+|---|---|
+| `ruff check .` | lint: unused imports, shadowed names, long lines |
+| `ruff format --check .` | formatting, so diffs are about behaviour |
+| `manage.py check` | a misconfigured setting, a broken URLconf, a model that won't make a table |
+| `manage.py makemigrations --check --dry-run` | **a model change with no migration** |
+| `manage.py test` | the suite — including the tenant-isolation tests |
+
+That fourth step deserves a sentence. A model change with no migration works perfectly on
+your laptop, because your database already has the column. It fails on a fresh deploy, which
+is the worst possible place to find out. See [[Migrations]].
+
+For the browser-level tests — the five pages that matter, clicked through like a user — see
+[[End-to-End Testing]].
 
 ## How the seven rules land
 
