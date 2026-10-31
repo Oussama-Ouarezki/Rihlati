@@ -69,6 +69,10 @@ def search(request):
     """A plain GET form, no JavaScript. Filters land in the URL, so a search is
     shareable and back-button friendly — someone pastes a link into a family
     WhatsApp group and everyone opens the same results."""
+    
+    # Determine search mode: keyword or NLP
+    mode = request.GET.get("mode", "keyword")
+    
     raw = {
         "kind": request.GET.get("kind") or None,
         "wilaya": request.GET.get("wilaya") or None,
@@ -78,17 +82,60 @@ def search(request):
     max_price = request.GET.get("max_price") or ""
     if max_price.isdigit():
         raw["price_max"] = int(max_price) * 100
-
+    
     try:
-        # The same schema the JSON API validates against. A bad `sort=` in the
-        # URL bar therefore fails the same way in both places, instead of one
-        # of them quietly accepting it and ordering by a column of its choice.
         filters = OfferFilters(**{k: v for k, v in raw.items() if v is not None})
     except Exception:
         filters = OfferFilters()
-
-    offers = apply_filters(Offer.publicly_visible().select_related("agency"), filters)
-
+    
+    # Apply NLP parsing if in nlp mode
+    if mode == "nlp" and raw.get("q"):
+        from apps.common.nlp_parser import parse_query
+        parsed = parse_query(raw["q"])
+        
+        # Build NLP filter parameters
+        nlp_kind = parsed["kind"] if parsed["kind"] else None
+        nlp_budget_max = parsed["budget_max"]  # already in centimes
+        nlp_destination = parsed["destination"]
+        nlp_inclusions = parsed["inclusions"]
+        
+        # Create a temporary filters object with NLP params
+        from ninja import Field
+        from apps.offers.api import Strict as OfferStrict
+        
+        class NlpFilters(Strict):
+            kind: str | None = None if not nlp_kind else (nlp_kind[0] if isinstance(nlp_kind, list) else nlp_kind)
+            wilaya: str | None = None
+            q: str | None = None
+            price_min: int | None = None
+            price_max: int | None = None
+            date_from: date | None = None
+            date_to: date | None = None
+            sort: str = "departure"
+            limit: int = 20
+            offset: int = 0
+            nlp_kind: list[str] | None = nlp_kind
+            nlp_budget_max: int | None = nlp_budget_max
+            nlp_duration_days: int | None = parsed["duration_days"]
+            nlp_destination: str | None = nlp_destination
+            nlp_inclusions: dict[str, bool] | None = nlp_inclusions
+        
+        nlp_filters = NlpFilters(
+            kind=nlp_kind[0] if (isinstance(nlp_kind, list) and nlp_kind) else None,
+            nlp_kind=nlp_kind,
+            nlp_budget_max=parsed["budget_max"],
+            nlp_destination=parsed["destination"],
+            nlp_inclusions=parsed["inclusions"],
+        )
+        
+        # Apply NLP filters using apply_filters
+        offers = apply_filters(
+            Offer.publicly_visible().select_related("agency"), 
+            nlp_filters
+        )
+    else:
+        offers = apply_filters(Offer.publicly_visible().select_related("agency"), filters)
+    
     wilayas = (
         Offer.publicly_visible()
         .exclude(departure_wilaya_code="")
@@ -96,6 +143,17 @@ def search(request):
         .distinct()
         .order_by("departure_wilaya_code")
     )
+    
+    # Build selected context for template
+    selected = {
+        "kind": filters.kind or "",
+        "wilaya": filters.wilaya or "",
+        "q": filters.q or "",
+        "sort": filters.sort,
+        "max_price": max_price,
+        "mode": mode,
+    }
+    
     return render(
         request,
         "pages/search.html",
@@ -103,13 +161,7 @@ def search(request):
             "offers": offers[:50],
             "wilayas": [(code, WILAYA_NAMES_FR.get(code, code)) for code in wilayas],
             "kinds": Offer.KINDS,
-            "selected": {
-                "kind": filters.kind or "",
-                "wilaya": filters.wilaya or "",
-                "q": filters.q or "",
-                "sort": filters.sort,
-                "max_price": max_price,
-            },
+            "selected": selected,
             "total": offers.count(),
         },
     )

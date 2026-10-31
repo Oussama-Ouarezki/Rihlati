@@ -23,7 +23,9 @@
 
   {% comment %} A plain GET form, no JavaScript. Filters land in the URL, so a search is
      shareable and back-button friendly. {% endcomment %}
-  <form method="get" class="card relative z-10 -mt-3 grid gap-3 p-4 sm:-mt-3 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_1fr_8rem_auto] lg:items-end">
+  <form method="get" action="{% url 'search' %}" class="card relative z-10 -mt-3 grid gap-3 p-4 sm:-mt-3 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_1fr_8rem_auto] lg:items-end">
+    <input type="hidden" name="mode" id="search-mode-header" value="{{ selected.mode|default:'keyword'}}">
+
     <div>
       <label for="filter-kind" class="field-label">Trip type</label>
       <select id="filter-kind" name="kind" class="field-input">
@@ -49,7 +51,7 @@
 
     <div>
       <label for="filter-q" class="field-label">Search</label>
-      <input id="filter-q" type="search" name="q" value="{{ selected.q }}"
+      <input id="filter-q" type="search" name="q" value="{{ selected.q|default:'' }}"
              placeholder="Omra, Istanbul, visa…" class="field-input">
       <button type="button" class="btn btn-sm text-slate-400 ml-2 ai-search-trigger"
               data-query="">
@@ -78,28 +80,55 @@
     </div>
   </form>
 
-  {% comment %}
-  AI Search modal HTML — hidden by default, shown when the AI trigger button is clicked.
-  Uses the same form method (GET) so results are URL-shareable and back-button friendly.
-  {% endcomment %}
+  {% comment %} NLP Search modal - appears when AI trigger is clicked {% endcomment %}
   <div id="ai-search-modal" class="fixed inset-0 hidden items-center justify-center bg-black/60 z-50 modal-content">
     <div class="bg-white rounded-lg p-6 max-w-lg w-full mx-4 shadow-2xl">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-xl font-bold">AI Search</h3>
         <button class="close-modal text-slate-500 hover:text-slate-700" aria-label="Close search modal">×</button>
       </div>
-      <form method="get" class="space-y-4">
-        <div>
-          <label class="field-label">Describe your trip</label>
-          <input type="text" id="ai-query" name="nlp_query" placeholder="e.g. Omra with visa included under 400 DZD"
-                 class="field-input w-full py-2 px-3 rounded border focus:outline-none focus:border-brand-600"
-                 value="{{ nlp_query|default:'' }}">
+
+      {% comment %} Determine if we're in NLP mode from the header search bar {% endcomment %}
+      {% if selected.mode == 'nlp' %}
+        <input type="hidden" name="mode" value="nlp">
+        <div class="mb-4 p-3 bg-slate-50 rounded-lg">
+          <p class="text-sm text-slate-600">Mode: Natural Language Search</p>
+          <p class="text-xs text-slate-500 mt-1">Your query was parsed as natural language. You can modify it below.</p>
         </div>
+      {% endif %}
+
+      <form method="get" class="space-y-4">
+        {% if selected.mode == 'nlp' %}
+          {% comment %} NLP mode: show parsed intent and allow editing {% endcomment %}
+          <div>
+            <label class="field-label">Natural language query</label>
+            <input type="text" id="ai-query" name="q"
+                   placeholder="e.g. Omra with visa included under 400 DZD"
+                   class="field-input w-full py-2 px-3 rounded border focus:outline-none focus:border-brand-600"
+                   value="{{ selected.q|default:'' }}">
+            <p class="text-xs text-slate-500 mt-1 break-all" id="parsed-intent">
+              {% if selected.q %}
+                {% load i18n %}
+                {% if kind%}Kind: {{ kind }}{% endif %}{% if budget_max %}, Budget: {{ budget_max|default:"" }}{% endif %}{% if destination %}, Destination: {{ destination }}{% endif %}
+              {% endif %}
+            </p>
+          </div>
+        {% else %}
+          <div>
+            <label class="field-label">Describe your trip</label>
+            <input type="text" id="ai-query" name="nlp_query"
+                   placeholder="e.g. Omra with visa included under 400 DZD"
+                   class="field-input w-full py-2 px-3 rounded border focus:outline-none focus:border-brand-600"
+                   value="{{ nlp_query|default:'' }}">
+          </div>
+        {% endif %}
+
         <div>
           <label class="field-label">Max budget (DZD)</label>
           <input type="number" id="ai-budget" name="max_price" min="0" step="1000"
                  value="{{ selected.max_price|default:'' }}" class="field-input w-full py-2 px-3 rounded border">
         </div>
+
         <div>
           <label class="field-label">Sort</label>
           <select id="ai-sort" name="sort" class="field-input">
@@ -109,8 +138,9 @@
             <option value="quality" {% if selected.sort == 'quality' %}selected{% endif %}>Best described</option>
           </select>
         </div>
+
         <div class="flex gap-2">
-          <button type="submit" class="btn btn-primary flex-1">Search with AI</button>
+          <button type="submit" class="btn btn-primary flex-1">Search</button>
           <button type="button" class="btn btn-outline close-modal flex-1">Cancel</button>
         </div>
       </form>
@@ -162,3 +192,4 @@
       });
     });
   </script>
+{% endblock %}

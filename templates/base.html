@@ -29,10 +29,25 @@
         <span class="hidden rounded-full bg-sand-100 px-2.5 py-1 text-[11px] font-medium text-sand-700 sm:inline">
           Django preview
         </span>
-        <a href="{% url 'search' %}"
-           class="hidden text-sm font-medium text-slate-600 hover:text-brand-700 sm:inline">
-          Explore trips
-        </a>
+
+        {% comment %} Search bar: persistent across all pages, keyword or NLP mode. {% endcomment %}
+        <form method="get" action="{% url 'search' %}" class="relative w-64 sm:w-auto">
+          <input type="hidden" name="mode" id="search-mode" value="keyword">
+          <input type="text"
+                 name="q"
+                 id="search-input"
+                 placeholder="Search offers… (kind, wilaya, budget, or ask in natural language)"
+                 class="search-input block w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent">
+          <button type="button"
+                  class="search-mode-toggle absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-brand-600"
+                  aria-label="Switch to NLP mode">
+            🔍
+          </button>
+          <button type="submit"
+                  class="search-submit absolute right-2 top-1/2 -translate-y-1/2 btn btn-sm btn-brand">
+            Go
+          </button>
+        </form>
 
         {% if user.is_authenticated %}
           <a href="{% url 'dashboard' %}" class="btn btn-primary btn-sm">Agency console</a>
@@ -67,7 +82,11 @@
         {% else %}
           <a href="{% url 'login' %}" class="btn btn-primary btn-sm">Agency login</a>
         {% endif %}
-      </div>
+
+        <a href="{% url 'search' %}"
+           class="hidden text-sm font-medium text-slate-600 hover:text-brand-700 sm:inline">
+          Explore trips
+        </a>
     </div>
   </header>
 
@@ -118,5 +137,48 @@
   {% comment %} Draws the trip programme's road through its pins. Decoration only:
      with this script off the programme still renders, over a straight band. {% endcomment %}
   <script src="{% static 'road.js' %}" defer></script>
+  <script>
+    // Search bar mode switching (Keyword / NLP)
+    document.addEventListener('DOMContentLoaded', function() {
+      const modeToggle = document.querySelector('.search-mode-toggle');
+      const searchInput = document.getElementById('search-input');
+      const searchForm = document.querySelector('form[action*="search"]');
+      const modeInput = document.getElementById('search-mode');
+      
+      if (!modeToggle || !searchInput || !searchForm) return;
+      
+      let isNLP = false;
+      
+      // Toggle mode
+      modeToggle.addEventListener('click', function() {
+        isNLP = !isNLP;
+        modeInput.value = isNLP ? 'nlp' : 'keyword';
+        
+        if (isNLP) {
+          searchInput.placeholder = 'Describe your trip in natural language…\n(e.g. "Omra with visa included under 400 DZD" or "organized trip to Oran under 30000 DZD")';
+          searchInput.classList.add('nlp-mode');
+          this.setAttribute('aria-label', 'Switch to keyword mode');
+          this.textContent = '✒️';
+        } else {
+          searchInput.placeholder = 'Search offers… (kind, wilaya, budget, or ask in natural language)';
+          searchInput.classList.remove('nlp-mode');
+          this.setAttribute('aria-label', 'Switch to NLP mode');
+          this.textContent = '🔍';
+        }
+      });
+      
+      // Update placeholder on load based on existing mode param
+      const urlParams = new URLSearchParams(window.location.search);
+      const initialMode = urlParams.get('mode');
+      if (initialMode === 'nlp') {
+        isNLP = true;
+        modeInput.value = 'nlp';
+        searchInput.placeholder = 'Describe your trip in natural language…\n(e.g. "Omra with visa included under 400 DZD")';
+        searchInput.classList.add('nlp-mode');
+        modeToggle.setAttribute('aria-label', 'Switch to keyword mode');
+        modeToggle.textContent = '✒️';
+      }
+    });
+  </script>
 </body>
 </html>
