@@ -95,37 +95,28 @@ def search(request):
         
         # Build NLP filter parameters
         nlp_kind = parsed["kind"] if parsed["kind"] else None
-        nlp_budget_max = parsed["budget_max"]  # already in centimes
+        nlp_budget_max = parsed["budget_max"]  # already in centimes per nlp_parser docs
         nlp_destination = parsed["destination"]
         nlp_inclusions = parsed["inclusions"]
         
-        # Create a temporary filters object with NLP params
-        from ninja import Field
-        from apps.offers.api import Strict as OfferStrict
-        
-        class NlpFilters(Strict):
-            kind: str | None = None if not nlp_kind else (nlp_kind[0] if isinstance(nlp_kind, list) else nlp_kind)
-            wilaya: str | None = None
-            q: str | None = None
-            price_min: int | None = None
-            price_max: int | None = None
-            date_from: date | None = None
-            date_to: date | None = None
-            sort: str = "departure"
-            limit: int = 20
-            offset: int = 0
-            nlp_kind: list[str] | None = nlp_kind
-            nlp_budget_max: int | None = nlp_budget_max
-            nlp_duration_days: int | None = parsed["duration_days"]
-            nlp_destination: str | None = nlp_destination
-            nlp_inclusions: dict[str, bool] | None = nlp_inclusions
-        
-        nlp_filters = NlpFilters(
+        # Create filter dict with NLP parameters
+        # reuse OfferFilters and override NLP params
+        nlp_filters = OfferFilters(
             kind=nlp_kind[0] if (isinstance(nlp_kind, list) and nlp_kind) else None,
+            wilaya=None,
+            q=None,
+            price_min=None,
+            price_max=None,
+            date_from=None,
+            date_to=None,
+            sort="departure",
+            limit=20,
+            offset=0,
             nlp_kind=nlp_kind,
-            nlp_budget_max=parsed["budget_max"],
-            nlp_destination=parsed["destination"],
-            nlp_inclusions=parsed["inclusions"],
+            nlp_budget_max=nlp_budget_max,
+            nlp_duration_days=parsed["duration_days"],
+            nlp_destination=nlp_destination,
+            nlp_inclusions=nlp_inclusions,
         )
         
         # Apply NLP filters using apply_filters
