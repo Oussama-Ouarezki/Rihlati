@@ -1,5 +1,5 @@
 # Rihlati — Django
-
+https://youtu.be/IKNXL0jojDU
 Two-sided marketplace + CRM for Algerian travel agencies. Travelers discover verified agency
 offers (Omra, Hajj, organized trips, visa help); agencies receive qualified leads and work them
 in a built-in CRM.
